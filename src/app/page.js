@@ -121,13 +121,19 @@ const QuotationPage=()=>{
   const [manualHeader,setManualHeader]=useState({project:"",salesArea:"",gender:"",updated:new Date().toISOString().split("T")[0]});
   const fileRef=useRef(null);
 
+  const loadPdfJs=()=>new Promise((resolve,reject)=>{
+    if(window.pdfjsLib)return resolve(window.pdfjsLib);
+    const script=document.createElement('script');
+    script.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    script.onload=()=>{window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';resolve(window.pdfjsLib)};
+    script.onerror=reject;document.head.appendChild(script);
+  });
+
   const handlePDFUpload=async(e)=>{
     const file=e.target.files?.[0];if(!file)return;
     setParsing(true);setParseError(null);
     try{
-      // Extract text from PDF on client side using pdf.js
-      const pdfjsLib=await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.mjs');
-      pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.mjs';
+      const pdfjsLib=await loadPdfJs();
       const arrayBuffer=await file.arrayBuffer();
       const pdf=await pdfjsLib.getDocument({data:arrayBuffer}).promise;
       const lines=[];
@@ -142,7 +148,6 @@ const QuotationPage=()=>{
         }
         if(line)lines.push(line);
       }
-      // Send extracted lines to server for structured parsing
       const res=await fetch("/api/parse-quotation",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({lines})});
       if(!res.ok){const err=await res.json();throw new Error(err.error||"Parse failed");}
       const data=await res.json();setParsedData(data);
