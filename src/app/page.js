@@ -124,12 +124,29 @@ const QuotationPage=()=>{
   const handlePDFUpload=async(e)=>{
     const file=e.target.files?.[0];if(!file)return;
     setParsing(true);setParseError(null);
-    const formData=new FormData();formData.append("file",file);
     try{
-      const res=await fetch("/api/parse-quotation",{method:"POST",body:formData});
+      // Extract text from PDF on client side using pdf.js
+      const pdfjsLib=await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.mjs');
+      pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.mjs';
+      const arrayBuffer=await file.arrayBuffer();
+      const pdf=await pdfjsLib.getDocument({data:arrayBuffer}).promise;
+      const lines=[];
+      for(let i=1;i<=pdf.numPages;i++){
+        const page=await pdf.getPage(i);
+        const content=await page.getTextContent();
+        let lastY=null;let line='';
+        for(const item of content.items){
+          if(lastY!==null&&Math.abs(item.transform[5]-lastY)>2){lines.push(line);line='';}
+          line+=(line?' ':'')+item.str;
+          lastY=item.transform[5];
+        }
+        if(line)lines.push(line);
+      }
+      // Send extracted lines to server for structured parsing
+      const res=await fetch("/api/parse-quotation",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({lines})});
       if(!res.ok){const err=await res.json();throw new Error(err.error||"Parse failed");}
       const data=await res.json();setParsedData(data);
-      setManualHeader({project:data.project||"",salesArea:data.salesArea||"",gender:data.gender||"",updated:data.updated||new Date().toISOString().split("T")[0]});
+      setManualHeader({project:data.project||"",salesArea:String(data.salesArea||""),gender:data.gender||"",updated:data.updated||new Date().toISOString().split("T")[0]});
     }catch(err){setParseError(err.message);}finally{setParsing(false);}
   };
 
