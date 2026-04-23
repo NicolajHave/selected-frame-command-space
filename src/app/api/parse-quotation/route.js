@@ -11,18 +11,31 @@ function parseEuro(raw) {
   return parseFloat(s) || 0;
 }
 
+// Extract ALL euro amounts from a line - handles BOTH formats:
+// Format A (pdftotext): "€ 3 7.225" - € before number
+// Format B (pdf.js):    "37.225€"   - € after number
 function extractEuros(line) {
   const matches = [];
-  const regex = /€\s*([\d\s.,]+|-)/g;
+  // Format A: € followed by digits/spaces/dots/commas
+  const regexA = /€\s*([\d\s.,]+)/g;
   let m;
-  while ((m = regex.exec(line)) !== null) matches.push(parseEuro(m[1]));
+  while ((m = regexA.exec(line)) !== null) {
+    const val = parseEuro(m[1]);
+    if (val > 0) matches.push(val);
+  }
+  // Format B: digits/dots before € sign (pdf.js format)
+  const regexB = /([\d.,]+)\s*€/g;
+  while ((m = regexB.exec(line)) !== null) {
+    const val = parseEuro(m[1]);
+    if (val > 0 && !matches.includes(val)) matches.push(val);
+  }
   return matches;
 }
 
 export async function POST(request) {
   try {
     const { lines } = await request.json();
-    if (!lines?.length) return Response.json({ error: 'No lines provided' }, { status: 400 });
+    if (!lines?.length) return Response.json({ error: 'No lines' }, { status: 400 });
 
     const fullText = lines.join('\n');
     const get = (p) => { const m = fullText.match(p); return m ? m[1].trim() : null; };
@@ -39,88 +52,85 @@ export async function POST(request) {
 
     const categories = [];
     let currentCat = null;
-    const catHeaders = ['INVENTORY', 'SELECTED DELIVERIES', 'SPECIFIC PROJECT COST', 'SPECIAL ELEMENTS', 'FITTING ROOMS', 'FLOOR', 'AV & HIFI', 'CONSTRUCTION'];
-    let grandTotal = 0;
-    let grandSqmPrice = 0;
+    const catNames = ['INVENTORY', 'SELECTED DELIVERIES', 'SPECIFIC PROJECT COST', 'SPECIAL ELEMENTS', 'FITTING ROOMS', 'FLOOR', 'AV & HIFI', 'CONSTRUCTION'];
+    let grandTotal = 0, grandSqm = 0;
     let inSummary = false;
 
     for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
+      const t = line.trim();
+      if (!t) continue;
+      const upper = t.toUpperCase();
 
-      // Skip the Project cost overview section entirely - we get totals from category Total lines
-      if (trimmed.includes('Project cost overview')) { inSummary = true; continue; }
-      if (trimmed.startsWith('Conditions:')) break;
+      // Summary section
+      if (t.includes('Project cost overview') || upper.includes('HEADERS')) { inSummary = true; continue; }
+      if (t.startsWith('Conditions:') || t.startsWith('Payment terms')) break;
 
-      // Only grab the grand total from summary
       if (inSummary) {
-        if (trimmed.toUpperCase().includes('TOTAL EXCL')) {
-          const euros = extractEuros(trimmed);
-          grandTotal = euros[0] || 0;
-          grandSqmPrice = euros[1] || 0;
+        if (upper.includes('TOTAL EXCL') || upper.startsWith('TOTAL EXCL')) {
+          const euros = extractEuros(t);
+          if (euros.length >= 1) grandTotal = euros[0];
+          if (euros.length >= 2) grandSqm = euros[1];
         }
         continue;
       }
 
-      // Category header
-      const upperTrimmed = trimmed.toUpperCase();
-      const matchedCat = catHeaders.find(h => upperTrimmed === h || (upperTrimmed.startsWith(h) && !trimmed.includes('€')));
-      if (matchedCat && !trimmed.includes('€')) {
+      // Category header (line that is just the category name, no €)
+      const matchedCat = catNames.find(c => upper === c || upper.startsWith(c));
+      if (matchedCat && !t.includes('€')) {
         currentCat = { name: matchedCat, items: [], total: 0 };
         categories.push(currentCat);
         continue;
       }
 
-      if (trimmed.includes('Product Name') || trimmed.includes('item no.') || trimmed.includes('Headers')) continue;
+      if (upper.includes('PRODUCT NAME') || upper.includes('ITEM NO.')) continue;
       if (!currentCat) continue;
 
-      // CRITICAL: Total row for current category - this is the source of truth
-      if (/^Total\b/i.test(trimmed) && trimmed.includes('€')) {
-        const euros = extractEuros(trimmed);
-        if (euros.length > 0) {
-          currentCat.total = euros[euros.length - 1]; // Last € amount is the total
-        }
+      // Total line for category
+      // Handles both "Total € 37.225" and "Total37.225€"
+      if (/^Total/i.test(t)) {
+        const euros = extractEuros(t);
+        if (euros.length > 0) currentCat.total = euros[euros.length - 1];
         continue;
       }
 
-      if (trimmed.startsWith('Transportation & Accomodation') || trimmed.startsWith('Freight & Logistic')) continue;
+      if (t.startsWith('Transportation & Accomodation') || t.startsWith('Freight & Logistic')) continue;
 
-      // Item line
-      if (trimmed.includes('€')) {
-        const euros = extractEuros(trimmed);
+      // Item line - must contain € or a number followed by €
+      if (t.includes('€')) {
+        const euros = extractEuros(t);
         const totalPrice = euros.length >= 1 ? euros[euros.length - 1] : 0;
         const unitPrice = euros.length >= 2 ? euros[euros.length - 2] : 0;
-        const qtyMatch = trimmed.match(/(\d+)\s*(pcs|Hours|hours|pack|Pack|km)/);
+        const qtyMatch = t.match(/(\d+)\s*(pcs|Hours|hours|pack|Pack|km)/);
         const qty = qtyMatch ? parseInt(qtyMatch[1]) : 0;
-        let name = qtyMatch ? trimmed.substring(0, trimmed.indexOf(qtyMatch[0])).trim() : trimmed.split('€')[0].trim();
+        let name = qtyMatch ? t.substring(0, t.indexOf(qtyMatch[0])).trim() : t.split('€')[0].split(/\d+[.,]\d+€/).at(0)?.trim() || '';
         name = name.replace(/^[\d._-]+[A-Za-z]?\s+/, '').trim();
-        if (!name) name = trimmed.split('€')[0].replace(/^[\d._-]+[A-Za-z]?\s+/, '').trim();
-        if (name && name.length > 1) currentCat.items.push({ name, qty, unitPrice, totalPrice });
+        if (!name || name.length < 2) {
+          // Try extracting before first number
+          const beforeNum = t.match(/^([\d._-]+[A-Za-z]?\s+)?(.+?)(?=\d+\s*(?:pcs|Hours|pack|km)|[\d.,]+\s*€)/);
+          name = beforeNum ? beforeNum[2].trim() : t.substring(0, 40).trim();
+        }
+        if (name && name.length > 1 && (totalPrice > 0 || qty > 0)) {
+          currentCat.items.push({ name, qty, unitPrice, totalPrice });
+        }
       }
     }
 
-    // Build summary using category Total lines as source of truth
-    const getCatTotal = (name) => categories.find(c => c.name === name)?.total || 0;
+    // Build summary from category Total lines
+    const getCat = (n) => categories.find(c => c.name === n)?.total || 0;
     const summary = {
-      inventory: getCatTotal('INVENTORY'),
-      selectedDeliveries: getCatTotal('SELECTED DELIVERIES'),
-      specificProjectCost: getCatTotal('SPECIFIC PROJECT COST'),
-      specialElements: getCatTotal('SPECIAL ELEMENTS'),
-      fittingRooms: getCatTotal('FITTING ROOMS'),
-      floor: getCatTotal('FLOOR'),
-      avHifi: getCatTotal('AV & HIFI'),
-      construction: getCatTotal('CONSTRUCTION'),
+      inventory: getCat('INVENTORY'),
+      selectedDeliveries: getCat('SELECTED DELIVERIES'),
+      specificProjectCost: getCat('SPECIFIC PROJECT COST'),
+      specialElements: getCat('SPECIAL ELEMENTS'),
+      fittingRooms: getCat('FITTING ROOMS'),
+      floor: getCat('FLOOR'),
+      avHifi: getCat('AV & HIFI'),
+      construction: getCat('CONSTRUCTION'),
       totalExclVat: grandTotal || 0,
-      sqmPrice: grandSqmPrice || 0,
+      sqmPrice: grandSqm || 0,
     };
-
-    // If grand total wasn't found in summary, calculate from categories
-    if (!summary.totalExclVat) {
-      summary.totalExclVat = summary.inventory + summary.selectedDeliveries + summary.specificProjectCost + summary.specialElements + summary.fittingRooms + summary.floor + summary.avHifi + summary.construction;
-    }
-    if (!summary.sqmPrice && header.salesArea > 0 && summary.totalExclVat > 0) {
-      summary.sqmPrice = Math.round(summary.totalExclVat / header.salesArea);
-    }
+    if (!summary.totalExclVat) summary.totalExclVat = Object.values(summary).reduce((a, b) => a + b, 0) - summary.sqmPrice;
+    if (!summary.sqmPrice && header.salesArea > 0 && summary.totalExclVat > 0) summary.sqmPrice = Math.round(summary.totalExclVat / header.salesArea);
 
     return Response.json({ ...header, categories, summary });
   } catch (error) {
