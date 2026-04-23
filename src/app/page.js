@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 const C={steel:"#8A8D8F",steelL:"#B8BBBE",steelD:"#5C5F61",oak:"#C4944A",sage:"#B5C4B1",surface:"#F5F4F1",surfaceD:"#ECEAE5",white:"#FFFFFF",black:"#1A1A1A",text:"#2C2C2C",textS:"#6B6B6B",accent:"#3D6B4F",warn:"#D4A843",danger:"#C75B4A",success:"#5A8F6A",go:"#4A7C5C",review:"#C4944A",nogo:"#C75B4A"};
 
@@ -17,19 +17,14 @@ const PHASES=[
   {num:10,name:"Close & Learning",color:"#AA62E3",desc:"ROI follow-up. Performance deck. Brand space maintenance planning. Annual review."},
 ];
 
-// Fallback data
 const FALLBACK_PROJECTS=[
-  {gid:"1213743319652053",name:"Salling / Kultorvet, København K",type:"Shop-in-Shop – New Opening",sex:null,phaseNum:0,region:null,dueOn:null,completed:false,completedAt:null,notes:"",url:"https://app.asana.com/1/8322162975325/project/1209245583930344/task/1213743319652053",created:"2026-03-20"},
-  {gid:"1213466587160571",name:"Lui & Lei, Gronau",type:"Shop-in-Shop – New Opening",sex:null,phaseNum:0,region:null,dueOn:"2026-08-10",completed:false,completedAt:null,notes:"",url:"https://app.asana.com/1/8322162975325/project/1209245583930344/task/1213466587160571",created:"2026-02-27"},
-  {gid:"1213241885300894",name:"Magasin, Lyngby",type:"Soft Shop Solution",sex:"WOMENS",phaseNum:0,region:"NORTH",dueOn:"2026-04-09",completed:false,completedAt:null,notes:"",url:"https://app.asana.com/1/8322162975325/project/1209245583930344/task/1213241885300894",created:"2026-02-12"},
-  {gid:"1213181226270095",name:"Hagemeyer, Minden",type:"Shop-in-Shop – New Opening",sex:"MENS",phaseNum:0,region:null,dueOn:"2026-02-26",completed:false,completedAt:null,notes:"",url:"https://app.asana.com/1/8322162975325/project/1209245583930344/task/1213181226270095",created:"2026-02-09"},
-  {gid:"1209270075048030",name:"Heppel, Rosenheim",type:"SIS",sex:"MENS",phaseNum:11,region:null,dueOn:"2025-03-21",completed:true,completedAt:"2025-03-25",notes:"",url:"https://app.asana.com/1/8322162975325/project/1209245583930344/task/1209270075048030",created:"2025-01-29"},
-  {gid:"1209245583945517",name:"Printemps, Vélizy",type:"SIS",sex:"MENS",phaseNum:11,region:null,dueOn:"2025-06-08",completed:true,completedAt:"2025-09-18",notes:"",url:"https://app.asana.com/1/8322162975325/project/1209245583930344/task/1209245583945517",created:"2025-01-29"},
-  {gid:"1209318634125698",name:"Salling, Aarhus",type:"SIS",sex:"MENS",phaseNum:11,region:null,dueOn:"2025-03-05",completed:true,completedAt:"2025-03-14",notes:"",url:"https://app.asana.com/1/8322162975325/project/1209245583930344/task/1209318634125698",created:"2025-02-05"},
+  {gid:"1",name:"Salling / Kultorvet, København K",type:"Shop-in-Shop – New Opening",sex:null,phaseNum:0,region:null,dueOn:null,completed:false,completedAt:null,notes:"",url:"#",created:"2026-03-20"},
+  {gid:"2",name:"Magasin, Lyngby",type:"Soft Shop Solution",sex:"WOMENS",phaseNum:0,region:"NORTH",dueOn:"2026-04-09",completed:false,completedAt:null,notes:"",url:"#",created:"2026-02-12"},
+  {gid:"3",name:"Heppel, Rosenheim",type:"SIS",sex:"MENS",phaseNum:11,region:null,dueOn:"2025-03-21",completed:true,completedAt:"2025-03-25",notes:"",url:"#",created:"2025-01-29"},
 ];
 
 const fmtDate=(d)=>d?new Date(d).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):"—";
-const fmtEur=(n)=>typeof n==="number"?`€${n.toLocaleString("de-DE",{minimumFractionDigits:0,maximumFractionDigits:0})}`:"—";
+const fmtEur=(n)=>typeof n==="number"&&n>0?`€${n.toLocaleString("de-DE",{minimumFractionDigits:0,maximumFractionDigits:0})}`:"—";
 const SIS_IMAGES=["/images/kh_selected_sis_018_web.jpg","/images/kh_selected_sis_075_web.jpg","/images/kh_selected_sis_023_web.jpg","/images/kh_selected_sis_032_web.jpg","/images/kh_selected_sis_048_web.jpg","/images/kh_selected_sis_029_web.jpg"];
 
 const Badge=({children,variant="default"})=>{const s={default:{bg:C.surfaceD,c:C.text},success:{bg:"#E8F2EA",c:C.go},warning:{bg:"#FDF3E0",c:C.warn},danger:{bg:"#FDEAE6",c:C.danger},phase0:{bg:"#E8F5E0",c:"#4A8C2A"}}[variant]||{bg:C.surfaceD,c:C.text};return<span style={{display:"inline-block",padding:"3px 10px",borderRadius:4,fontSize:11,fontWeight:600,letterSpacing:".5px",textTransform:"uppercase",background:s.bg,color:s.c}}>{children}</span>};
@@ -43,15 +38,9 @@ const OverviewPage=({projects,setPage,setDetail})=>{
   return(<div>
     <div style={{background:`linear-gradient(135deg,${C.black} 0%,${C.steelD} 100%)`,borderRadius:12,padding:"40px 44px",marginBottom:32,position:"relative",overflow:"hidden"}}>
       <div style={{position:"absolute",top:0,right:0,width:"50%",height:"100%",backgroundImage:"url(/images/kh_selected_sis_075_web.jpg)",backgroundSize:"cover",backgroundPosition:"center",opacity:.15}}/>
-      <div style={{position:"relative",zIndex:1}}>
-        <img src="/images/logo.png" alt="Selected Frame" style={{height:32,marginBottom:12,filter:"invert(1)"}}/>
-        <div style={{fontSize:11,color:C.steelL,fontWeight:600,letterSpacing:"2px",textTransform:"uppercase",marginTop:8}}>[ Command Space ]</div>
-        <p style={{fontSize:14,color:C.steelL,margin:"8px 0 0"}}>A frame for the business we share</p>
-      </div>
+      <div style={{position:"relative",zIndex:1}}><img src="/images/logo.png" alt="Selected Frame" style={{height:32,marginBottom:12,filter:"invert(1)"}}/><div style={{fontSize:11,color:C.steelL,fontWeight:600,letterSpacing:"2px",textTransform:"uppercase",marginTop:8}}>[ Command Space ]</div><p style={{fontSize:14,color:C.steelL,margin:"8px 0 0"}}>A frame for the business we share</p></div>
     </div>
-    <div style={{display:"flex",gap:16,marginBottom:32,flexWrap:"wrap"}}>
-      <KPI label="Active Projects" value={active.length} sub="In progress"/><KPI label="Completed" value={completed.length} sub="Installed"/><KPI label="Total" value={projects.length} sub="All Brand Spaces"/>
-    </div>
+    <div style={{display:"flex",gap:16,marginBottom:32,flexWrap:"wrap"}}><KPI label="Active Projects" value={active.length} sub="In progress"/><KPI label="Completed" value={completed.length} sub="Installed"/><KPI label="Total" value={projects.length} sub="All Brand Spaces"/></div>
     <Title sub="Selected Frame in action">The Concept</Title>
     <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:32}}>{SIS_IMAGES.slice(0,3).map((src,i)=><div key={i} style={{borderRadius:8,overflow:"hidden",height:180}}><img src={src} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div>)}</div>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginBottom:32}}>
@@ -97,9 +86,9 @@ const ADD_ONS=[
   {id:"screen75",name:'75" Screen (wall module mounted)',price:1351,cat:"AV & HiFi"},
   {id:"carpet",name:"Carpet",price:469,cat:"Floor"},
   {id:"leather_tray",name:"Leather Tray",price:282,cat:"Accessories"},
-  {id:"shirt_hangers_100",name:"Shirt Hangers (100 pcs)",price:138,cat:"Selected Deliveries"},
-  {id:"clip_hangers_100",name:"Clip Hangers (100 pcs)",price:166,cat:"Selected Deliveries"},
-  {id:"coat_hangers_50",name:"Coat Hangers (50 pcs)",price:177,cat:"Selected Deliveries"},
+  {id:"shirt_hangers_50",name:"Shirt Hangers (50 pcs)",price:69,cat:"Selected Deliveries"},
+  {id:"clip_hangers_50",name:"Clip Hangers (50 pcs)",price:83,cat:"Selected Deliveries"},
+  {id:"coat_hangers_25",name:"Coat Hangers (25 pcs)",price:89,cat:"Selected Deliveries"},
 ];
 
 const QuotationPage=()=>{
@@ -108,16 +97,18 @@ const QuotationPage=()=>{
   const [parseError,setParseError]=useState(null);
   const [addOns,setAddOns]=useState({});
   const [customItems,setCustomItems]=useState([]);
-  const [manualHeader,setManualHeader]=useState({project:"",salesArea:"",gender:"",updated:new Date().toISOString().split("T")[0]});
+  const [header,setHeader]=useState({project:"",salesArea:"",gender:"",updated:""});
+  // Editable category totals
+  const [catOverrides,setCatOverrides]=useState({inventory:"",selectedDeliveries:"",specificProjectCost:""});
   const fileRef=useRef(null);
 
-  const loadPdfJs=()=>new Promise((resolve,reject)=>{
+  const loadPdfJs=useCallback(()=>new Promise((resolve,reject)=>{
     if(window.pdfjsLib)return resolve(window.pdfjsLib);
     const script=document.createElement('script');
     script.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
     script.onload=()=>{window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';resolve(window.pdfjsLib)};
     script.onerror=reject;document.head.appendChild(script);
-  });
+  }),[]);
 
   const handlePDFUpload=async(e)=>{
     const file=e.target.files?.[0];if(!file)return;
@@ -140,8 +131,10 @@ const QuotationPage=()=>{
       }
       const res=await fetch("/api/parse-quotation",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({lines})});
       if(!res.ok){const err=await res.json();throw new Error(err.error||"Parse failed");}
-      const data=await res.json();setParsedData(data);
-      setManualHeader({project:data.project||"",salesArea:String(data.salesArea||""),gender:data.gender||"",updated:data.updated||new Date().toISOString().split("T")[0]});
+      const data=await res.json();
+      setParsedData(data);
+      setHeader({project:data.project||"",salesArea:String(data.salesArea||""),gender:data.gender||"",updated:data.updated||""});
+      setCatOverrides({inventory:String(data.summary?.inventory||""),selectedDeliveries:String(data.summary?.selectedDeliveries||""),specificProjectCost:String(data.summary?.specificProjectCost||"")});
     }catch(err){setParseError(err.message);}finally{setParsing(false);}
   };
 
@@ -151,50 +144,72 @@ const QuotationPage=()=>{
   const updateCustom=(i,field,val)=>setCustomItems(prev=>prev.map((item,idx)=>idx===i?{...item,[field]:val}:item));
   const removeCustom=(i)=>setCustomItems(prev=>prev.filter((_,idx)=>idx!==i));
 
-  const supplierTotal=parsedData?.summary?.totalExclVat||0;
+  const invTotal=parseFloat(catOverrides.inventory)||0;
+  const delTotal=parseFloat(catOverrides.selectedDeliveries)||0;
+  const projTotal=parseFloat(catOverrides.specificProjectCost)||0;
+  const supplierTotal=invTotal+delTotal+projTotal;
   const addOnTotal=Object.entries(addOns).reduce((sum,[id,{qty}])=>{const item=ADD_ONS.find(a=>a.id===id);return sum+(item?item.price*qty:0);},0);
   const customTotal=customItems.reduce((sum,item)=>sum+(parseFloat(item.price)||0)*(parseInt(item.qty)||1),0);
   const grandTotal=supplierTotal+addOnTotal+customTotal;
-  const sqm=parseFloat(manualHeader.salesArea)||parsedData?.salesArea||0;
+  const sqm=parseFloat(header.salesArea)||0;
 
-  const IF=({label,value,onChange,type="text"})=><div style={{marginBottom:12}}><label style={{display:"block",fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>{label}</label><input type={type} value={value} onChange={e=>onChange(e.target.value)} style={{width:"100%",padding:"8px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,outline:"none"}}/></div>;
+  const PlusMinus=({value,onChange})=>(
+    <div style={{display:"flex",alignItems:"center",gap:0}}>
+      <button onClick={()=>onChange(Math.max(1,value-1))} style={{width:28,height:28,border:`1px solid ${C.surfaceD}`,borderRadius:"4px 0 0 4px",background:C.surface,cursor:"pointer",fontSize:14,color:C.text,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+      <input type="text" inputMode="numeric" value={value} onChange={e=>onChange(parseInt(e.target.value)||1)} style={{width:40,height:28,border:`1px solid ${C.surfaceD}`,borderLeft:"none",borderRight:"none",fontSize:13,textAlign:"center",outline:"none",fontFamily:"'DM Mono',monospace"}}/>
+      <button onClick={()=>onChange(value+1)} style={{width:28,height:28,border:`1px solid ${C.surfaceD}`,borderRadius:"0 4px 4px 0",background:C.surface,cursor:"pointer",fontSize:14,color:C.text,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+    </div>
+  );
+
+  const EditableTotal=({label,field})=>(
+    <div style={{padding:"10px 14px",background:C.surface,borderRadius:6}}>
+      <div style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>{label}</div>
+      <div style={{display:"flex",alignItems:"center",gap:6}}>
+        <span style={{fontSize:16,color:C.text,fontFamily:"'Cormorant Garamond',serif"}}>€</span>
+        <input type="text" inputMode="decimal" value={catOverrides[field]} onChange={e=>setCatOverrides(prev=>({...prev,[field]:e.target.value}))} style={{fontSize:18,fontWeight:300,color:C.text,fontFamily:"'DM Mono',monospace",border:"none",borderBottom:`1px solid ${C.surfaceD}`,background:"transparent",outline:"none",width:100,padding:"2px 0"}}/>
+      </div>
+    </div>
+  );
 
   return(<div>
     <Title sub="Upload a supplier quotation PDF to generate a branded project quotation">Quotation Builder</Title>
-
-    {/* Upload area */}
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginBottom:32}}>
       <div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>
         <div style={{fontSize:14,fontWeight:600,color:C.text,marginBottom:16}}>1. Upload Supplier Quotation</div>
-        <div style={{border:`2px dashed ${parsing?C.oak:C.surfaceD}`,borderRadius:8,padding:32,textAlign:"center",cursor:"pointer",transition:"all .2s",background:parsing?C.oak+"06":"transparent"}} onClick={()=>fileRef.current?.click()} onDragOver={e=>{e.preventDefault();e.currentTarget.style.borderColor=C.oak}} onDragLeave={e=>e.currentTarget.style.borderColor=C.surfaceD} onDrop={e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f){const dt=new DataTransfer();dt.items.add(f);fileRef.current.files=dt.files;handlePDFUpload({target:{files:[f]}})}}}>
+        <div style={{border:`2px dashed ${parsing?C.oak:C.surfaceD}`,borderRadius:8,padding:32,textAlign:"center",cursor:"pointer",background:parsing?C.oak+"06":"transparent"}} onClick={()=>fileRef.current?.click()}>
           <input ref={fileRef} type="file" accept=".pdf" style={{display:"none"}} onChange={handlePDFUpload}/>
-          {parsing?<div><div style={{fontSize:24,marginBottom:8}}>⏳</div><div style={{fontSize:13,color:C.oak,fontWeight:500}}>Parsing PDF with AI…</div></div>:
-          parsedData?<div><div style={{fontSize:24,marginBottom:8}}>✅</div><div style={{fontSize:13,color:C.success,fontWeight:500}}>{parsedData.project}</div><div style={{fontSize:11,color:C.textS,marginTop:4}}>{fmtEur(parsedData.summary?.totalExclVat)} · {parsedData.salesArea} m² · Click to upload new</div></div>:
-          <div><div style={{fontSize:24,marginBottom:8}}>📄</div><div style={{fontSize:13,color:C.textS}}>Drop PDF here or click to upload</div><div style={{fontSize:11,color:C.textS,marginTop:4}}>Supports &elements quotation format</div></div>}
+          {parsing?<div><div style={{fontSize:24,marginBottom:8}}>⏳</div><div style={{fontSize:13,color:C.oak,fontWeight:500}}>Parsing PDF…</div></div>:
+          parsedData?<div><div style={{fontSize:24,marginBottom:8}}>✅</div><div style={{fontSize:13,color:C.success,fontWeight:500}}>{parsedData.project}</div><div style={{fontSize:11,color:C.textS,marginTop:4}}>{fmtEur(supplierTotal)} · {parsedData.salesArea} m² · Click to upload new</div></div>:
+          <div><div style={{fontSize:24,marginBottom:8}}>📄</div><div style={{fontSize:13,color:C.textS}}>Drop PDF here or click to upload</div></div>}
         </div>
         {parseError&&<div style={{marginTop:12,padding:"10px 14px",background:"#FDEAE6",borderRadius:6,fontSize:12,color:C.danger}}>{parseError}</div>}
       </div>
-
       <div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>
         <div style={{fontSize:14,fontWeight:600,color:C.text,marginBottom:16}}>Project Details</div>
-        <IF label="Project Name" value={manualHeader.project} onChange={v=>setManualHeader({...manualHeader,project:v})}/>
-        <IF label="Sales Area (m²)" value={manualHeader.salesArea} onChange={v=>setManualHeader({...manualHeader,salesArea:v})}/>
-        <IF label="Gender" value={manualHeader.gender} onChange={v=>setManualHeader({...manualHeader,gender:v})}/>
-        <IF label="Date" value={manualHeader.updated} onChange={v=>setManualHeader({...manualHeader,updated:v})} type="date"/>
+        <div style={{marginBottom:12}}><label style={{display:"block",fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>Project Name</label><input value={header.project} onChange={e=>setHeader(h=>({...h,project:e.target.value}))} style={{width:"100%",padding:"8px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,outline:"none"}}/></div>
+        <div style={{marginBottom:12}}><label style={{display:"block",fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>Sales Area (m²)</label><input value={header.salesArea} onChange={e=>setHeader(h=>({...h,salesArea:e.target.value}))} style={{width:"100%",padding:"8px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,outline:"none"}}/></div>
+        <div style={{marginBottom:12}}><label style={{display:"block",fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>Gender</label><select value={header.gender} onChange={e=>setHeader(h=>({...h,gender:e.target.value}))} style={{width:"100%",padding:"8px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,background:C.white}}><option value="">Choose Gender</option><option value="Unisex">Unisex</option><option value="Womens">Womens</option><option value="Mens">Mens</option></select></div>
+        <div style={{marginBottom:12}}><label style={{display:"block",fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>Date</label><input type="date" value={header.updated} onChange={e=>setHeader(h=>({...h,updated:e.target.value}))} style={{width:"100%",padding:"8px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,outline:"none"}}/></div>
       </div>
     </div>
 
-    {/* Parsed summary */}
+    {/* Parsed summary with editable totals */}
     {parsedData&&<div style={{marginBottom:32}}>
-      <Title sub="From supplier quotation">Parsed Cost Breakdown</Title>
+      <Title sub="From supplier quotation – click amounts to edit">Cost Breakdown</Title>
       <div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,marginBottom:16}}>
-          {[["Inventory",parsedData.summary?.inventory],["Selected Deliveries",parsedData.summary?.selectedDeliveries],["Project Costs",parsedData.summary?.specificProjectCost],["Special Elements",parsedData.summary?.specialElements],["Fitting Rooms",parsedData.summary?.fittingRooms],["Supplier Total",parsedData.summary?.totalExclVat]].map(([l,v])=>v?<div key={l} style={{padding:"10px 14px",background:C.surface,borderRadius:6}}><div style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px"}}>{l}</div><div style={{fontSize:18,fontWeight:300,color:C.text,fontFamily:"'Cormorant Garamond',serif"}}>{fmtEur(v)}</div></div>:null)}
+          <EditableTotal label="Inventory" field="inventory"/>
+          <EditableTotal label="Selected Deliveries" field="selectedDeliveries"/>
+          <EditableTotal label="Specific Project Cost" field="specificProjectCost"/>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+          <div style={{padding:"10px 14px",background:C.black,borderRadius:6,color:C.white}}><div style={{fontSize:11,fontWeight:600,color:C.steelL,textTransform:"uppercase",letterSpacing:".5px"}}>Supplier Total</div><div style={{fontSize:20,fontWeight:300,fontFamily:"'Cormorant Garamond',serif"}}>{fmtEur(supplierTotal)}</div></div>
+          {sqm>0&&<div style={{padding:"10px 14px",background:C.surface,borderRadius:6}}><div style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px"}}>SQM Price</div><div style={{fontSize:20,fontWeight:300,color:C.text,fontFamily:"'Cormorant Garamond',serif"}}>{fmtEur(sqm>0?Math.round(supplierTotal/sqm):0)} / m²</div></div>}
         </div>
         {parsedData.categories?.map(cat=>(
           <details key={cat.name} style={{marginBottom:8}}>
             <summary style={{cursor:"pointer",fontSize:13,fontWeight:600,color:C.text,padding:"8px 0",borderBottom:`1px solid ${C.surfaceD}`}}>{cat.name} — {fmtEur(cat.total)} ({cat.items?.length||0} items)</summary>
-            <div style={{padding:"8px 0"}}>{cat.items?.map((item,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"3px 0",color:C.textS}}><span>{item.qty}× {item.name}</span><span style={{fontWeight:500,color:C.text}}>{fmtEur(item.totalPrice)}</span></div>)}</div>
+            <div style={{padding:"8px 0"}}>{cat.items?.map((item,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"3px 0",color:C.textS}}><span>{item.qty>0?`${item.qty}× `:""}{item.name}</span><span style={{fontWeight:500,color:C.text}}>{fmtEur(item.totalPrice)}</span></div>)}</div>
           </details>
         ))}
       </div>
@@ -203,20 +218,19 @@ const QuotationPage=()=>{
     {/* Add-ons */}
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginBottom:32}}>
       <div>
-        <Title sub="Select optional elements to add to the quotation">2. Add-ons</Title>
+        <Title sub="Select optional elements">2. Add-ons</Title>
         <div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>
           {ADD_ONS.map(item=>{const sel=addOns[item.id];return(
-            <div key={item.id} style={{display:"flex",alignItems:"center",gap:12,padding:"8px 0",borderBottom:`1px solid ${C.surfaceD}`}}>
+            <div key={item.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:`1px solid ${C.surfaceD}`}}>
               <input type="checkbox" checked={!!sel} onChange={()=>toggleAddOn(item.id)} style={{width:16,height:16,accentColor:C.oak}}/>
               <div style={{flex:1}}><div style={{fontSize:13,color:C.text}}>{item.name}</div><div style={{fontSize:11,color:C.textS}}>{item.cat} · {fmtEur(item.price)} / pc</div></div>
-              {sel&&<input type="text" inputMode="numeric" value={sel.qty} onChange={e=>setAddOnQty(item.id,e.target.value)} style={{width:48,padding:"4px 8px",borderRadius:4,border:`1px solid ${C.surfaceD}`,fontSize:13,textAlign:"center"}}/>}
+              {sel&&<PlusMinus value={sel.qty} onChange={v=>setAddOnQty(item.id,v)}/>}
               {sel&&<div style={{fontSize:13,fontWeight:600,color:C.text,minWidth:60,textAlign:"right"}}>{fmtEur(item.price*sel.qty)}</div>}
             </div>);})}
         </div>
       </div>
-
       <div>
-        <Title sub="Add any additional costs not covered above">3. Custom Items</Title>
+        <Title sub="Additional costs">3. Custom Items</Title>
         <div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>
           {customItems.map((item,i)=>(
             <div key={i} style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
@@ -228,56 +242,51 @@ const QuotationPage=()=>{
           <button onClick={addCustomItem} style={{width:"100%",padding:"10px",borderRadius:6,border:`1px dashed ${C.surfaceD}`,background:"transparent",cursor:"pointer",fontSize:13,color:C.textS}}>+ Add custom item</button>
         </div>
 
-        {/* Grand total */}
         <div style={{background:C.black,borderRadius:8,padding:24,marginTop:20,color:C.white}}>
           <div style={{fontSize:11,color:C.steelL,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase",marginBottom:12}}>Quotation Summary</div>
-          {supplierTotal>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.1)"}}><span style={{color:C.steelL}}>Supplier (inventory + delivery + project)</span><span style={{fontWeight:500}}>{fmtEur(supplierTotal)}</span></div>}
+          {supplierTotal>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.1)"}}><span style={{color:C.steelL}}>Supplier</span><span style={{fontWeight:500}}>{fmtEur(supplierTotal)}</span></div>}
           {addOnTotal>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.1)"}}><span style={{color:C.steelL}}>Add-ons</span><span style={{fontWeight:500}}>{fmtEur(addOnTotal)}</span></div>}
           {customTotal>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.1)"}}><span style={{color:C.steelL}}>Custom items</span><span style={{fontWeight:500}}>{fmtEur(customTotal)}</span></div>}
           <div style={{display:"flex",justifyContent:"space-between",fontSize:20,paddingTop:12,fontFamily:"'Cormorant Garamond',serif"}}><span>Total excl. VAT</span><span style={{fontWeight:500}}>{fmtEur(grandTotal)}</span></div>
           {sqm>0&&<div style={{fontSize:12,color:C.steelL,marginTop:4,textAlign:"right"}}>{fmtEur(Math.round(grandTotal/sqm))} / m²</div>}
         </div>
 
-        {/* PDF Export */}
         {grandTotal>0&&<button onClick={()=>{
           const addOnItems=Object.entries(addOns).map(([id,{qty}])=>{const a=ADD_ONS.find(x=>x.id===id);return a?{name:a.name,qty,total:a.price*qty}:null}).filter(Boolean);
           const customItemsList=customItems.filter(i=>i.name&&parseFloat(i.price)).map(i=>({name:i.name,qty:parseInt(i.qty)||1,total:(parseFloat(i.price)||0)*(parseInt(i.qty)||1)}));
           const w=window.open('','_blank');
-          w.document.write(`<!DOCTYPE html><html><head><title>Quotation – ${manualHeader.project||'Selected Frame'}</title>
+          w.document.write(`<!DOCTYPE html><html><head><title>Quotation – ${header.project||'Selected Frame'}</title>
           <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
           <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'DM Sans',sans-serif;color:#2C2C2C;padding:40px 60px;max-width:900px;margin:0 auto}
           .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:40px;padding-bottom:24px;border-bottom:2px solid #1A1A1A}
-          .logo{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:300;color:#1A1A1A}.logo span{display:block;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#8A8D8F;font-family:'DM Sans',sans-serif;margin-top:4px}
+          .logo{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:300}.logo span{display:block;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#8A8D8F;font-family:'DM Sans',sans-serif;margin-top:4px}
           .meta{text-align:right;font-size:12px;color:#6B6B6B}.meta strong{color:#2C2C2C;display:block;font-size:14px;margin-bottom:4px}
           h2{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:400;margin:32px 0 16px;padding-bottom:8px;border-bottom:1px solid #ECEAE5}
           table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:24px}th{text-align:left;padding:8px 12px;background:#F5F4F1;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#6B6B6B;border-bottom:1px solid #ECEAE5}
           td{padding:6px 12px;border-bottom:1px solid #F5F4F1}.r{text-align:right}
-          .total-row{background:#1A1A1A;color:#fff;padding:20px 24px;border-radius:8px;margin-top:32px;display:flex;justify-content:space-between;align-items:center}
-          .total-row .label{font-size:14px;color:#B8BBBE}.total-row .amount{font-size:24px;font-family:'Cormorant Garamond',serif;font-weight:300}
+          .total-row{background:#1A1A1A;color:#fff;padding:20px 24px;border-radius:8px;margin-top:32px}.total-label{font-size:14px;color:#B8BBBE}.total-amount{font-size:24px;font-family:'Cormorant Garamond',serif;font-weight:300;text-align:right}
           .sqm{font-size:11px;color:#B8BBBE;text-align:right;margin-top:4px}
           .footer{margin-top:48px;padding-top:20px;border-top:1px solid #ECEAE5;font-size:10px;color:#8A8D8F;display:flex;justify-content:space-between}
           @media print{body{padding:20px 40px}button{display:none!important}}</style></head><body>
-          <div class="header"><div><div class="logo">Selected Frame<span>[ A frame for the business we share ]</span></div></div>
-          <div class="meta"><strong>Quotation</strong>${manualHeader.project||''}<br>${manualHeader.salesArea?manualHeader.salesArea+' m²':''} ${manualHeader.gender?'· '+manualHeader.gender:''}<br>${manualHeader.updated||''}</div></div>
+          <div class="header"><div class="logo">Selected Frame<span>[ A frame for the business we share ]</span></div>
+          <div class="meta"><strong>Quotation</strong>${header.project}<br>${header.salesArea?header.salesArea+' m²':''} ${header.gender?'· '+header.gender:''}<br>${header.updated}</div></div>
           <button onclick="window.print()" style="background:#1A1A1A;color:#fff;border:none;padding:10px 24px;border-radius:6px;font-size:13px;cursor:pointer;margin-bottom:24px;font-family:'DM Sans',sans-serif">Print / Save as PDF</button>
-          ${parsedData?`<h2>Supplier – ${parsedData.supplier||'&elements ApS'}</h2>
+          <h2>Supplier – &elements ApS</h2>
           <table><thead><tr><th>Category</th><th class="r">Amount</th></tr></thead><tbody>
-          ${parsedData.categories?.map(cat=>`<tr><td>${cat.name}</td><td class="r">${fmtEur(cat.total)}</td></tr>`).join('')||''}
+          <tr><td>Inventory</td><td class="r">${fmtEur(invTotal)}</td></tr>
+          <tr><td>Selected Deliveries</td><td class="r">${fmtEur(delTotal)}</td></tr>
+          <tr><td>Specific Project Cost</td><td class="r">${fmtEur(projTotal)}</td></tr>
           <tr style="font-weight:600;border-top:2px solid #ECEAE5"><td>Supplier Total</td><td class="r">${fmtEur(supplierTotal)}</td></tr>
-          </tbody></table>`:''}
+          </tbody></table>
           ${addOnItems.length>0?`<h2>Add-ons</h2><table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Total</th></tr></thead><tbody>
           ${addOnItems.map(a=>`<tr><td>${a.name}</td><td class="r">${a.qty}</td><td class="r">${fmtEur(a.total)}</td></tr>`).join('')}
-          <tr style="font-weight:600;border-top:2px solid #ECEAE5"><td colspan="2">Add-ons Total</td><td class="r">${fmtEur(addOnTotal)}</td></tr>
-          </tbody></table>`:''}
+          <tr style="font-weight:600;border-top:2px solid #ECEAE5"><td colspan="2">Add-ons Total</td><td class="r">${fmtEur(addOnTotal)}</td></tr></tbody></table>`:''}
           ${customItemsList.length>0?`<h2>Additional Items</h2><table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Total</th></tr></thead><tbody>
           ${customItemsList.map(a=>`<tr><td>${a.name}</td><td class="r">${a.qty}</td><td class="r">${fmtEur(a.total)}</td></tr>`).join('')}
-          <tr style="font-weight:600;border-top:2px solid #ECEAE5"><td colspan="2">Additional Total</td><td class="r">${fmtEur(customTotal)}</td></tr>
-          </tbody></table>`:''}
-          <div class="total-row"><div><div class="label">Total excl. VAT</div></div><div class="amount">${fmtEur(grandTotal)}</div></div>
-          ${sqm>0?`<div class="sqm">${fmtEur(Math.round(grandTotal/sqm))} / m²</div>`:''}
-          <div class="footer"><span>Selected Frame · Brand Spaces</span><span>Confidential – for internal use only</span></div>
-          </body></html>`);w.document.close();
-        }} style={{width:"100%",padding:"14px",borderRadius:8,border:"none",background:C.oak,color:C.white,fontSize:14,fontWeight:600,cursor:"pointer",marginTop:16,fontFamily:"'DM Sans',sans-serif"}}>
+          <tr style="font-weight:600;border-top:2px solid #ECEAE5"><td colspan="2">Additional Total</td><td class="r">${fmtEur(customTotal)}</td></tr></tbody></table>`:''}
+          <div class="total-row"><div style="display:flex;justify-content:space-between;align-items:center"><div class="total-label">Total excl. VAT</div><div class="total-amount">${fmtEur(grandTotal)}</div></div>${sqm>0?`<div class="sqm">${fmtEur(Math.round(grandTotal/sqm))} / m²</div>`:''}</div>
+          <div class="footer"><span>Selected Frame · Brand Spaces</span><span>Confidential – for internal use only</span></div></body></html>`);w.document.close();
+        }} style={{width:"100%",padding:"14px",borderRadius:8,border:"none",background:C.oak,color:C.white,fontSize:14,fontWeight:600,cursor:"pointer",marginTop:16}}>
           Export Quotation as PDF →
         </button>}
       </div>
@@ -293,7 +302,7 @@ const ROIPage=()=>{
   let nav;if(model==="uplift"){if(inp.valueView==="Wholesale")nav=incWS-annOpex;else if(inp.valueView==="Gross Profit")nav=(incWS*(n("gm")/100))-annOpex;else nav=(incWS*(n("ebit")/100))-annOpex;}else{const tWS=n("markup")>0?n("retail")/n("markup"):0;if(inp.valueView==="Wholesale")nav=tWS-annOpex;else if(inp.valueView==="Gross Profit")nav=(tWS*(n("gm")/100))-annOpex;else nav=(tWS*(n("ebit")/100))-annOpex;}
   const pbM=nav>0?(n("capex")/nav)*12:null;const status=!pbM||nav<=0?"NO GO":pbM<=goT?"GO":pbM<=revT?"REVIEW":"NO GO";
   const reason=nav<=0?"Net value ≤ 0":status==="NO GO"?"Payback above threshold":status==="REVIEW"?"Borderline – escalation":"Within policy";
-  const IF=({label,field,suffix,options})=><div style={{marginBottom:14}}><label style={{display:"block",fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>{label}</label>{options?<select value={inp[field]} onChange={e=>setInp({...inp,[field]:e.target.value})} style={{width:"100%",padding:"10px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:14,background:C.white}}>{options.map(o=><option key={o}>{o}</option>)}</select>:<div style={{display:"flex",alignItems:"center",gap:6}}><input type="text" inputMode="decimal" value={inp[field]} onChange={e=>setInp({...inp,[field]:e.target.value})} onFocus={e=>e.target.select()} style={{flex:1,padding:"10px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:14,outline:"none",fontFamily:"'DM Mono',monospace"}}/>{suffix&&<span style={{fontSize:12,color:C.textS,minWidth:28}}>{suffix}</span>}</div>}</div>;
+  const IF=({label,field,suffix,options})=><div style={{marginBottom:14}}><label style={{display:"block",fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>{label}</label>{options?<select value={inp[field]} onChange={e=>setInp(p=>({...p,[field]:e.target.value}))} style={{width:"100%",padding:"10px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:14,background:C.white}}>{options.map(o=><option key={o}>{o}</option>)}</select>:<div style={{display:"flex",alignItems:"center",gap:6}}><input type="text" inputMode="decimal" value={inp[field]} onChange={e=>setInp(p=>({...p,[field]:e.target.value}))} onFocus={e=>e.target.select()} style={{flex:1,padding:"10px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:14,outline:"none",fontFamily:"'DM Mono',monospace"}}/>{suffix&&<span style={{fontSize:12,color:C.textS,minWidth:28}}>{suffix}</span>}</div>}</div>;
   return<div><Title sub="Evaluate SIS investment business cases">ROI Investment Tool</Title>
     <div style={{display:"flex",gap:8,marginBottom:24}}>{[["uplift","Uplift Model","Existing distribution"],["total","Total Payback","New distribution"]].map(([k,l,d])=><div key={k} style={{flex:1,padding:"16px 20px",borderRadius:8,cursor:"pointer",border:`2px solid ${model===k?C.oak:C.surfaceD}`,background:model===k?C.oak+"08":C.white}} onClick={()=>setModel(k)}><div style={{fontSize:14,fontWeight:600,color:C.text}}>{l}</div><div style={{fontSize:11,color:C.textS,marginTop:4}}>{d}</div></div>)}</div>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 280px",gap:24}}>
@@ -305,31 +314,23 @@ const ROIPage=()=>{
     </div></div>;
 };
 
-// ─── FLOW / INSTALLED / STANDARDS / ADMIN ─────────────────
+// ─── OTHER PAGES ──────────────────────────────────────────
 const FlowPage=()=><div><Title sub="Phase 0–10 governance journey">Project Flow</Title><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:32,borderRadius:8,overflow:"hidden"}}><div style={{height:200}}><img src="/images/kh_selected_sis_048_web.jpg" alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div><div style={{height:200}}><img src="/images/kh_selected_sis_023_web.jpg" alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div></div><div style={{position:"relative"}}><div style={{position:"absolute",left:23,top:20,bottom:20,width:2,background:`linear-gradient(to bottom,${C.steelL},${C.accent})`}}/>{PHASES.map(ph=><div key={ph.num} style={{display:"flex",gap:24,marginBottom:16,position:"relative"}}><div style={{width:48,height:48,borderRadius:"50%",background:ph.color,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:16,fontWeight:600,boxShadow:`0 2px 8px ${ph.color}44`,zIndex:1}}>{ph.num}</div><div style={{background:C.white,borderRadius:8,padding:"16px 20px",border:`1px solid ${C.surfaceD}`,flex:1,borderLeft:`4px solid ${ph.color}`}}><div style={{fontSize:11,fontWeight:600,color:ph.color,textTransform:"uppercase",letterSpacing:"1px"}}>Phase {ph.num}</div><div style={{fontSize:18,fontWeight:400,color:C.text,fontFamily:"'Cormorant Garamond',serif"}}>{ph.name}</div><p style={{fontSize:12,color:C.textS,margin:"6px 0 0",lineHeight:1.5}}>{ph.desc}</p></div></div>)}</div></div>;
-
-const InstalledPage=({projects})=>{const completed=projects.filter(p=>p.completed);return<div><Title sub="Completed installations">Installed Base</Title><div style={{display:"flex",gap:16,marginBottom:24}}><KPI label="Installations" value={completed.length}/></div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>{completed.map(p=><div key={p.gid} style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`,borderTop:`4px solid ${C.accent}`}}><div style={{fontSize:16,fontWeight:400,color:C.text,fontFamily:"'Cormorant Garamond',serif",marginBottom:8}}>{p.name}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:12}}>{[["Type",p.type],["Sex",p.sex||"—"],["Completed",fmtDate(p.completedAt)],["Due Was",fmtDate(p.dueOn)]].map(([l,v])=><div key={l}><div style={{color:C.textS,fontSize:10,fontWeight:600,textTransform:"uppercase"}}>{l}</div><div style={{color:C.text,fontWeight:500}}>{v}</div></div>)}</div><a href={p.url} target="_blank" rel="noopener noreferrer" style={{display:"inline-block",marginTop:12,fontSize:11,color:C.oak,textDecoration:"none",fontWeight:500}}>View details →</a></div>)}</div></div>};
-
+const InstalledPage=({projects})=>{const comp=projects.filter(p=>p.completed);return<div><Title sub="Completed installations">Installed Base</Title><div style={{display:"flex",gap:16,marginBottom:24}}><KPI label="Installations" value={comp.length}/></div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>{comp.map(p=><div key={p.gid} style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`,borderTop:`4px solid ${C.accent}`}}><div style={{fontSize:16,fontWeight:400,color:C.text,fontFamily:"'Cormorant Garamond',serif",marginBottom:8}}>{p.name}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:12}}>{[["Type",p.type],["Sex",p.sex||"—"],["Completed",fmtDate(p.completedAt)],["Due Was",fmtDate(p.dueOn)]].map(([l,v])=><div key={l}><div style={{color:C.textS,fontSize:10,fontWeight:600,textTransform:"uppercase"}}>{l}</div><div style={{color:C.text,fontWeight:500}}>{v}</div></div>)}</div><a href={p.url} target="_blank" rel="noopener noreferrer" style={{display:"inline-block",marginTop:12,fontSize:11,color:C.oak,textDecoration:"none",fontWeight:500}}>View details →</a></div>)}</div></div>};
 const StandardsPage=()=><div><Title sub="Concept guidelines">Standards & Knowledge</Title><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:32,borderRadius:8,overflow:"hidden"}}><div style={{height:220}}><img src="/images/kh_selected_sis_032_web.jpg" alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div><div style={{height:220}}><img src="/images/kh_selected_sis_018_web.jpg" alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}>{[{t:"Selected Frame Concept",d:"Flexible, modular, balancing industrial precision with natural warmth.",items:["Steel – Cool, industrial, minimalistic","Colour & shapes – Softness, playfulness","Warm wood – Scandinavian touch"]},{t:"Floor Plan Standards",d:"Standard proposals by size.",items:["25 m² – Compact","40 m² – Standard","60 m² – Full","80 m² – Flagship"]},{t:"Design Pillars",d:"Three core pillars.",items:["[ Visibility ] – Impact in-store","[ Consistency ] – Cohesive brand","[ Flexibility ] – Scalable"]},{t:"Performance Partnership",d:"Data-driven collaboration.",items:["Real-time sell-in/sell-out","Trade meetings","Pre-set budgets","Seasonal planning control"]}].map(s=><div key={s.t} style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}><div style={{fontSize:18,fontWeight:400,color:C.text,fontFamily:"'Cormorant Garamond',serif",marginBottom:6}}>{s.t}</div><p style={{fontSize:12,color:C.textS,margin:"0 0 12px",lineHeight:1.5}}>{s.d}</p>{s.items.map(i=><div key={i} style={{fontSize:12,color:C.text,padding:"4px 0",borderBottom:`1px solid ${C.surfaceD}`}}>{i}</div>)}</div>)}</div></div>;
-
 const AdminPage=({projects})=><div><Title sub="System health">Admin</Title><div style={{display:"flex",gap:16,marginBottom:24,flexWrap:"wrap"}}><KPI label="Source" value="BRAND SPACES"/><KPI label="Tasks" value={projects.length}/><KPI label="Status" value="Connected"/></div><div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}><div style={{fontSize:14,fontWeight:600,color:C.text,marginBottom:16}}>Field Completeness</div>{[["Name",100],["Due Date",Math.round(projects.filter(p=>p.dueOn).length/Math.max(projects.length,1)*100)],["Phase",100],["Sex",Math.round(projects.filter(p=>p.sex).length/Math.max(projects.length,1)*100)],["Region",Math.round(projects.filter(p=>p.region).length/Math.max(projects.length,1)*100)]].map(([f,pct])=><div key={f} style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span>{f}</span><span style={{color:pct>=80?C.success:pct>=40?C.warn:C.danger,fontWeight:600}}>{pct}%</span></div><div style={{height:4,background:C.surfaceD,borderRadius:2}}><div style={{height:4,borderRadius:2,width:`${pct}%`,background:pct>=80?C.success:pct>=40?C.warn:C.danger}}/></div></div>)}</div></div>;
 
 // ─── MAIN ─────────────────────────────────────────────────
 export default function Home(){
   const [page,setPage]=useState("overview");const [detail,setDetail]=useState(null);const [hover,setHover]=useState(null);
   const [projects,setProjects]=useState(FALLBACK_PROJECTS);
-
-  useEffect(()=>{
-    const fetchProjects=async()=>{try{const res=await fetch("/api/projects");if(res.ok){const data=await res.json();if(data.projects?.length>0)setProjects(data.projects)}}catch(e){console.log("Using fallback")}};
-    fetchProjects();const interval=setInterval(fetchProjects,15*60*1000);return()=>clearInterval(interval);
-  },[]);
-
+  useEffect(()=>{const f=async()=>{try{const r=await fetch("/api/projects");if(r.ok){const d=await r.json();if(d.projects?.length>0)setProjects(d.projects)}}catch(e){}};f();const i=setInterval(f,15*60*1000);return()=>clearInterval(i)},[]);
   const nav=[{id:"overview",label:"Overview",icon:"◈"},{id:"projects",label:"Projects",icon:"▦"},{id:"quotation",label:"Quotation",icon:"📋"},{id:"roi",label:"ROI Tool",icon:"◇"},{id:"flow",label:"Project Flow",icon:"⟳"},{id:"installed",label:"Installed Base",icon:"⊞"},{id:"standards",label:"Standards",icon:"☰"},{id:"admin",label:"Admin",icon:"⚙"}];
   return<div style={{display:"flex",minHeight:"100vh",background:C.surface}}>
     <div style={{width:220,background:C.black,color:C.white,flexShrink:0,display:"flex",flexDirection:"column",padding:"28px 0",position:"sticky",top:0,height:"100vh"}}>
       <div style={{padding:"0 24px",marginBottom:36}}><img src="/images/logo.png" alt="Selected Frame" style={{height:28,filter:"invert(1)",marginBottom:8}}/><div style={{fontSize:9,color:C.steel,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:4}}>Command Space</div></div>
       <div style={{flex:1}}>{nav.map(item=><div key={item.id} style={{padding:"10px 24px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontSize:13,fontWeight:page===item.id?600:400,background:page===item.id?C.steelD+"33":hover===item.id?"rgba(255,255,255,.04)":"transparent",color:page===item.id?C.white:C.steelL,borderLeft:page===item.id?`3px solid ${C.oak}`:"3px solid transparent"}} onClick={()=>{setPage(item.id);setDetail(null)}} onMouseEnter={()=>setHover(item.id)} onMouseLeave={()=>setHover(null)}><span style={{fontSize:16,width:20,textAlign:"center",opacity:.7}}>{item.icon}</span>{item.label}</div>)}</div>
-      <div style={{padding:"16px 24px",borderTop:`1px solid ${C.steelD}33`}}><div style={{fontSize:10,color:C.steel}}>v1.3</div><div style={{fontSize:10,color:C.steel,marginTop:2}}>[ A frame for the business we share ]</div></div>
+      <div style={{padding:"16px 24px",borderTop:`1px solid ${C.steelD}33`}}><div style={{fontSize:10,color:C.steel}}>v1.4</div><div style={{fontSize:10,color:C.steel,marginTop:2}}>[ A frame for the business we share ]</div></div>
     </div>
     <div style={{flex:1,overflow:"auto"}}><div style={{padding:"14px 40px",background:C.white,borderBottom:`1px solid ${C.surfaceD}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{fontSize:13,color:C.textS}}>{nav.find(n=>n.id===page)?.label}</div><div style={{fontSize:12,color:C.textS}}>{new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div></div>
       <div style={{padding:"32px 40px",maxWidth:1200}}>
