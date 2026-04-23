@@ -1,17 +1,53 @@
 export const dynamic = 'force-dynamic';
 
-function parseEuro(str) {
-  if (!str || str.includes('€ -') || str.trim() === '-') return 0;
-  let clean = str.replace(/€/g, '').trim().replace(/\s+/g, '');
-  if (clean.includes(',') && !clean.includes('.')) {
-    clean = clean.replace(',', '.');
-  } else if (clean.includes(',')) {
-    clean = clean.replace(/\./g, '').replace(',', '.');
+// The core challenge: &elements PDFs have Euro amounts with random spaces
+// Examples from real PDFs:
+//   "€ 3 7.225"  → 37225    (spaces inside digits, dot is thousand separator)
+//   "€ 1 .237"   → 1237     (space before dot-thousand-separator)
+//   "€ 8 8"      → 88       (space inside two-digit number)
+//   "€ 2 .942"   → 2942
+//   "€ 1 ,38"    → 1.38     (comma is decimal, for unit prices like hangers)
+//   "€ -"        → 0
+//   "€ 1 .370"   → 1370
+//   "€ 4 8.509"  → 48509
+
+function parseEuro(raw) {
+  if (!raw) return 0;
+  let s = raw.replace(/€/g, '').trim();
+  if (s === '-' || s === '') return 0;
+  
+  // Step 1: Remove ALL spaces - they are PDF extraction artifacts
+  s = s.replace(/\s+/g, '');
+  
+  // Step 2: Handle comma as decimal separator (e.g., "1,38" → "1.38")
+  // Only if comma exists and is followed by 1-2 digits at end
+  if (/,\d{1,2}$/.test(s) && !s.includes('.')) {
+    s = s.replace(',', '.');
+    return parseFloat(s) || 0;
   }
-  const dotMatch = clean.match(/^(\d+)\.(\d{3})$/);
-  if (dotMatch) clean = dotMatch[1] + dotMatch[2];
-  const num = parseFloat(clean);
-  return isNaN(num) ? 0 : Math.round(num * 100) / 100;
+  
+  // Step 3: Handle dot as thousand separator (e.g., "37.225" "1.237" "2.942")
+  // In European format, dots separate thousands. Since these are prices in whole euros,
+  // a dot followed by exactly 3 digits = thousand separator, not decimal
+  s = s.replace(/\.(\d{3})/g, '$1');
+  
+  // Step 4: Remove any remaining dots or commas
+  s = s.replace(/[.,]/g, '');
+  
+  const num = parseFloat(s);
+  return isNaN(num) ? 0 : num;
+}
+
+// Extract all € amounts from a line using a regex that captures the messy format
+function extractEuros(line) {
+  // Match € followed by digits, spaces, dots, commas, and dashes
+  const matches = [];
+  const regex = /€\s*([\d\s.,]+|-)/g;
+  let m;
+  while ((m = regex.exec(line)) !== null) {
+    matches.push(parseEuro(m[1]));
+  }
+  return matches;
 }
 
 export async function POST(request) {
@@ -20,13 +56,13 @@ export async function POST(request) {
     const { lines } = body;
     
     if (!lines || !Array.isArray(lines)) {
-      return Response.json({ error: 'No lines provided. Send { lines: [...] }' }, { status: 400 });
+      return Response.json({ error: 'No lines provided' }, { status: 400 });
     }
 
     const fullText = lines.join('\n');
     
     // Parse header
-    const get = (pattern) => { const m = fullText.match(pattern); return m ? m[1].trim() : null; };
+    const get = (p) => { const m = fullText.match(p); return m ? m[1].trim() : null; };
     const header = {
       project: get(/Project:\s*(.+)/),
       salesArea: parseInt(get(/Sales area,?\s*sqm:\s*(\d+)/) || '0'),
@@ -38,71 +74,98 @@ export async function POST(request) {
       supplier: '&elements ApS',
     };
 
-    // Parse line items by finding € amounts on each line
+    // Parse into categories
     const categories = [];
     let currentCat = null;
-    const catHeaders = ['INVENTORY', 'SELECTED DELIVERIES', 'SPECIFIC PROJECT COST', 'SPECIAL ELEMENTS', 'FITTING ROOMS', 'FLOOR', 'AV & HiFi', 'CONSTRUCTION'];
+    const catHeaders = ['INVENTORY', 'SELECTED DELIVERIES', 'SPECIFIC PROJECT COST', 'SPECIAL ELEMENTS', 'FITTING ROOMS', 'FLOOR', 'AV & HIFI', 'CONSTRUCTION'];
     const summaryData = {};
+    let inSummary = false;
 
     for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed) continue;
-
-      // Check category header
-      const isCatHeader = catHeaders.find(h => trimmed.toUpperCase() === h || trimmed.toUpperCase().startsWith(h + '\n'));
-      if (isCatHeader) {
-        currentCat = { name: isCatHeader, items: [], total: 0 };
+      
+      // Detect "Project cost overview" section
+      if (trimmed.includes('Project cost overview')) { inSummary = true; continue; }
+      if (trimmed.startsWith('Conditions:')) { inSummary = false; break; }
+      
+      // Parse summary lines (after "Project cost overview")
+      if (inSummary && trimmed.includes('€')) {
+        const euros = extractEuros(trimmed);
+        const upper = trimmed.toUpperCase();
+        if (upper.includes('TOTAL EXCL')) {
+          summaryData.totalExclVat = euros[0] || 0;
+          summaryData.sqmPrice = euros[1] || 0;
+        } else if (upper.includes('INVENTORY')) {
+          summaryData.inventory = euros[0] || 0;
+        } else if (upper.includes('SELECTED DEL')) {
+          summaryData.selectedDeliveries = euros[0] || 0;
+        } else if (upper.includes('SPECIFIC')) {
+          summaryData.specificProjectCost = euros[0] || 0;
+        } else if (upper.includes('SPECIAL')) {
+          summaryData.specialElements = euros[0] || 0;
+        } else if (upper.includes('FITTING')) {
+          summaryData.fittingRooms = euros[0] || 0;
+        } else if (upper.includes('FLOOR')) {
+          summaryData.floor = euros[0] || 0;
+        } else if (upper.includes('AV')) {
+          summaryData.avHifi = euros[0] || 0;
+        } else if (upper.includes('CONSTRUCTION')) {
+          summaryData.construction = euros[0] || 0;
+        }
+        continue;
+      }
+      if (inSummary) continue;
+      
+      // Detect category headers
+      const upperTrimmed = trimmed.toUpperCase();
+      const matchedCat = catHeaders.find(h => upperTrimmed === h || upperTrimmed.startsWith(h));
+      if (matchedCat && !trimmed.includes('€')) {
+        currentCat = { name: matchedCat, items: [], total: 0 };
         categories.push(currentCat);
         continue;
       }
-
+      
       // Skip column headers
       if (trimmed.includes('Product Name') || trimmed.includes('item no.')) continue;
-      if (trimmed.startsWith('Project cost overview')) continue;
-      if (trimmed.startsWith('Conditions:') || trimmed.startsWith('Payment terms')) break;
-
-      // Summary rows (e.g., "INVENTORY € 37.948 € 632")
-      const summaryMatch = trimmed.match(/^(INVENTORY|SELECTED DELIVERIES|SPECIFIC PROJECT COST|SPECIAL ELEMENTS|FITTING ROOMS|FLOOR|AV & HiFi|CONSTRUCTION|Total excl\. VAT)\s+€\s*([\d\s.,]+)/i);
-      if (summaryMatch) {
-        const label = summaryMatch[1].trim().toUpperCase();
-        const value = parseEuro('€' + summaryMatch[2]);
-        if (label.includes('TOTAL')) summaryData.totalExclVat = value;
-        else if (label.includes('INVENTORY')) summaryData.inventory = value;
-        else if (label.includes('SELECTED DEL')) summaryData.selectedDeliveries = value;
-        else if (label.includes('SPECIFIC')) summaryData.specificProjectCost = value;
-        else if (label.includes('SPECIAL')) summaryData.specialElements = value;
-        else if (label.includes('FITTING')) summaryData.fittingRooms = value;
-        else if (label.includes('FLOOR')) summaryData.floor = value;
-        else if (label.includes('AV')) summaryData.avHifi = value;
-        else if (label.includes('CONSTRUCTION')) summaryData.construction = value;
+      if (trimmed.includes('Headers') && trimmed.includes('Sales price')) continue;
+      
+      if (!currentCat) continue;
+      
+      // Total row
+      if (/^Total\b/.test(trimmed)) {
+        const euros = extractEuros(trimmed);
+        if (euros.length > 0) currentCat.total = euros[euros.length - 1];
         continue;
       }
-
-      // Total row for current category
-      if (trimmed.match(/^Total\s/) && currentCat) {
-        const euroMatch = trimmed.match(/€\s*([\d\s.,]+)/);
-        if (euroMatch) currentCat.total = parseEuro('€' + euroMatch[1]);
-        continue;
-      }
-
-      // Regular item line - look for € signs
-      if (currentCat && trimmed.includes('€')) {
-        const euros = [...trimmed.matchAll(/€\s*([\d\s.,]+)/g)].map(m => parseEuro('€' + m[1]));
+      
+      // Transportation & Accomodation cost (sub-header, skip)
+      if (trimmed.startsWith('Transportation & Accomodation')) continue;
+      if (trimmed.startsWith('Freight & Logistic')) continue;
+      
+      // Regular item line with € amounts
+      if (trimmed.includes('€')) {
+        const euros = extractEuros(trimmed);
         const unitPrice = euros.length >= 2 ? euros[euros.length - 2] : 0;
         const totalPrice = euros.length >= 1 ? euros[euros.length - 1] : 0;
-
-        // Extract qty (number before "pcs" or "Hours" or "pack" or "km")
-        const qtyMatch = trimmed.match(/(\d+)\s*(pcs|Hours|hours|pack|km|Pack)/);
+        
+        // Extract quantity
+        const qtyMatch = trimmed.match(/(\d+)\s*(pcs|Hours|hours|pack|Pack|km)/);
         const qty = qtyMatch ? parseInt(qtyMatch[1]) : 0;
-
-        // Product name is everything before the quantity or first €
-        let name = trimmed.split(/\d+\s*(pcs|Hours|pack|km)/)[0].trim();
-        // Remove item number prefix
-        name = name.replace(/^[\d\w-]+\s+/, '').trim();
-        // Clean up
-        if (name.length < 2) name = trimmed.split('€')[0].trim().replace(/^[\d\w.-]+\s+/, '');
-
-        if (totalPrice > 0 || qty > 0) {
+        
+        // Extract product name: text before qty pattern or before first €
+        let name = '';
+        if (qtyMatch) {
+          name = trimmed.substring(0, trimmed.indexOf(qtyMatch[0])).trim();
+        } else {
+          name = trimmed.split('€')[0].trim();
+        }
+        // Remove leading item number (pattern: digits, dots, dashes, underscores)
+        name = name.replace(/^[\d._-]+[A-Za-z]?\s+/, '').trim();
+        // Also remove trailing technical specs
+        if (!name) name = trimmed.split('€')[0].replace(/^[\d._-]+[A-Za-z]?\s+/, '').trim();
+        
+        if (name && name.length > 1) {
           currentCat.items.push({ name, qty, unitPrice, totalPrice });
         }
       }
@@ -116,16 +179,16 @@ export async function POST(request) {
       specialElements: summaryData.specialElements || categories.find(c => c.name === 'SPECIAL ELEMENTS')?.total || 0,
       fittingRooms: summaryData.fittingRooms || categories.find(c => c.name === 'FITTING ROOMS')?.total || 0,
       floor: summaryData.floor || categories.find(c => c.name === 'FLOOR')?.total || 0,
-      avHifi: summaryData.avHifi || categories.find(c => c.name === 'AV & HiFi')?.total || 0,
+      avHifi: summaryData.avHifi || categories.find(c => c.name === 'AV & HIFI')?.total || 0,
       construction: summaryData.construction || categories.find(c => c.name === 'CONSTRUCTION')?.total || 0,
       totalExclVat: summaryData.totalExclVat || 0,
-      sqmPrice: 0,
+      sqmPrice: summaryData.sqmPrice || 0,
     };
 
     if (!summary.totalExclVat) {
-      summary.totalExclVat = summary.inventory + summary.selectedDeliveries + summary.specificProjectCost + summary.specialElements + summary.fittingRooms + summary.floor + summary.avHifi + summary.construction;
+      summary.totalExclVat = Object.values(summary).reduce((a, b) => a + b, 0) - summary.sqmPrice;
     }
-    if (header.salesArea > 0 && summary.totalExclVat > 0) {
+    if (!summary.sqmPrice && header.salesArea > 0 && summary.totalExclVat > 0) {
       summary.sqmPrice = Math.round(summary.totalExclVat / header.salesArea);
     }
 
