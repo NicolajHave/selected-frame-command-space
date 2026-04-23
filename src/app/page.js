@@ -93,19 +93,9 @@ const ProjectsPage=({projects,detail,setDetail})=>{
 
 // ─── QUOTATION BUILDER ────────────────────────────────────
 const ADD_ONS=[
-  {id:"screen75",name:'75" Screen (wall mounted)',price:1370,cat:"AV & HiFi"},
-  {id:"screen_cover",name:"Screen Cover (stainless steel)",price:661,cat:"Special Elements"},
-  {id:"lightposter_750",name:"Light Poster 750×2000mm",price:1179,cat:"Special Elements"},
-  {id:"lightposter_print_750",name:"Print for Light Poster 750×2000",price:75,cat:"Special Elements"},
-  {id:"lightposter_2200",name:"Light Poster 2200×2200mm",price:1475,cat:"Special Elements"},
-  {id:"lightposter_print_2200",name:"Print for Light Poster 2200×2200",price:224,cat:"Special Elements"},
-  {id:"carpet_small",name:"Carpet (small)",price:450,cat:"Floor"},
-  {id:"carpet_large",name:"Carpet (large)",price:651,cat:"Floor"},
-  {id:"fitting_curtain",name:"Fitting Room – Curtain & Track",price:614,cat:"Fitting Rooms"},
-  {id:"fitting_mirror",name:"Fitting Room – Mirror 800×2000",price:248,cat:"Fitting Rooms"},
-  {id:"fitting_hangerbar",name:"Fitting Room – Hanger Bar",price:161,cat:"Fitting Rooms"},
-  {id:"fitting_stool",name:"Fitting Room – Oak Stool",price:463,cat:"Fitting Rooms"},
-  {id:"counter",name:"Counter (estimate)",price:3300,cat:"Special Elements"},
+  {id:"screen55",name:'55" Screen (wall mounted)',price:1370,cat:"AV & HiFi"},
+  {id:"screen75",name:'75" Screen (wall module mounted)',price:1351,cat:"AV & HiFi"},
+  {id:"carpet",name:"Carpet",price:469,cat:"Floor"},
   {id:"leather_tray",name:"Leather Tray",price:282,cat:"Accessories"},
   {id:"shirt_hangers_100",name:"Shirt Hangers (100 pcs)",price:138,cat:"Selected Deliveries"},
   {id:"clip_hangers_100",name:"Clip Hangers (100 pcs)",price:166,cat:"Selected Deliveries"},
@@ -247,6 +237,49 @@ const QuotationPage=()=>{
           <div style={{display:"flex",justifyContent:"space-between",fontSize:20,paddingTop:12,fontFamily:"'Cormorant Garamond',serif"}}><span>Total excl. VAT</span><span style={{fontWeight:500}}>{fmtEur(grandTotal)}</span></div>
           {sqm>0&&<div style={{fontSize:12,color:C.steelL,marginTop:4,textAlign:"right"}}>{fmtEur(Math.round(grandTotal/sqm))} / m²</div>}
         </div>
+
+        {/* PDF Export */}
+        {grandTotal>0&&<button onClick={()=>{
+          const addOnItems=Object.entries(addOns).map(([id,{qty}])=>{const a=ADD_ONS.find(x=>x.id===id);return a?{name:a.name,qty,total:a.price*qty}:null}).filter(Boolean);
+          const customItemsList=customItems.filter(i=>i.name&&parseFloat(i.price)).map(i=>({name:i.name,qty:parseInt(i.qty)||1,total:(parseFloat(i.price)||0)*(parseInt(i.qty)||1)}));
+          const w=window.open('','_blank');
+          w.document.write(`<!DOCTYPE html><html><head><title>Quotation – ${manualHeader.project||'Selected Frame'}</title>
+          <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+          <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'DM Sans',sans-serif;color:#2C2C2C;padding:40px 60px;max-width:900px;margin:0 auto}
+          .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:40px;padding-bottom:24px;border-bottom:2px solid #1A1A1A}
+          .logo{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:300;color:#1A1A1A}.logo span{display:block;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#8A8D8F;font-family:'DM Sans',sans-serif;margin-top:4px}
+          .meta{text-align:right;font-size:12px;color:#6B6B6B}.meta strong{color:#2C2C2C;display:block;font-size:14px;margin-bottom:4px}
+          h2{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:400;margin:32px 0 16px;padding-bottom:8px;border-bottom:1px solid #ECEAE5}
+          table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:24px}th{text-align:left;padding:8px 12px;background:#F5F4F1;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#6B6B6B;border-bottom:1px solid #ECEAE5}
+          td{padding:6px 12px;border-bottom:1px solid #F5F4F1}.r{text-align:right}
+          .total-row{background:#1A1A1A;color:#fff;padding:20px 24px;border-radius:8px;margin-top:32px;display:flex;justify-content:space-between;align-items:center}
+          .total-row .label{font-size:14px;color:#B8BBBE}.total-row .amount{font-size:24px;font-family:'Cormorant Garamond',serif;font-weight:300}
+          .sqm{font-size:11px;color:#B8BBBE;text-align:right;margin-top:4px}
+          .footer{margin-top:48px;padding-top:20px;border-top:1px solid #ECEAE5;font-size:10px;color:#8A8D8F;display:flex;justify-content:space-between}
+          @media print{body{padding:20px 40px}button{display:none!important}}</style></head><body>
+          <div class="header"><div><div class="logo">Selected Frame<span>[ A frame for the business we share ]</span></div></div>
+          <div class="meta"><strong>Quotation</strong>${manualHeader.project||''}<br>${manualHeader.salesArea?manualHeader.salesArea+' m²':''} ${manualHeader.gender?'· '+manualHeader.gender:''}<br>${manualHeader.updated||''}</div></div>
+          <button onclick="window.print()" style="background:#1A1A1A;color:#fff;border:none;padding:10px 24px;border-radius:6px;font-size:13px;cursor:pointer;margin-bottom:24px;font-family:'DM Sans',sans-serif">Print / Save as PDF</button>
+          ${parsedData?`<h2>Supplier – ${parsedData.supplier||'&elements ApS'}</h2>
+          <table><thead><tr><th>Category</th><th class="r">Amount</th></tr></thead><tbody>
+          ${parsedData.categories?.map(cat=>`<tr><td>${cat.name}</td><td class="r">${fmtEur(cat.total)}</td></tr>`).join('')||''}
+          <tr style="font-weight:600;border-top:2px solid #ECEAE5"><td>Supplier Total</td><td class="r">${fmtEur(supplierTotal)}</td></tr>
+          </tbody></table>`:''}
+          ${addOnItems.length>0?`<h2>Add-ons</h2><table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Total</th></tr></thead><tbody>
+          ${addOnItems.map(a=>`<tr><td>${a.name}</td><td class="r">${a.qty}</td><td class="r">${fmtEur(a.total)}</td></tr>`).join('')}
+          <tr style="font-weight:600;border-top:2px solid #ECEAE5"><td colspan="2">Add-ons Total</td><td class="r">${fmtEur(addOnTotal)}</td></tr>
+          </tbody></table>`:''}
+          ${customItemsList.length>0?`<h2>Additional Items</h2><table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Total</th></tr></thead><tbody>
+          ${customItemsList.map(a=>`<tr><td>${a.name}</td><td class="r">${a.qty}</td><td class="r">${fmtEur(a.total)}</td></tr>`).join('')}
+          <tr style="font-weight:600;border-top:2px solid #ECEAE5"><td colspan="2">Additional Total</td><td class="r">${fmtEur(customTotal)}</td></tr>
+          </tbody></table>`:''}
+          <div class="total-row"><div><div class="label">Total excl. VAT</div></div><div class="amount">${fmtEur(grandTotal)}</div></div>
+          ${sqm>0?`<div class="sqm">${fmtEur(Math.round(grandTotal/sqm))} / m²</div>`:''}
+          <div class="footer"><span>Selected Frame · Brand Spaces</span><span>Confidential – for internal use only</span></div>
+          </body></html>`);w.document.close();
+        }} style={{width:"100%",padding:"14px",borderRadius:8,border:"none",background:C.oak,color:C.white,fontSize:14,fontWeight:600,cursor:"pointer",marginTop:16,fontFamily:"'DM Sans',sans-serif"}}>
+          Export Quotation as PDF →
+        </button>}
       </div>
     </div>
   </div>);
