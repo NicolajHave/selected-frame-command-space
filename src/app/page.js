@@ -453,8 +453,11 @@ const ROI_MODEL_INFO={
   },
 };
 
-const ROIPage=()=>{
+const ROIPage=({projects=[]})=>{
   const [model,setModel]=useState("uplift");
+  const [linkedProject,setLinkedProject]=useState(null);
+  const [pushStatus,setPushStatus]=useState(null); // {ok, message}
+  const [pushing,setPushing]=useState(false);
   const [inp,setInp]=useState({
     retail:"150000",        // Last year retail sales
     expectedRetail:"172500",// Expected retail next year (drives uplift % for Uplift Model)
@@ -516,7 +519,8 @@ const ROIPage=()=>{
 
   // ASANA-ready summary string (matches Excel B32 format)
   const sqmDisplay=model==="uplift"?`Existing ${n("existSqm")} + Added ${n("addSqm")} = Total ${ts}`:`Total ${totalSqmTP}`;
-  const asanaSummary=`ROI Summary – SIS Investment\nView: ${inp.valueView}\n${model==="uplift"?`Scenario: ${n("upliftPct").toFixed(1)}% uplift`:`Model: Total Payback (new distribution)`}\nSpace (m²): ${sqmDisplay}\nCAPEX (EUR): ${n("capex").toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:1})}\nNet Annual Value (EUR): ${nv?nv.toLocaleString("de-DE",{minimumFractionDigits:0,maximumFractionDigits:0}):"—"}\nPayback (Months): ${pm?Math.round(pm):"N/A"}\nDecision: ${st} – ${re}`;
+  const projectLine=linkedProject?`Project: ${linkedProject.name}\n`:"";
+  const asanaSummary=`ROI Summary – SIS Investment\n${projectLine}View: ${inp.valueView}\n${model==="uplift"?`Scenario: ${n("upliftPct").toFixed(1)}% uplift`:`Model: Total Payback (new distribution)`}\nSpace (m²): ${sqmDisplay}\nCAPEX (EUR): ${n("capex").toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:1})}\nNet Annual Value (EUR): ${nv?nv.toLocaleString("de-DE",{minimumFractionDigits:0,maximumFractionDigits:0}):"—"}\nPayback (Months): ${pm?Math.round(pm):"N/A"}\nDecision: ${st} – ${re}`;
 
   const [copied,setCopied]=useState(false);
   const copySummary=()=>{
@@ -525,9 +529,43 @@ const ROIPage=()=>{
       setTimeout(()=>setCopied(false),2000);
     });
   };
+  const pushToAsana=async()=>{
+    if(!linkedProject?.gid)return;
+    setPushing(true);setPushStatus(null);
+    try{
+      const r=await fetch("/api/asana-comment",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({taskGid:linkedProject.gid,text:asanaSummary}),
+      });
+      const data=await r.json();
+      if(!r.ok)throw new Error(data.error||"Push failed");
+      setPushStatus({ok:true,message:`Posted to "${linkedProject.name}"`});
+      setTimeout(()=>setPushStatus(null),4000);
+    }catch(e){
+      setPushStatus({ok:false,message:e.message||"Could not push"});
+    }finally{
+      setPushing(false);
+    }
+  };
 
   return <div>
     <Title sub="Decision support framework for SIS investment cases">ROI Decision Engine</Title>
+
+    {/* Project linker */}
+    <div style={{background:C.white,borderRadius:8,padding:16,border:`1px solid ${C.surfaceD}`,marginBottom:24,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+      <div style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px"}}>Linked project</div>
+      {linkedProject?<>
+        <div style={{flex:1,minWidth:200,fontSize:13,fontWeight:600,color:C.text,padding:"6px 12px",background:C.oak+"15",borderRadius:6,borderLeft:`3px solid ${C.oak}`}}>{linkedProject.name}</div>
+        <button onClick={()=>{setLinkedProject(null);setPushStatus(null)}} style={{padding:"6px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,background:C.white,fontSize:11,color:C.textS,cursor:"pointer"}}>Clear</button>
+      </>:<>
+        <select onChange={e=>{const p=projects.find(x=>x.gid===e.target.value);if(p)setLinkedProject(p)}} value="" style={{flex:1,minWidth:200,padding:"8px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,background:C.white,cursor:"pointer"}}>
+          <option value="" disabled>Select a project to link…</option>
+          {projects.filter(p=>!p.completed).sort((a,b)=>(a.name||"").localeCompare(b.name||"")).map(p=><option key={p.gid} value={p.gid}>{p.name}</option>)}
+        </select>
+        <span style={{fontSize:10,color:C.textS,maxWidth:280}}>Optional. Required only to push the summary back to Asana.</span>
+      </>}
+    </div>
 
     {/* Model toggle with description */}
     <div style={{display:"flex",gap:8,marginBottom:24}}>
@@ -623,13 +661,18 @@ const ROIPage=()=>{
 
     {/* ASANA-ready summary */}
     <div style={{background:C.black,borderRadius:8,padding:24,color:C.white,marginBottom:24}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,gap:12,flexWrap:"wrap"}}>
         <div>
           <div style={{fontSize:11,color:C.steelL,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase"}}>ASANA-ready summary</div>
-          <div style={{fontSize:11,color:C.steel,marginTop:2}}>Paste this into the project task for documentation</div>
+          <div style={{fontSize:11,color:C.steel,marginTop:2}}>{linkedProject?`Push directly to "${linkedProject.name}" or copy to clipboard`:"Link a project above to enable push, or copy to clipboard"}</div>
         </div>
-        <button onClick={copySummary} style={{padding:"8px 16px",borderRadius:6,border:"none",background:copied?C.go:C.oak,color:C.white,fontSize:12,fontWeight:600,cursor:"pointer"}}>{copied?"✓ Copied":"Copy summary"}</button>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={copySummary} style={{padding:"8px 16px",borderRadius:6,border:`1px solid ${C.steel}`,background:copied?C.go:"transparent",color:C.white,fontSize:12,fontWeight:600,cursor:"pointer"}}>{copied?"✓ Copied":"Copy summary"}</button>
+          <button onClick={pushToAsana} disabled={!linkedProject||pushing} style={{padding:"8px 16px",borderRadius:6,border:"none",background:!linkedProject||pushing?C.steel:(pushStatus?.ok?C.go:C.oak),color:C.white,fontSize:12,fontWeight:600,cursor:!linkedProject||pushing?"not-allowed":"pointer",opacity:!linkedProject?0.5:1}}>{pushing?"Pushing…":pushStatus?.ok?"✓ Posted":"Push to Asana"}</button>
+        </div>
       </div>
+      {pushStatus&&!pushStatus.ok&&<div style={{fontSize:11,color:C.danger,padding:"8px 12px",background:"rgba(196,108,68,.15)",borderRadius:6,marginBottom:12,borderLeft:`3px solid ${C.danger}`}}>✗ {pushStatus.message}</div>}
+      {pushStatus?.ok&&<div style={{fontSize:11,color:C.steelL,padding:"8px 12px",background:"rgba(46,125,50,.15)",borderRadius:6,marginBottom:12,borderLeft:`3px solid ${C.go}`}}>✓ {pushStatus.message}</div>}
       <pre style={{fontSize:11,color:C.steelL,fontFamily:"'DM Mono',monospace",whiteSpace:"pre-wrap",lineHeight:1.6,margin:0}}>{asanaSummary}</pre>
     </div>
 
@@ -712,13 +755,13 @@ export default function Home(){const [page,setPage]=useState("overview");const [
   useEffect(()=>{const f=async()=>{try{const r=await fetch("/api/projects");if(r.ok){const d=await r.json();if(d.projects?.length>0)setProjects(d.projects)}}catch(e){}};f();const i=setInterval(f,15*60*1000);return()=>clearInterval(i)},[]);
   const nav=[{id:"overview",label:"Overview",icon:"◈"},{id:"projects",label:"Projects",icon:"▦"},{id:"quotation",label:"Quotation",icon:"📋"},{id:"roi",label:"ROI Tool",icon:"◇"},{id:"flow",label:"Project Flow",icon:"⟳"},{id:"installed",label:"Installed Base",icon:"⊞"},{id:"standards",label:"Standards",icon:"☰"},{id:"admin",label:"Admin",icon:"⚙"}];
   return<div style={{display:"flex",minHeight:"100vh",background:C.surface}}>
-    <div style={{width:220,background:C.black,color:C.white,flexShrink:0,display:"flex",flexDirection:"column",padding:"28px 0",position:"sticky",top:0,height:"100vh"}}><div style={{padding:"0 24px",marginBottom:36}}><img src={LOGO_WHITE} alt="" style={{height:28,marginBottom:8}}/><div style={{fontSize:9,color:C.steel,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:4}}>Command Space</div></div><div style={{flex:1}}>{nav.map(it=><div key={it.id} style={{padding:"10px 24px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontSize:13,fontWeight:page===it.id?600:400,background:page===it.id?C.steelD+"33":hover===it.id?"rgba(255,255,255,.04)":"transparent",color:page===it.id?C.white:C.steelL,borderLeft:page===it.id?`3px solid ${C.oak}`:"3px solid transparent"}} onClick={()=>{setPage(it.id);setDetail(null)}} onMouseEnter={()=>setHover(it.id)} onMouseLeave={()=>setHover(null)}><span style={{fontSize:16,width:20,textAlign:"center",opacity:.7}}>{it.icon}</span>{it.label}</div>)}</div><div style={{padding:"16px 24px",borderTop:`1px solid ${C.steelD}33`}}><div style={{fontSize:10,color:C.steel}}>v2.4.1</div><div style={{fontSize:10,color:C.steel,marginTop:2}}>[ A frame for the business we share ]</div></div></div>
+    <div style={{width:220,background:C.black,color:C.white,flexShrink:0,display:"flex",flexDirection:"column",padding:"28px 0",position:"sticky",top:0,height:"100vh"}}><div style={{padding:"0 24px",marginBottom:36}}><img src={LOGO_WHITE} alt="" style={{height:28,marginBottom:8}}/><div style={{fontSize:9,color:C.steel,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:4}}>Command Space</div></div><div style={{flex:1}}>{nav.map(it=><div key={it.id} style={{padding:"10px 24px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontSize:13,fontWeight:page===it.id?600:400,background:page===it.id?C.steelD+"33":hover===it.id?"rgba(255,255,255,.04)":"transparent",color:page===it.id?C.white:C.steelL,borderLeft:page===it.id?`3px solid ${C.oak}`:"3px solid transparent"}} onClick={()=>{setPage(it.id);setDetail(null)}} onMouseEnter={()=>setHover(it.id)} onMouseLeave={()=>setHover(null)}><span style={{fontSize:16,width:20,textAlign:"center",opacity:.7}}>{it.icon}</span>{it.label}</div>)}</div><div style={{padding:"16px 24px",borderTop:`1px solid ${C.steelD}33`}}><div style={{fontSize:10,color:C.steel}}>v2.5.0</div><div style={{fontSize:10,color:C.steel,marginTop:2}}>[ A frame for the business we share ]</div></div></div>
     <div style={{flex:1,overflow:"auto"}}><div style={{padding:"14px 40px",background:C.white,borderBottom:`1px solid ${C.surfaceD}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{fontSize:13,color:C.textS}}>{nav.find(n=>n.id===page)?.label}</div><div style={{fontSize:12,color:C.textS}}>{new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div></div>
       <div style={{padding:"32px 40px",maxWidth:1200}}>
         {page==="overview"&&<OverviewPage projects={projects} setPage={setPage} setDetail={setDetail}/>}
         {page==="projects"&&<ProjectsPage projects={projects} detail={detail} setDetail={setDetail}/>}
         {page==="quotation"&&<QuotationPage/>}
-        {page==="roi"&&<ROIPage/>}
+        {page==="roi"&&<ROIPage projects={projects}/>}
         {page==="flow"&&<FlowPage/>}
         {page==="installed"&&<InstalledPage projects={projects}/>}
         {page==="standards"&&<StandardsPage/>}
