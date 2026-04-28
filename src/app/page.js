@@ -424,21 +424,295 @@ Bestseller A/S`;
     </div></div>};
 
 // ─── ROI ──────────────────────────────────────────────────
-// Module-level IF input field for ROI tool (prevents focus loss on every keystroke)
-const ROIField=({label,field,suffix,options,inp,setInp})=><div style={{marginBottom:14}}><label style={{display:"block",fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>{label}</label>{options?<select value={inp[field]} onChange={e=>setInp(p=>({...p,[field]:e.target.value}))} style={{width:"100%",padding:"10px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:14,background:C.white}}>{options.map(o=><option key={o}>{o}</option>)}</select>:<div style={{display:"flex",alignItems:"center",gap:6}}><input type="text" inputMode="decimal" value={inp[field]} onChange={e=>setInp(p=>({...p,[field]:e.target.value}))} onFocus={e=>e.target.select()} style={{flex:1,padding:"10px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:14,outline:"none",fontFamily:"'DM Mono',monospace"}}/>{suffix&&<span style={{fontSize:12,color:C.textS,minWidth:28}}>{suffix}</span>}</div>}</div>;
+const ROIField=({label,field,suffix,options,inp,setInp,help})=><div style={{marginBottom:14}}>
+  <label style={{display:"block",fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>{label}</label>
+  {options?
+    <select value={inp[field]} onChange={e=>setInp(p=>({...p,[field]:e.target.value}))} style={{width:"100%",padding:"10px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:14,background:C.white}}>{options.map(o=><option key={o}>{o}</option>)}</select>
+    :<div style={{display:"flex",alignItems:"center",gap:6}}>
+      <input type="text" inputMode="decimal" value={inp[field]} onChange={e=>setInp(p=>({...p,[field]:e.target.value}))} onFocus={e=>e.target.select()} style={{flex:1,padding:"10px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:14,outline:"none",fontFamily:"'DM Mono',monospace"}}/>
+      {suffix&&<span style={{fontSize:12,color:C.textS,minWidth:28}}>{suffix}</span>}
+    </div>
+  }
+  {help&&<div style={{fontSize:10,color:C.textS,marginTop:4,lineHeight:1.4}}>{help}</div>}
+</div>;
 
-const ROIPage=()=>{const [model,setModel]=useState("uplift");const [inp,setInp]=useState({retail:"150000",markup:"2.9",capex:"20000",opex:"16",scenario:"Base",valueView:"Gross Profit",gm:"35",ebit:"19",existSqm:"20",addSqm:"10"});const n=k=>parseFloat(inp[k])||0;const scen={Worst:.05,Base:.10,Best:.15};const goT=24,revT=36;const ts=n("existSqm")+n("addSqm");const rs=ts>0?n("retail")/ts:0;const ao=n("capex")*(n("opex")/100);const iw=n("markup")>0?((n("addSqm")*rs)+(n("existSqm")*rs*(scen[inp.scenario]||.1)))/n("markup"):0;let nv;if(model==="uplift"){if(inp.valueView==="Wholesale")nv=iw-ao;else if(inp.valueView==="Gross Profit")nv=(iw*(n("gm")/100))-ao;else nv=(iw*(n("ebit")/100))-ao}else{const tw=n("markup")>0?n("retail")/n("markup"):0;if(inp.valueView==="Wholesale")nv=tw-ao;else if(inp.valueView==="Gross Profit")nv=(tw*(n("gm")/100))-ao;else nv=(tw*(n("ebit")/100))-ao}const pm=nv>0?(n("capex")/nv)*12:null;const st=!pm||nv<=0?"NO GO":pm<=goT?"GO":pm<=revT?"REVIEW":"NO GO";const re=nv<=0?"Net value ≤ 0":st==="NO GO"?"Payback above threshold":st==="REVIEW"?"Borderline":"Within policy";return<div><Title sub="Evaluate SIS investment cases">ROI Investment Tool</Title><div style={{display:"flex",gap:8,marginBottom:24}}>{[["uplift","Uplift Model","Existing"],["total","Total Payback","New"]].map(([k,l,d])=><div key={k} style={{flex:1,padding:"16px 20px",borderRadius:8,cursor:"pointer",border:`2px solid ${model===k?C.oak:C.surfaceD}`,background:model===k?C.oak+"08":C.white}} onClick={()=>setModel(k)}><div style={{fontSize:14,fontWeight:600}}>{l}</div><div style={{fontSize:11,color:C.textS,marginTop:4}}>{d}</div></div>)}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 280px",gap:24}}><div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}><div style={{fontSize:14,fontWeight:600,marginBottom:16}}>Financial</div><ROIField label="Retail Sales / Year" field="retail" suffix="EUR" inp={inp} setInp={setInp}/><ROIField label="Mark-up" field="markup" inp={inp} setInp={setInp}/><ROIField label="CAPEX" field="capex" suffix="EUR" inp={inp} setInp={setInp}/><ROIField label="OPEX" field="opex" suffix="%" inp={inp} setInp={setInp}/>{model==="uplift"&&<ROIField label="Scenario" field="scenario" options={["Worst","Base","Best"]} inp={inp} setInp={setInp}/>}<ROIField label="Value View" field="valueView" options={["Wholesale","Gross Profit","EBIT"]} inp={inp} setInp={setInp}/>{inp.valueView==="Gross Profit"&&<ROIField label="Gross Margin" field="gm" suffix="%" inp={inp} setInp={setInp}/>}</div><div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}><div style={{fontSize:14,fontWeight:600,marginBottom:16}}>Space</div>{model==="uplift"&&<><ROIField label="Existing" field="existSqm" suffix="m²" inp={inp} setInp={setInp}/><ROIField label="Added" field="addSqm" suffix="m²" inp={inp} setInp={setInp}/></>}<div style={{background:C.surface,borderRadius:6,padding:"12px 14px"}}><div style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase"}}>Total</div><div style={{fontSize:22,fontWeight:300,fontFamily:"'Cormorant Garamond',serif"}}>{ts} m²</div></div></div><div style={{borderRadius:8,padding:24,border:`2px solid ${st==="GO"?C.go:st==="REVIEW"?C.review:C.nogo}`,background:st==="GO"?"#E8F2EA":st==="REVIEW"?"#FDF3E0":"#FDEAE6"}}><div style={{textAlign:"center",marginBottom:16}}><div style={{fontSize:48,fontWeight:300,fontFamily:"'Cormorant Garamond',serif",color:st==="GO"?C.go:st==="REVIEW"?C.review:C.nogo}}>{st}</div></div><div style={{fontSize:12,color:C.textS,textAlign:"center",marginBottom:20}}>{re}</div>{[["Net Value",nv?fmtEur(Math.round(nv)):"—"],["Payback",pm?`${pm.toFixed(1)} mo`:"N/A"],["OPEX/yr",fmtEur(Math.round(ao))]].map(([l,v])=><div key={l} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",fontSize:12,borderBottom:"1px solid rgba(0,0,0,.06)"}}><span style={{color:C.textS}}>{l}</span><span style={{fontWeight:600}}>{v}</span></div>)}</div></div></div>};
+const ROI_MODEL_INFO={
+  uplift:{
+    title:"Uplift Model",
+    subtitle:"Existing partner / Structural relaunch",
+    what:"Converts expected retail sales into wholesale value, applies a defined uplift to isolate the incremental impact of the Selected Frame investment, and compares this against required CAPEX and ongoing OPEX. Result is a payback in months.",
+    principle:"ROI is calculated on incremental value only — not total shop turnover. This ensures decisions are based on additional business created by the investment, not baseline sales that would exist anyway.",
+    use:"Use this when an existing distribution point is being upgraded or relaunched. Requires a reliable baseline.",
+  },
+  total:{
+    title:"Total Payback Model",
+    subtitle:"New distribution",
+    what:"Converts expected annual retail sales into wholesale turnover using the mark-up, subtracts annual OPEX, compares net value against CAPEX. Output is payback in months.",
+    principle:"Designed for new shops where no reliable baseline exists. Does NOT isolate incremental uplift; instead answers: 'Can the total expected business justify the investment?'",
+    use:"Use this for greenfield distribution. Can be run alongside Uplift for grey-zone cases (e.g. multibrand → dedicated SIS).",
+  },
+};
+
+const ROIPage=()=>{
+  const [model,setModel]=useState("uplift");
+  const [inp,setInp]=useState({
+    retail:"150000",        // Last year retail sales
+    expectedRetail:"172500",// Expected retail next year (drives uplift % for Uplift Model)
+    upliftPct:"15",         // Manual uplift % (Uplift Model only)
+    markup:"2.9",
+    capex:"20000",
+    opex:"16",
+    valueView:"Gross Profit",
+    gm:"35",
+    ebit:"19",
+    existSqm:"20",
+    addSqm:"10",
+    totalSqm:"30",          // Total Payback Model only - independent sqm field
+  });
+  const n=k=>parseFloat(inp[k])||0;
+  const goT=24,revT=36;
+
+  // Auto-calc uplift % from Last Year vs Expected
+  const calcUpliftFromExpected=()=>{
+    const ly=n("retail"),ey=n("expectedRetail");
+    if(ly>0&&ey>0){
+      const pct=((ey-ly)/ly)*100;
+      setInp(p=>({...p,upliftPct:pct.toFixed(1)}));
+    }
+  };
+  // Preset shortcuts
+  const setPreset=(p)=>setInp(prev=>({...prev,upliftPct:p}));
+
+  const ao=n("capex")*(n("opex")/100);
+
+  // Uplift Model calculations
+  const ts=n("existSqm")+n("addSqm");
+  const rs=ts>0?n("retail")/ts:0;
+  const upliftFraction=n("upliftPct")/100;
+  const incRetailUplift=n("existSqm")*rs*upliftFraction;
+  const incRetailVolume=n("addSqm")*rs;
+  const incRetailTotal=incRetailUplift+incRetailVolume;
+  const iw=n("markup")>0?incRetailTotal/n("markup"):0;
+  const volumeShare=incRetailTotal>0?incRetailVolume/incRetailTotal:0;
+  const upliftShare=incRetailTotal>0?incRetailUplift/incRetailTotal:0;
+  const primaryDriver=volumeShare>=upliftShare?"Volume-driven":"Brand Presence-driven";
+
+  // Total Payback Model calculations (uses its own sqm)
+  const totalSqmTP=n("totalSqm");
+  const tw=n("markup")>0?n("retail")/n("markup"):0;
+
+  // Net annual value depends on model + value view
+  let nv;
+  const baseValue=model==="uplift"?iw:tw;
+  if(inp.valueView==="Wholesale")nv=baseValue-ao;
+  else if(inp.valueView==="Gross Profit")nv=(baseValue*(n("gm")/100))-ao;
+  else nv=(baseValue*(n("ebit")/100))-ao;
+
+  const pm=nv>0?(n("capex")/nv)*12:null;
+  const st=!pm||nv<=0?"NO GO":pm<=goT?"GO":pm<=revT?"REVIEW":"NO GO";
+  const re=nv<=0?"Net annual value is zero or negative":st==="NO GO"?"Payback exceeds policy threshold of 36 months":st==="REVIEW"?"Borderline — between 24 and 36 months payback. Conscious escalation required.":"Within policy thresholds (≤24 months payback)";
+
+  const info=ROI_MODEL_INFO[model];
+
+  // ASANA-ready summary string (matches Excel B32 format)
+  const sqmDisplay=model==="uplift"?`Existing ${n("existSqm")} + Added ${n("addSqm")} = Total ${ts}`:`Total ${totalSqmTP}`;
+  const asanaSummary=`ROI Summary – SIS Investment\nView: ${inp.valueView}\n${model==="uplift"?`Scenario: ${n("upliftPct").toFixed(1)}% uplift`:`Model: Total Payback (new distribution)`}\nSpace (m²): ${sqmDisplay}\nCAPEX (EUR): ${n("capex").toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:1})}\nNet Annual Value (EUR): ${nv?nv.toLocaleString("de-DE",{minimumFractionDigits:0,maximumFractionDigits:0}):"—"}\nPayback (Months): ${pm?Math.round(pm):"N/A"}\nDecision: ${st} – ${re}`;
+
+  const [copied,setCopied]=useState(false);
+  const copySummary=()=>{
+    navigator.clipboard.writeText(asanaSummary).then(()=>{
+      setCopied(true);
+      setTimeout(()=>setCopied(false),2000);
+    });
+  };
+
+  return <div>
+    <Title sub="Decision support framework for SIS investment cases">ROI Decision Engine</Title>
+
+    {/* Model toggle with description */}
+    <div style={{display:"flex",gap:8,marginBottom:24}}>
+      {[["uplift","Uplift Model","Existing / Relaunch"],["total","Total Payback","New Distribution"]].map(([k,l,d])=>
+        <div key={k} style={{flex:1,padding:"16px 20px",borderRadius:8,cursor:"pointer",border:`2px solid ${model===k?C.oak:C.surfaceD}`,background:model===k?C.oak+"08":C.white}} onClick={()=>setModel(k)}>
+          <div style={{fontSize:14,fontWeight:600}}>{l}</div>
+          <div style={{fontSize:11,color:C.textS,marginTop:4}}>{d}</div>
+        </div>)}
+    </div>
+
+    {/* Explainer card */}
+    <div style={{background:C.surface,borderRadius:8,padding:20,marginBottom:24,borderLeft:`3px solid ${C.oak}`}}>
+      <div style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:8}}>About this model</div>
+      <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>{info.title} — <span style={{color:C.textS,fontWeight:400}}>{info.subtitle}</span></div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:20,marginTop:12,fontSize:11,lineHeight:1.5}}>
+        <div><div style={{fontWeight:600,color:C.text,marginBottom:4}}>What the tool does</div><div style={{color:C.textS}}>{info.what}</div></div>
+        <div><div style={{fontWeight:600,color:C.text,marginBottom:4}}>Key principle</div><div style={{color:C.textS}}>{info.principle}</div></div>
+        <div><div style={{fontWeight:600,color:C.text,marginBottom:4}}>Intended use</div><div style={{color:C.textS}}>{info.use}</div></div>
+      </div>
+    </div>
+
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 320px",gap:24,marginBottom:24}}>
+      {/* Financial inputs */}
+      <div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>
+        <div style={{fontSize:14,fontWeight:600,marginBottom:16}}>Financial</div>
+        <ROIField label="Last Year Retail Sales" field="retail" suffix="EUR" inp={inp} setInp={setInp} help="Baseline retail turnover from the prior year"/>
+        {model==="uplift"&&<>
+          <ROIField label="Expected Retail Sales / Year" field="expectedRetail" suffix="EUR" inp={inp} setInp={setInp} help="Total retail expected once the SIS is operational"/>
+          <button onClick={calcUpliftFromExpected} style={{width:"100%",marginBottom:14,padding:"8px 10px",border:`1px solid ${C.oak}`,borderRadius:6,background:C.oak+"15",color:C.oak,fontSize:11,fontWeight:600,cursor:"pointer"}}>↻ Auto-calculate uplift % from expected vs last year</button>
+          <ROIField label="Uplift %" field="upliftPct" suffix="%" inp={inp} setInp={setInp} help="Performance uplift on existing space. Manual entry or use auto-calculate above."/>
+          <div style={{display:"flex",gap:6,marginBottom:14,marginTop:-8}}>
+            <span style={{fontSize:10,color:C.textS,alignSelf:"center"}}>Presets:</span>
+            {[["5","Worst"],["10","Base"],["15","Best"]].map(([v,l])=><button key={l} onClick={()=>setPreset(v)} style={{flex:1,padding:"4px 6px",fontSize:10,borderRadius:4,border:`1px solid ${C.surfaceD}`,background:inp.upliftPct===v?C.oak+"15":C.white,color:inp.upliftPct===v?C.oak:C.textS,cursor:"pointer",fontWeight:600}}>{l} {v}%</button>)}
+          </div>
+        </>}
+        <ROIField label="Mark-up (Retail ÷ Wholesale)" field="markup" inp={inp} setInp={setInp} help="Ratio used to convert retail to wholesale value"/>
+        <ROIField label="CAPEX" field="capex" suffix="EUR" inp={inp} setInp={setInp} help="One-time investment to design, produce, deliver, and install Selected Frame setup"/>
+        <ROIField label="OPEX" field="opex" suffix="%" inp={inp} setInp={setInp} help="Annual operating cost as % of CAPEX (maintenance, repairs)"/>
+        <ROIField label="Value View" field="valueView" options={["Wholesale","Gross Profit","EBIT"]} inp={inp} setInp={setInp}/>
+        {inp.valueView==="Gross Profit"&&<ROIField label="Gross Margin" field="gm" suffix="%" inp={inp} setInp={setInp}/>}
+        {inp.valueView==="EBIT"&&<ROIField label="EBIT" field="ebit" suffix="%" inp={inp} setInp={setInp}/>}
+      </div>
+
+      {/* Space */}
+      <div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>
+        <div style={{fontSize:14,fontWeight:600,marginBottom:16}}>Space</div>
+        {model==="uplift"?<>
+          <ROIField label="Existing Space" field="existSqm" suffix="m²" inp={inp} setInp={setInp} help="Sqm currently allocated to the brand"/>
+          <ROIField label="Added Space" field="addSqm" suffix="m²" inp={inp} setInp={setInp} help="Net additional sqm created by the SIS investment"/>
+          <div style={{background:C.surface,borderRadius:6,padding:"12px 14px",marginTop:14}}>
+            <div style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase"}}>Total Shop Size</div>
+            <div style={{fontSize:22,fontWeight:300,fontFamily:"'Cormorant Garamond',serif"}}>{ts} m²</div>
+          </div>
+          {/* Mini Indicator preview - simple bar */}
+          {incRetailTotal>0&&<div style={{marginTop:16}}>
+            <div style={{fontSize:10,fontWeight:600,color:C.textS,textTransform:"uppercase",marginBottom:6}}>Value Driver Split</div>
+            <div style={{display:"flex",height:8,borderRadius:4,overflow:"hidden",background:C.surfaceD}}>
+              <div style={{width:`${volumeShare*100}%`,background:C.oak}}/>
+              <div style={{width:`${upliftShare*100}%`,background:C.go}}/>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:C.textS,marginTop:4}}>
+              <span>Volume {(volumeShare*100).toFixed(0)}%</span>
+              <span>Uplift {(upliftShare*100).toFixed(0)}%</span>
+            </div>
+            <div style={{fontSize:10,color:C.text,marginTop:6,fontWeight:600}}>Primary driver: {primaryDriver}</div>
+          </div>}
+        </>:<>
+          <ROIField label="Total Shop Size" field="totalSqm" suffix="m²" inp={inp} setInp={setInp} help="Total floor area of the new distribution point"/>
+          <div style={{background:C.surface,borderRadius:6,padding:"12px 14px",marginTop:14,fontSize:11,color:C.textS,lineHeight:1.5}}>
+            New distribution does not split into existing/added — only the total shop size matters for this model.
+          </div>
+        </>}
+      </div>
+
+      {/* Decision panel */}
+      <div style={{borderRadius:8,padding:24,border:`2px solid ${st==="GO"?C.go:st==="REVIEW"?C.review:C.nogo}`,background:st==="GO"?"#E8F2EA":st==="REVIEW"?"#FDF3E0":"#FDEAE6",display:"flex",flexDirection:"column"}}>
+        <div style={{textAlign:"center",marginBottom:8}}>
+          <div style={{fontSize:48,fontWeight:300,fontFamily:"'Cormorant Garamond',serif",color:st==="GO"?C.go:st==="REVIEW"?C.review:C.nogo,lineHeight:1}}>{st}</div>
+        </div>
+        <div style={{fontSize:11,color:C.textS,textAlign:"center",marginBottom:16,lineHeight:1.4,padding:"0 6px"}}>{re}</div>
+        <div style={{borderTop:`1px solid rgba(0,0,0,.08)`,paddingTop:12}}>
+          {[["Net Annual Value",nv?fmtEur(Math.round(nv)):"—"],["Payback",pm?`${pm.toFixed(1)} mo`:"N/A"],["Annual OPEX",fmtEur(Math.round(ao))]].map(([l,v])=>
+            <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",fontSize:12,borderBottom:"1px solid rgba(0,0,0,.06)"}}>
+              <span style={{color:C.textS}}>{l}</span>
+              <span style={{fontWeight:600}}>{v}</span>
+            </div>)}
+        </div>
+        <div style={{marginTop:12,fontSize:10,color:C.textS,textAlign:"center"}}>
+          Thresholds: GO ≤24 mo · REVIEW ≤36 mo · NO GO &gt;36 mo
+        </div>
+      </div>
+    </div>
+
+    {/* ASANA-ready summary */}
+    <div style={{background:C.black,borderRadius:8,padding:24,color:C.white,marginBottom:24}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div>
+          <div style={{fontSize:11,color:C.steelL,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase"}}>ASANA-ready summary</div>
+          <div style={{fontSize:11,color:C.steel,marginTop:2}}>Paste this into the project task for documentation</div>
+        </div>
+        <button onClick={copySummary} style={{padding:"8px 16px",borderRadius:6,border:"none",background:copied?C.go:C.oak,color:C.white,fontSize:12,fontWeight:600,cursor:"pointer"}}>{copied?"✓ Copied":"Copy summary"}</button>
+      </div>
+      <pre style={{fontSize:11,color:C.steelL,fontFamily:"'DM Mono',monospace",whiteSpace:"pre-wrap",lineHeight:1.6,margin:0}}>{asanaSummary}</pre>
+    </div>
+
+    {/* Threshold reference */}
+    <div style={{background:C.white,borderRadius:8,padding:20,border:`1px solid ${C.surfaceD}`}}>
+      <div style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:10}}>Decision logic</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,fontSize:11}}>
+        <div style={{padding:"10px 14px",background:"#E8F2EA",borderRadius:6,borderLeft:`3px solid ${C.go}`}}><div style={{fontWeight:700,color:C.go,marginBottom:4}}>GO</div><div style={{color:C.textS,lineHeight:1.4}}>Payback within defined policy thresholds (≤24 months). Investment proceeds normally.</div></div>
+        <div style={{padding:"10px 14px",background:"#FDF3E0",borderRadius:6,borderLeft:`3px solid ${C.review}`}}><div style={{fontWeight:700,color:C.review,marginBottom:4}}>REVIEW</div><div style={{color:C.textS,lineHeight:1.4}}>Borderline cases (24–36 months) requiring conscious escalation and strategic rationale.</div></div>
+        <div style={{padding:"10px 14px",background:"#FDEAE6",borderRadius:6,borderLeft:`3px solid ${C.nogo}`}}><div style={{fontWeight:700,color:C.nogo,marginBottom:4}}>NO GO</div><div style={{color:C.textS,lineHeight:1.4}}>Payback exceeds 36 months or net annual value is negative. Strategic exception required to override.</div></div>
+      </div>
+    </div>
+  </div>;
+};
 
 const FlowPage=()=><div><Title sub="Phase 0–10">Project Flow</Title><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:32,borderRadius:8,overflow:"hidden"}}><div style={{height:200}}><img src="/images/kh_selected_sis_048_web.jpg" alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div><div style={{height:200}}><img src="/images/kh_selected_sis_023_web.jpg" alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div></div><div style={{position:"relative"}}><div style={{position:"absolute",left:23,top:20,bottom:20,width:2,background:`linear-gradient(to bottom,${C.steelL},${C.accent})`}}/>{PHASES.map(ph=><div key={ph.num} style={{display:"flex",gap:24,marginBottom:16,position:"relative"}}><div style={{width:48,height:48,borderRadius:"50%",background:ph.color,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:16,fontWeight:600,boxShadow:`0 2px 8px ${ph.color}44`,zIndex:1}}>{ph.num}</div><div style={{background:C.white,borderRadius:8,padding:"16px 20px",border:`1px solid ${C.surfaceD}`,flex:1,borderLeft:`4px solid ${ph.color}`}}><div style={{fontSize:11,fontWeight:600,color:ph.color,textTransform:"uppercase",letterSpacing:"1px"}}>Phase {ph.num}</div><div style={{fontSize:18,fontWeight:400,fontFamily:"'Cormorant Garamond',serif"}}>{ph.name}</div><p style={{fontSize:12,color:C.textS,margin:"6px 0 0",lineHeight:1.5}}>{ph.desc}</p></div></div>)}</div></div>;
 const InstalledPage=({projects})=>{const c=projects.filter(p=>p.completed);return<div><Title sub="Completed">Installed Base</Title><div style={{display:"flex",gap:16,marginBottom:24}}><KPI label="Total" value={c.length}/></div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>{c.map(p=><div key={p.gid} style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`,borderTop:`4px solid ${C.accent}`}}><div style={{fontSize:16,fontWeight:400,fontFamily:"'Cormorant Garamond',serif",marginBottom:8}}>{p.name}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:12}}>{[["Type",p.type],["Completed",fmtDate(p.completedAt)]].map(([l,v])=><div key={l}><div style={{color:C.textS,fontSize:10,fontWeight:600,textTransform:"uppercase"}}>{l}</div><div style={{fontWeight:500}}>{v}</div></div>)}</div><a href={p.url} target="_blank" rel="noopener noreferrer" style={{display:"inline-block",marginTop:12,fontSize:11,color:C.oak,textDecoration:"none",fontWeight:500}}>Details →</a></div>)}</div></div>};
 const StandardsPage=()=><div><Title sub="Concept guidelines">Standards</Title><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:32,borderRadius:8,overflow:"hidden"}}><div style={{height:220}}><img src="/images/kh_selected_sis_032_web.jpg" alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div><div style={{height:220}}><img src="/images/kh_selected_sis_018_web.jpg" alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}>{[{t:"Selected Frame",d:"Flexible, modular, Scandinavian design.",i:["Steel – Industrial, minimalistic","Shapes – Softness, playfulness","Wood – Warmth, Scandinavian"]},{t:"Floor Plans",d:"Standard sizes.",i:["25 m²","40 m²","60 m²","80 m²"]},{t:"Design Pillars",d:"Core principles.",i:["Visibility","Consistency","Flexibility"]},{t:"Partnership",d:"Data-driven collaboration.",i:["Real-time data","Trade meetings","Budgets","Seasonal control"]}].map(s=><div key={s.t} style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}><div style={{fontSize:18,fontWeight:400,fontFamily:"'Cormorant Garamond',serif",marginBottom:6}}>{s.t}</div><p style={{fontSize:12,color:C.textS,margin:"0 0 12px"}}>{s.d}</p>{s.i.map(i=><div key={i} style={{fontSize:12,padding:"4px 0",borderBottom:`1px solid ${C.surfaceD}`}}>{i}</div>)}</div>)}</div></div>;
-const AdminPage=({projects})=><div><Title sub="System health">Admin</Title><div style={{display:"flex",gap:16,marginBottom:24}}><KPI label="Source" value="BRAND SPACES"/><KPI label="Tasks" value={projects.length}/><KPI label="Status" value="Connected"/></div><div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}><div style={{fontSize:14,fontWeight:600,marginBottom:16}}>Field Completeness</div>{[["Name",100],["Due Date",Math.round(projects.filter(p=>p.dueOn).length/Math.max(projects.length,1)*100)],["Sex",Math.round(projects.filter(p=>p.sex).length/Math.max(projects.length,1)*100)],["Region",Math.round(projects.filter(p=>p.region).length/Math.max(projects.length,1)*100)]].map(([f,pct])=><div key={f} style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span>{f}</span><span style={{color:pct>=80?C.success:pct>=40?C.warn:C.danger,fontWeight:600}}>{pct}%</span></div><div style={{height:4,background:C.surfaceD,borderRadius:2}}><div style={{height:4,borderRadius:2,width:`${pct}%`,background:pct>=80?C.success:pct>=40?C.warn:C.danger}}/></div></div>)}</div></div>;
+const AdminPage=({projects})=>{
+  const [testing,setTesting]=useState(false);
+  const [result,setResult]=useState(null);
+  const runTest=async()=>{
+    setTesting(true);setResult(null);
+    try{
+      const r=await fetch("/api/test-asana-write",{method:"POST"});
+      const data=await r.json();
+      setResult(data);
+    }catch(e){
+      setResult({success:false,summary:"Network or server error: "+e.message,log:[]});
+    }finally{
+      setTesting(false);
+    }
+  };
+  return <div>
+    <Title sub="System health">Admin</Title>
+    <div style={{display:"flex",gap:16,marginBottom:24}}>
+      <KPI label="Source" value="BRAND SPACES"/>
+      <KPI label="Tasks" value={projects.length}/>
+      <KPI label="Status" value="Connected"/>
+    </div>
+    <div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`,marginBottom:20}}>
+      <div style={{fontSize:14,fontWeight:600,marginBottom:16}}>Field Completeness</div>
+      {[["Name",100],["Due Date",Math.round(projects.filter(p=>p.dueOn).length/Math.max(projects.length,1)*100)],["Sex",Math.round(projects.filter(p=>p.sex).length/Math.max(projects.length,1)*100)],["Region",Math.round(projects.filter(p=>p.region).length/Math.max(projects.length,1)*100)]].map(([f,pct])=>
+        <div key={f} style={{marginBottom:10}}>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
+            <span>{f}</span><span style={{color:pct>=80?C.success:pct>=40?C.warn:C.danger,fontWeight:600}}>{pct}%</span>
+          </div>
+          <div style={{height:4,background:C.surfaceD,borderRadius:2}}>
+            <div style={{height:4,borderRadius:2,width:`${pct}%`,background:pct>=80?C.success:pct>=40?C.warn:C.danger}}/>
+          </div>
+        </div>)}
+    </div>
+    <div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+        <div>
+          <div style={{fontSize:14,fontWeight:600}}>Asana Write Access Test</div>
+          <div style={{fontSize:11,color:C.textS,marginTop:4,maxWidth:520,lineHeight:1.5}}>Verifies if the configured ASANA_TOKEN can write comments to tasks. Required for the upcoming "Push ROI Summary to Asana" feature. The test creates a temporary comment and deletes it immediately — no permanent change to your Asana workspace.</div>
+        </div>
+        <button onClick={runTest} disabled={testing} style={{padding:"10px 18px",borderRadius:6,border:"none",background:testing?C.steelL:C.oak,color:C.white,fontSize:12,fontWeight:600,cursor:testing?"not-allowed":"pointer",minWidth:120,whiteSpace:"nowrap"}}>{testing?"Testing...":"Run Test"}</button>
+      </div>
+      {result&&<div style={{marginTop:16,padding:16,borderRadius:8,background:result.success?"#E8F2EA":"#FDEAE6",borderLeft:`4px solid ${result.success?C.go:C.nogo}`}}>
+        <div style={{fontSize:13,fontWeight:600,color:result.success?C.go:C.nogo,marginBottom:8}}>{result.success?"✓ "+result.summary:"✗ "+result.summary}</div>
+        {result.testedTaskName&&<div style={{fontSize:11,color:C.textS,marginBottom:12}}>Tested against task: <strong>{result.testedTaskName}</strong></div>}
+        {result.log&&result.log.length>0&&<div style={{borderTop:`1px solid ${C.surfaceD}`,paddingTop:12,marginTop:8}}>
+          <div style={{fontSize:10,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:8}}>Test Log</div>
+          {result.log.map((entry,i)=><div key={i} style={{display:"flex",gap:10,fontSize:11,padding:"6px 0",borderBottom:i<result.log.length-1?`1px solid ${C.surfaceD}`:"none"}}>
+            <span style={{color:entry.ok?C.go:C.nogo,fontWeight:700,minWidth:14}}>{entry.ok?"✓":"✗"}</span>
+            <div style={{flex:1}}>
+              <div style={{color:C.text,fontWeight:600}}>{entry.label}</div>
+              <div style={{color:C.textS,fontFamily:"'DM Mono',monospace",fontSize:10,marginTop:2,wordBreak:"break-word"}}>{entry.detail}</div>
+            </div>
+          </div>)}
+        </div>}
+      </div>}
+    </div>
+  </div>;
+};
 
 export default function Home(){const [page,setPage]=useState("overview");const [detail,setDetail]=useState(null);const [hover,setHover]=useState(null);const [projects,setProjects]=useState(FALLBACK_PROJECTS);
   useEffect(()=>{const f=async()=>{try{const r=await fetch("/api/projects");if(r.ok){const d=await r.json();if(d.projects?.length>0)setProjects(d.projects)}}catch(e){}};f();const i=setInterval(f,15*60*1000);return()=>clearInterval(i)},[]);
   const nav=[{id:"overview",label:"Overview",icon:"◈"},{id:"projects",label:"Projects",icon:"▦"},{id:"quotation",label:"Quotation",icon:"📋"},{id:"roi",label:"ROI Tool",icon:"◇"},{id:"flow",label:"Project Flow",icon:"⟳"},{id:"installed",label:"Installed Base",icon:"⊞"},{id:"standards",label:"Standards",icon:"☰"},{id:"admin",label:"Admin",icon:"⚙"}];
   return<div style={{display:"flex",minHeight:"100vh",background:C.surface}}>
-    <div style={{width:220,background:C.black,color:C.white,flexShrink:0,display:"flex",flexDirection:"column",padding:"28px 0",position:"sticky",top:0,height:"100vh"}}><div style={{padding:"0 24px",marginBottom:36}}><img src={LOGO_WHITE} alt="" style={{height:28,marginBottom:8}}/><div style={{fontSize:9,color:C.steel,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:4}}>Command Space</div></div><div style={{flex:1}}>{nav.map(it=><div key={it.id} style={{padding:"10px 24px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontSize:13,fontWeight:page===it.id?600:400,background:page===it.id?C.steelD+"33":hover===it.id?"rgba(255,255,255,.04)":"transparent",color:page===it.id?C.white:C.steelL,borderLeft:page===it.id?`3px solid ${C.oak}`:"3px solid transparent"}} onClick={()=>{setPage(it.id);setDetail(null)}} onMouseEnter={()=>setHover(it.id)} onMouseLeave={()=>setHover(null)}><span style={{fontSize:16,width:20,textAlign:"center",opacity:.7}}>{it.icon}</span>{it.label}</div>)}</div><div style={{padding:"16px 24px",borderTop:`1px solid ${C.steelD}33`}}><div style={{fontSize:10,color:C.steel}}>v2.3.0</div><div style={{fontSize:10,color:C.steel,marginTop:2}}>[ A frame for the business we share ]</div></div></div>
+    <div style={{width:220,background:C.black,color:C.white,flexShrink:0,display:"flex",flexDirection:"column",padding:"28px 0",position:"sticky",top:0,height:"100vh"}}><div style={{padding:"0 24px",marginBottom:36}}><img src={LOGO_WHITE} alt="" style={{height:28,marginBottom:8}}/><div style={{fontSize:9,color:C.steel,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:4}}>Command Space</div></div><div style={{flex:1}}>{nav.map(it=><div key={it.id} style={{padding:"10px 24px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontSize:13,fontWeight:page===it.id?600:400,background:page===it.id?C.steelD+"33":hover===it.id?"rgba(255,255,255,.04)":"transparent",color:page===it.id?C.white:C.steelL,borderLeft:page===it.id?`3px solid ${C.oak}`:"3px solid transparent"}} onClick={()=>{setPage(it.id);setDetail(null)}} onMouseEnter={()=>setHover(it.id)} onMouseLeave={()=>setHover(null)}><span style={{fontSize:16,width:20,textAlign:"center",opacity:.7}}>{it.icon}</span>{it.label}</div>)}</div><div style={{padding:"16px 24px",borderTop:`1px solid ${C.steelD}33`}}><div style={{fontSize:10,color:C.steel}}>v2.4.1</div><div style={{fontSize:10,color:C.steel,marginTop:2}}>[ A frame for the business we share ]</div></div></div>
     <div style={{flex:1,overflow:"auto"}}><div style={{padding:"14px 40px",background:C.white,borderBottom:`1px solid ${C.surfaceD}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{fontSize:13,color:C.textS}}>{nav.find(n=>n.id===page)?.label}</div><div style={{fontSize:12,color:C.textS}}>{new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div></div>
       <div style={{padding:"32px 40px",maxWidth:1200}}>
         {page==="overview"&&<OverviewPage projects={projects} setPage={setPage} setDetail={setDetail}/>}

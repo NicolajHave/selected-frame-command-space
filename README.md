@@ -1,64 +1,77 @@
-# Selected Frame · Command Space — v2.3.0
+# Selected Frame · Command Space — v2.4.0
 
 Internal Brand Spaces tool for Selected Frame concept.
 Live: https://selected-frame-command-space.vercel.app
 
-## What's new in v2.3.0
+## What's new in v2.4.0
 
-**Hanger Calculator** added to Quotation Builder. When a supplier PDF is parsed:
+**ROI Tool → ROI Decision Engine.** The tool was rebuilt from scratch to match the SIS Investment ROI Framework spreadsheet. Previously it was just a calculator; now it's a decision-support and gatekeeping mechanism.
 
-1. The calculator scans the Inventory items for fixtures that hold hangers
-2. Each match adds its hanger capacity to a running total (e.g. Sidehang 1400 = 50 hangers, Front hang = 12, Floor rack 700 = 25)
-3. The total is split 60% shirt / 25% clips / 15% coat
-4. Custom rounding applies:
-   - Shirt + clips → nearest 50 (rest >15 = up, rest ≤15 = down)
-   - Coat → nearest 25 (rest >5 = up, rest ≤5 = down)
-5. **Add to Quote** button populates the Add-ons section with the right pack quantities (shirt50, clip50, coat25)
+### New explanatory copy
+Each model now has its own card explaining:
+- **What the tool does** — plain language description of the calculation
+- **Key principle** — why the model is structured this way (incremental value vs total business)
+- **Intended use** — when to use this model
 
-Hidden when no matching fixtures exist. The three hanger items remain in Add-ons so they can also be edited manually.
+### Uplift % is now editable
+- Replaced Worst/Base/Best dropdown with a manual % input field
+- Three preset shortcuts (Worst 5% / Base 10% / Best 15%) remain as quick-fill buttons
+- New **Expected Retail Sales / Year** field with auto-calculate button — derives uplift % from (Expected − Last Year) / Last Year
 
-### Matching rules
+### Total Payback Model has its own sqm
+Previously it was reusing existing+added from Uplift Model (which is conceptually wrong — new distribution doesn't have an "existing" baseline). It now has a single dedicated **Total Shop Size** field.
 
-| Match | Hangers per unit |
-|---|---|
-| name contains "sidehang 1400" | 50 |
-| name contains "sidehang 700" | 25 |
-| name contains "wall unit" + "jeans" | 10 |
-| name contains "front hang" | 12 |
-| name contains "floor rack 1400" | 50 |
-| name contains "floor rack 700" | 25 |
-| name contains "jeans" + "double" | 15 |
-| name contains "jeans" + "single" | 30 |
-| name contains "wall unit" + "1400" (not bracket/mirror/screen/connector) | 50 |
-| name contains "wall unit" + "700" (not bracket/connector) | 25 |
+### Decision rationale text
+Below the GO/REVIEW/NO GO badge, the panel now shows specific narrative reasoning:
+- *"Within policy thresholds (≤24 months payback)"*
+- *"Borderline — between 24 and 36 months payback. Conscious escalation required."*
+- *"Payback exceeds policy threshold of 36 months"*
+- *"Net annual value is zero or negative"*
 
-Bracket, Mirror box, Screen, Connector plate etc. are correctly skipped.
+### Mini Indicator (Volume vs Brand Presence)
+On the Uplift Model, a small bar chart shows how much of the incremental value comes from added space (volume-driven) vs improved performance on existing space (brand presence-driven). Identifies the **primary driver** of the case.
 
-### Validated against real PDFs
+### ASANA-ready summary
+A black panel below the inputs renders a copy-paste-ready text block matching the format in the Excel Control Panel (cell B32). One-click **Copy** button puts it on the clipboard.
 
-| PDF | Matched fixtures | Raw total | Rounded shirt/clips/coat |
-|---|---|---|---|
-| Hagemeyer Minden | Sidehang 1400 (5), Front hang (4), Floor rack 1400 (6) | 598 | 350 / 150 / 100 |
-| Stockmann Helsinki | Sidehang 1400 (9), Jeans unit (1), Front hang (4), Floor rack 1400 (7), Floor rack 700 (1), Jeans rack double (1) | 898 | 550 / 250 / 150 |
+### Decision logic reference
+Always-visible threshold reference at the bottom (GO ≤24mo · REVIEW ≤36mo · NO GO >36mo) with rationale for each.
+
+## Validated against Excel Framework
+
+All key outputs reconcile to the spreadsheet to two decimal places:
+
+| Value | Tool | Excel reference |
+|---|---|---|
+| Inc wholesale (Uplift) | €22.413,79 | €22.413,79 |
+| Net annual value (Uplift, GP) | €4.644,83 | €4.644,83 |
+| Payback (Uplift) | 51,67 mo | 51,67 mo |
+| Volume share | 77% | 76,9% |
+| Net annual value (Total Payback) | €14.903,45 | €14.903,45 |
+| Payback (Total Payback) | 16,10 mo | 16,10 mo |
+
+## Deferred — not in this release
+
+- **Bind ROI to Quotation Tool** (auto-fill CAPEX from parsed quote)
+- **Bind ROI to Projects** (select project from dropdown to populate fields)
+- **Asana sync button** (push ROI summary to task description/comment via API)
+
+These are queued for a follow-up release once the Decision Engine has been validated in production. The Asana integration in particular requires a permissions check on the current `ASANA_TOKEN` (it may be read-only).
 
 ## How to deploy
 
 1. Unzip locally
-2. Go to https://github.com/NicolajHave/selected-frame-command-space
-3. Click "Add file" → "Upload files" → drag everything inside the unzipped folder
-4. Commit message: `v2.3.0 — Hanger Calculator`
-5. Vercel auto-deploys
+2. Drag everything inside the unzipped folder to GitHub repo root
+3. Commit message: `v2.4.0 — ROI Decision Engine`
+4. Vercel auto-deploys
 
 ## Smoke test
 
-1. Upload Hagemeyer PDF or similar
-2. Hanger Calculator panel appears below Cost Breakdown
-3. See matched fixtures and totals
-4. Click **Add to Quote** → Shirt/Clip/Coat hangers appear checked in Add-ons with auto-set quantities
-5. Button changes to "✓ Added to Quote" when add-ons match calculator output
-6. Adjust quantities manually in Add-ons if needed (Calculator total stays as a reference)
-
-## Inherited from v2.2.0
-- 3-pillar category mapping (Inventory + Floor + Special Elements + Fitting Rooms grouped together; AV & HiFi + Light + Construction grouped under Specific Project Cost)
-- Mailto-based email flow (no backend dependencies)
-- Input fields keep focus while typing
+1. Open ROI Decision Engine page
+2. **Uplift Model** tab — verify the explainer card shows "What the tool does", "Key principle", "Intended use"
+3. Fill in Last Year Retail (e.g. 150000) and Expected Retail (e.g. 172500), click "Auto-calculate uplift % from expected vs last year" — Uplift % should auto-fill to 15.0
+4. Verify Net Annual Value matches €4.645 and Payback matches 52 mo (Best 15% scenario)
+5. Verify Mini Indicator shows roughly Volume 77% / Uplift 23%, primary driver = Volume-driven
+6. Switch to **Total Payback Model** — verify Space section shows only one field (Total Shop Size)
+7. Verify Net Annual Value matches €14.903 and Payback matches 16,1 mo
+8. Click **Copy summary** in ASANA-ready panel — paste into a text editor to verify format
