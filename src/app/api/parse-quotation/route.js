@@ -59,7 +59,7 @@ export async function POST(request) {
 
     const categories = [];
     let currentCat = null;
-    const catNames = ['INVENTORY', 'SELECTED DELIVERIES', 'SPECIFIC PROJECT COST', 'SPECIAL ELEMENTS', 'FITTING ROOMS', 'FLOOR', 'AV & HIFI', 'CONSTRUCTION'];
+    const catNames = ['INVENTORY', 'SELECTED DELIVERIES', 'SPECIFIC PROJECT COST', 'SPECIAL ELEMENTS', 'FITTING ROOMS', 'FLOOR', 'AV & HIFI', 'CONSTRUCTION', 'LIGHT'];
     let grandTotal = 0, grandSqm = 0;
     let inSummary = false;
 
@@ -171,35 +171,58 @@ export async function POST(request) {
     });
 
     // Build summary from category Total lines
+    // Three-pillar mapping (consolidates &elements' 9 raw categories into the 3 we present):
+    //   Inventory pillar      = INVENTORY + FLOOR + SPECIAL ELEMENTS + FITTING ROOMS  (physical fixtures)
+    //   Selected Deliveries   = SELECTED DELIVERIES                                    (consumables)
+    //   Specific Project Cost = SPECIFIC PROJECT COST + AV & HIFI + LIGHT + CONSTRUCTION (services & install)
     const getCat = (n) => categories.find(c => c.name === n)?.total || 0;
+
+    const inventoryGroup = ['INVENTORY', 'FLOOR', 'SPECIAL ELEMENTS', 'FITTING ROOMS'];
+    const deliveriesGroup = ['SELECTED DELIVERIES'];
+    const projectCostGroup = ['SPECIFIC PROJECT COST', 'AV & HIFI', 'LIGHT', 'CONSTRUCTION'];
+
+    const sumGroup = (group) => group.reduce((s, n) => s + getCat(n), 0);
+
+    // Track which raw categories contributed to each pillar (for transparency in UI)
+    const groupBreakdown = (group) => group
+      .map(n => ({ name: n, value: getCat(n) }))
+      .filter(x => x.value > 0);
+
     const summary = {
-      inventory: getCat('INVENTORY'),
-      selectedDeliveries: getCat('SELECTED DELIVERIES'),
-      specificProjectCost: getCat('SPECIFIC PROJECT COST'),
+      inventory: sumGroup(inventoryGroup),
+      selectedDeliveries: sumGroup(deliveriesGroup),
+      specificProjectCost: sumGroup(projectCostGroup),
+      // Raw category totals kept for the detail breakdown UI
+      inventoryRaw: getCat('INVENTORY'),
+      selectedDeliveriesRaw: getCat('SELECTED DELIVERIES'),
+      specificProjectCostRaw: getCat('SPECIFIC PROJECT COST'),
       specialElements: getCat('SPECIAL ELEMENTS'),
       fittingRooms: getCat('FITTING ROOMS'),
       floor: getCat('FLOOR'),
       avHifi: getCat('AV & HIFI'),
+      light: getCat('LIGHT'),
       construction: getCat('CONSTRUCTION'),
+      // Group composition for UI transparency
+      inventoryBreakdown: groupBreakdown(inventoryGroup),
+      projectCostBreakdown: groupBreakdown(projectCostGroup),
       totalExclVat: grandTotal || 0,
       sqmPrice: grandSqm || 0,
     };
 
-    // Sanity check: do category totals add up to grand total?
+    // Sanity check: do the 3 pillar totals add up to grand total?
+    // (No double-counting: each raw category appears in exactly one pillar)
     if (summary.totalExclVat > 0) {
-      const sumOfCats = summary.inventory + summary.selectedDeliveries + summary.specificProjectCost +
-                        summary.specialElements + summary.fittingRooms + summary.floor +
-                        summary.avHifi + summary.construction;
-      const diff = Math.abs(summary.totalExclVat - sumOfCats);
+      const sumOfPillars = summary.inventory + summary.selectedDeliveries + summary.specificProjectCost;
+      const diff = Math.abs(summary.totalExclVat - sumOfPillars);
       const tolerance = Math.max(50, summary.totalExclVat * 0.02); // 2% or €50, whichever is larger
-      if (sumOfCats > 0 && diff > tolerance) {
-        addWarn('warn', `Category totals (€${sumOfCats.toLocaleString('de-DE')}) don't match grand total (€${summary.totalExclVat.toLocaleString('de-DE')}) - difference €${Math.round(diff).toLocaleString('de-DE')}`);
+      if (sumOfPillars > 0 && diff > tolerance) {
+        addWarn('warn', `Pillar totals (€${sumOfPillars.toLocaleString('de-DE')}) don't match grand total (€${summary.totalExclVat.toLocaleString('de-DE')}) - difference €${Math.round(diff).toLocaleString('de-DE')}`);
       }
     }
 
     if (!summary.totalExclVat) {
-      summary.totalExclVat = Object.values(summary).reduce((a, b) => a + b, 0) - summary.sqmPrice;
-      addWarn('info', 'Grand total not found in PDF - calculated from category sums');
+      summary.totalExclVat = summary.inventory + summary.selectedDeliveries + summary.specificProjectCost;
+      addWarn('info', 'Grand total not found in PDF - calculated from pillar sums');
     }
     if (!summary.sqmPrice && header.salesArea > 0 && summary.totalExclVat > 0) {
       summary.sqmPrice = Math.round(summary.totalExclVat / header.salesArea);
