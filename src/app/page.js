@@ -121,6 +121,33 @@ const ProjectsPage=({projects,detail,setDetail})=>{
 // ─── QUOTATION ────────────────────────────────────────────
 const ADD_ONS=[{id:"screen55",name:'55" Screen (wall mounted)',price:1370,cat:"AV & HiFi"},{id:"screen75",name:'75" Screen (wall module)',price:1351,cat:"AV & HiFi"},{id:"carpet",name:"Carpet",price:469,cat:"Floor"},{id:"leather_tray",name:"Leather Tray",price:282,cat:"Accessories"},{id:"shirt50",name:"Shirt Hangers (50 pcs)",price:69,cat:"Selected Deliveries"},{id:"clip50",name:"Clip Hangers (50 pcs)",price:83,cat:"Selected Deliveries"},{id:"coat25",name:"Coat Hangers (25 pcs)",price:89,cat:"Selected Deliveries"}];
 
+// Hanger Calculator: matching rules ordered by specificity (first match wins)
+// Each rule: test function on lowercased item name -> hangers per unit
+const HANGER_RULES=[
+  {label:"Wall unit Sidehang 1400",hangers:50,test:n=>n.includes("sidehang 1400")},
+  {label:"Wall unit Sidehang 700",hangers:25,test:n=>n.includes("sidehang 700")},
+  {label:"Wall unit Jeans unit",hangers:10,test:n=>n.includes("wall unit")&&n.includes("jeans")},
+  {label:"Wall unit Front hang",hangers:12,test:n=>n.includes("front hang")},
+  {label:"Floor rack 1400",hangers:50,test:n=>n.includes("floor rack 1400")},
+  {label:"Floor rack 700",hangers:25,test:n=>n.includes("floor rack 700")},
+  {label:"Jeans rack double",hangers:15,test:n=>n.includes("jeans")&&n.includes("double")},
+  {label:"Jeans rack single",hangers:30,test:n=>n.includes("jeans")&&n.includes("single")},
+  // Generic Wall unit 1400 / 700 - LAST so specific rules above win first
+  {label:"Wall unit 1400",hangers:50,test:n=>n.includes("wall unit")&&n.includes("1400")&&!n.includes("bracket")&&!n.includes("mirror")&&!n.includes("screen")&&!n.includes("connector")},
+  {label:"Wall unit 700",hangers:25,test:n=>n.includes("wall unit")&&n.includes("700")&&!n.includes("bracket")&&!n.includes("connector")},
+];
+
+const matchHangerRule=(itemName)=>{
+  if(!itemName)return null;
+  const n=itemName.toLowerCase();
+  return HANGER_RULES.find(r=>r.test(n))||null;
+};
+
+// Custom rounding: shirt/clips to nearest 50 (rest>15 up, rest<=15 down)
+//                  coat to nearest 25 (rest>5 up, rest<=5 down)
+const roundShirtClips=(n)=>{const rest=n%50;return rest>15?n+(50-rest):n-rest};
+const roundCoat=(n)=>{const rest=n%25;return rest>5?n+(25-rest):n-rest};
+
 const QuotationPage=()=>{
   const [parsed,setParsed]=useState(null);
   const [parsing,setParsing]=useState(false);
@@ -296,6 +323,78 @@ Bestseller A/S`;
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}><div style={{padding:"10px 14px",background:C.black,borderRadius:6,color:C.white}}><div style={{fontSize:11,fontWeight:600,color:C.steelL,textTransform:"uppercase",letterSpacing:".5px"}}>Total</div><div style={{fontSize:20,fontWeight:300,fontFamily:"'Cormorant Garamond',serif"}}>{fmtEur(supTotal)}</div></div>{sqm>0&&<div style={{padding:"10px 14px",background:C.surface,borderRadius:6}}><div style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase"}}>SQM Price</div><div style={{fontSize:20,fontWeight:300,fontFamily:"'Cormorant Garamond',serif"}}>{fmtEur(Math.round(supTotal/sqm))} / m²</div></div>}</div>
       {parsed.categories?.map(cat=><details key={cat.name} style={{marginBottom:8}}><summary style={{cursor:"pointer",fontSize:13,fontWeight:600,padding:"8px 0",borderBottom:`1px solid ${C.surfaceD}`}}>{cat.name} — {fmtEur(cat.total)} ({cat.items?.length||0} items)</summary><div style={{padding:"8px 0"}}>{cat.items?.map((it,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"3px 0",color:C.textS}}><span>{it.qty>0?`${it.qty}× `:""}{it.name}</span><span style={{fontWeight:500,color:C.text}}>{fmtEur(it.totalPrice)}</span></div>)}</div></details>)}
     </div></div>}
+    {(()=>{
+      // ── Hanger Calculator ─────────────────────────────────────────
+      // Auto-derived from parsed Inventory items. Hidden when nothing matches.
+      if(!parsed)return null;
+      const inv=parsed.categories?.find(c=>c.name==="INVENTORY");
+      if(!inv?.items?.length)return null;
+      const matched=inv.items.map(it=>{const r=matchHangerRule(it.name);return r?{...it,rule:r,subtotal:(it.qty||0)*r.hangers}:null}).filter(Boolean);
+      if(!matched.length)return null;
+      const rawTotal=matched.reduce((s,m)=>s+m.subtotal,0);
+      const shirtRaw=Math.round(rawTotal*0.60);
+      const clipsRaw=Math.round(rawTotal*0.25);
+      const coatRaw=Math.round(rawTotal*0.15);
+      const shirt=Math.max(0,roundShirtClips(shirtRaw));
+      const clips=Math.max(0,roundShirtClips(clipsRaw));
+      const coat=Math.max(0,roundCoat(coatRaw));
+      const addToQuote=()=>{
+        setAddOns(p=>{
+          const next={...p};
+          if(shirt>0)next.shirt50={qty:shirt/50};
+          if(clips>0)next.clip50={qty:clips/50};
+          if(coat>0)next.coat25={qty:coat/25};
+          return next;
+        });
+      };
+      // Detect if hangers are already added matching these exact qtys (so CTA can show "Updated")
+      const alreadyMatching=
+        (shirt===0||addOns.shirt50?.qty===shirt/50)&&
+        (clips===0||addOns.clip50?.qty===clips/50)&&
+        (coat===0||addOns.coat25?.qty===coat/25)&&
+        (shirt>0||clips>0||coat>0)&&
+        (addOns.shirt50||addOns.clip50||addOns.coat25);
+      return <div style={{marginBottom:32}}>
+        <Title sub="Auto-calculated from parsed fixtures – click Add to Quote to populate add-ons">Hanger Calculator</Title>
+        <div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`,display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}>
+          <div>
+            <div style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:10}}>Matched fixtures</div>
+            <div style={{maxHeight:200,overflow:"auto",marginBottom:12}}>{matched.map((m,i)=>
+              <div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"4px 0",borderBottom:i<matched.length-1?`1px solid ${C.surfaceD}`:"none"}}>
+                <span style={{color:C.text}}>{m.qty}× {m.rule.label}</span>
+                <span style={{color:C.textS,fontFamily:"'DM Mono',monospace"}}>{m.qty} × {m.rule.hangers} = {m.subtotal}</span>
+              </div>
+            )}</div>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"10px 14px",background:C.surface,borderRadius:6}}>
+              <span style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase"}}>Raw total</span>
+              <span style={{fontSize:18,fontWeight:300,fontFamily:"'Cormorant Garamond',serif"}}>{rawTotal} hangers</span>
+            </div>
+          </div>
+          <div>
+            <div style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:10}}>Type split (60/25/15)</div>
+            {[
+              {label:"Shirt",pct:60,raw:shirtRaw,rounded:shirt,pack:50,price:69,id:"shirt50"},
+              {label:"Clips",pct:25,raw:clipsRaw,rounded:clips,pack:50,price:83,id:"clip50"},
+              {label:"Coat",pct:15,raw:coatRaw,rounded:coat,pack:25,price:89,id:"coat25"},
+            ].map(s=><div key={s.label} style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"8px 0",borderBottom:`1px solid ${C.surfaceD}`}}>
+              <div>
+                <span style={{fontSize:13,fontWeight:600,color:C.text}}>{s.label}</span>
+                <span style={{fontSize:11,color:C.textS,marginLeft:8}}>({s.pct}% · {s.raw} → {s.rounded})</span>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:14,fontWeight:600,fontFamily:"'DM Mono',monospace"}}>{s.rounded} pcs</div>
+                <div style={{fontSize:10,color:C.textS}}>{s.rounded>0?`${s.rounded/s.pack}× ${s.pack}-pack · ${fmtEur((s.rounded/s.pack)*s.price)}`:"—"}</div>
+              </div>
+            </div>)}
+            <div style={{display:"flex",justifyContent:"space-between",padding:"10px 14px",background:C.black,borderRadius:6,color:C.white,marginTop:12}}>
+              <span style={{fontSize:11,fontWeight:600,color:C.steelL,textTransform:"uppercase"}}>Hanger cost</span>
+              <span style={{fontSize:18,fontWeight:300,fontFamily:"'Cormorant Garamond',serif"}}>{fmtEur((shirt/50)*69+(clips/50)*83+(coat/25)*89)}</span>
+            </div>
+            <button onClick={addToQuote} disabled={rawTotal===0} style={{width:"100%",marginTop:12,padding:"12px",borderRadius:8,border:"none",background:rawTotal===0?C.steelL:(alreadyMatching?C.success:C.oak),color:C.white,fontSize:13,fontWeight:600,cursor:rawTotal===0?"not-allowed":"pointer"}}>{alreadyMatching?"✓ Added to Quote":"Add to Quote →"}</button>
+          </div>
+        </div>
+      </div>;
+    })()}
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginBottom:32}}>
       <div><Title sub="Select optional elements">2. Add-ons</Title><div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>{ADD_ONS.map(a=>{const sel=addOns[a.id];return<div key={a.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:`1px solid ${C.surfaceD}`}}><input type="checkbox" checked={!!sel} onChange={()=>toggleAO(a.id)} style={{width:16,height:16,accentColor:C.oak}}/><div style={{flex:1}}><div style={{fontSize:13}}>{a.name}</div><div style={{fontSize:11,color:C.textS}}>{a.cat} · {fmtEur(a.price)} / pc</div></div>{sel&&<PM value={sel.qty} onChange={v=>setAOQty(a.id,v)}/>}{sel&&<div style={{fontSize:13,fontWeight:600,minWidth:60,textAlign:"right"}}>{fmtEur(a.price*sel.qty)}</div>}</div>})}</div></div>
       <div><Title sub="Additional costs">3. Custom Items</Title><div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>{customs.map((it,i)=><div key={i} style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}><input placeholder="Description" value={it.name} onChange={e=>setCustoms(p=>p.map((x,j)=>j===i?{...x,name:e.target.value}:x))} style={{flex:2,padding:"8px 10px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,outline:"none"}}/><input placeholder="€" type="text" inputMode="decimal" value={it.price} onChange={e=>setCustoms(p=>p.map((x,j)=>j===i?{...x,price:e.target.value}:x))} style={{width:80,padding:"8px 10px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,outline:"none"}}/><input placeholder="Qty" type="text" inputMode="numeric" value={it.qty} onChange={e=>setCustoms(p=>p.map((x,j)=>j===i?{...x,qty:e.target.value}:x))} style={{width:48,padding:"8px 10px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,textAlign:"center",outline:"none"}}/><button onClick={()=>setCustoms(p=>p.filter((_,j)=>j!==i))} style={{background:"none",border:"none",color:C.danger,cursor:"pointer",fontSize:16}}>×</button></div>)}<button onClick={()=>setCustoms(p=>[...p,{name:"",price:"",qty:"1"}])} style={{width:"100%",padding:"10px",borderRadius:6,border:`1px dashed ${C.surfaceD}`,background:"transparent",cursor:"pointer",fontSize:13,color:C.textS}}>+ Add custom item</button></div>
@@ -339,7 +438,7 @@ export default function Home(){const [page,setPage]=useState("overview");const [
   useEffect(()=>{const f=async()=>{try{const r=await fetch("/api/projects");if(r.ok){const d=await r.json();if(d.projects?.length>0)setProjects(d.projects)}}catch(e){}};f();const i=setInterval(f,15*60*1000);return()=>clearInterval(i)},[]);
   const nav=[{id:"overview",label:"Overview",icon:"◈"},{id:"projects",label:"Projects",icon:"▦"},{id:"quotation",label:"Quotation",icon:"📋"},{id:"roi",label:"ROI Tool",icon:"◇"},{id:"flow",label:"Project Flow",icon:"⟳"},{id:"installed",label:"Installed Base",icon:"⊞"},{id:"standards",label:"Standards",icon:"☰"},{id:"admin",label:"Admin",icon:"⚙"}];
   return<div style={{display:"flex",minHeight:"100vh",background:C.surface}}>
-    <div style={{width:220,background:C.black,color:C.white,flexShrink:0,display:"flex",flexDirection:"column",padding:"28px 0",position:"sticky",top:0,height:"100vh"}}><div style={{padding:"0 24px",marginBottom:36}}><img src={LOGO_WHITE} alt="" style={{height:28,marginBottom:8}}/><div style={{fontSize:9,color:C.steel,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:4}}>Command Space</div></div><div style={{flex:1}}>{nav.map(it=><div key={it.id} style={{padding:"10px 24px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontSize:13,fontWeight:page===it.id?600:400,background:page===it.id?C.steelD+"33":hover===it.id?"rgba(255,255,255,.04)":"transparent",color:page===it.id?C.white:C.steelL,borderLeft:page===it.id?`3px solid ${C.oak}`:"3px solid transparent"}} onClick={()=>{setPage(it.id);setDetail(null)}} onMouseEnter={()=>setHover(it.id)} onMouseLeave={()=>setHover(null)}><span style={{fontSize:16,width:20,textAlign:"center",opacity:.7}}>{it.icon}</span>{it.label}</div>)}</div><div style={{padding:"16px 24px",borderTop:`1px solid ${C.steelD}33`}}><div style={{fontSize:10,color:C.steel}}>v2.2.0</div><div style={{fontSize:10,color:C.steel,marginTop:2}}>[ A frame for the business we share ]</div></div></div>
+    <div style={{width:220,background:C.black,color:C.white,flexShrink:0,display:"flex",flexDirection:"column",padding:"28px 0",position:"sticky",top:0,height:"100vh"}}><div style={{padding:"0 24px",marginBottom:36}}><img src={LOGO_WHITE} alt="" style={{height:28,marginBottom:8}}/><div style={{fontSize:9,color:C.steel,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:4}}>Command Space</div></div><div style={{flex:1}}>{nav.map(it=><div key={it.id} style={{padding:"10px 24px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontSize:13,fontWeight:page===it.id?600:400,background:page===it.id?C.steelD+"33":hover===it.id?"rgba(255,255,255,.04)":"transparent",color:page===it.id?C.white:C.steelL,borderLeft:page===it.id?`3px solid ${C.oak}`:"3px solid transparent"}} onClick={()=>{setPage(it.id);setDetail(null)}} onMouseEnter={()=>setHover(it.id)} onMouseLeave={()=>setHover(null)}><span style={{fontSize:16,width:20,textAlign:"center",opacity:.7}}>{it.icon}</span>{it.label}</div>)}</div><div style={{padding:"16px 24px",borderTop:`1px solid ${C.steelD}33`}}><div style={{fontSize:10,color:C.steel}}>v2.3.0</div><div style={{fontSize:10,color:C.steel,marginTop:2}}>[ A frame for the business we share ]</div></div></div>
     <div style={{flex:1,overflow:"auto"}}><div style={{padding:"14px 40px",background:C.white,borderBottom:`1px solid ${C.surfaceD}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{fontSize:13,color:C.textS}}>{nav.find(n=>n.id===page)?.label}</div><div style={{fontSize:12,color:C.textS}}>{new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div></div>
       <div style={{padding:"32px 40px",maxWidth:1200}}>
         {page==="overview"&&<OverviewPage projects={projects} setPage={setPage} setDetail={setDetail}/>}
