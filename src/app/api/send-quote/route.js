@@ -1,16 +1,14 @@
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
+export const runtime = 'nodejs';
 
-import PDFDocument from 'pdfkit';
 import { Resend } from 'resend';
-import { readFileSync, existsSync } from 'fs';
-import path from 'path';
 
 const FROM_EMAIL = 'Selected Frame <selectedsis@selectedframe.com>';
 const REPLY_TO = 'selectedsis@bestseller.com';
 const BCC_EMAIL = 'selectedsis@selectedframe.com';
 
-// Format helpers (mirror frontend)
+// Format helpers
 const fmtEur = (n) => typeof n === 'number' && n > 0
   ? `€${n.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
   : '—';
@@ -23,28 +21,31 @@ const fmtDate = (iso) => {
 
 const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e || '');
 
-// Try to load logo from public/images at build time
-function loadLogoBuffer() {
-  // In Vercel serverless, public/ files are accessible relative to process.cwd()
-  const candidates = [
-    path.join(process.cwd(), 'public', 'images', 'logo-black.png'),
-    path.join(process.cwd(), 'public', 'logo-black.png'),
-  ];
-  for (const p of candidates) {
-    try {
-      if (existsSync(p)) return readFileSync(p);
-    } catch {}
+// Lazy logo loading - only at request time, only on server
+async function loadLogoBuffer() {
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+    const candidates = [
+      path.join(process.cwd(), 'public', 'images', 'logo-black.png'),
+      path.join(process.cwd(), 'public', 'logo-black.png'),
+    ];
+    for (const p of candidates) {
+      try {
+        if (fs.existsSync(p)) return fs.readFileSync(p);
+      } catch {}
+    }
+  } catch (e) {
+    console.error('Logo load error:', e.message);
   }
   return null;
 }
 
-const LOGO_BUFFER = loadLogoBuffer();
-
-/**
- * Generate PDF buffer using pdfkit. Mirrors the HTML print template visually.
- * Layout: 595×842 (A4), margins 50px.
- */
 async function generatePdfBuffer(data) {
+  // Dynamically import pdfkit so it stays out of the client bundle
+  const PDFDocument = (await import('pdfkit')).default;
+  const logoBuffer = await loadLogoBuffer();
+
   const {
     project, salesArea, gender, quotationDate, validUntil,
     inv, del, proj, supTotal,
@@ -61,38 +62,34 @@ async function generatePdfBuffer(data) {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
-      const W = doc.page.width;   // 595
-      const M = 50;                // margin
-      const CW = W - M * 2;        // content width = 495
+      const W = doc.page.width;
+      const M = 50;
+      const CW = W - M * 2;
 
       // --- HEADER ---
       let y = M;
-
-      // Left: logo + tagline
       const logoMaxH = 36;
       const logoMaxW = 200;
       let logoBottomY = y + logoMaxH;
-      if (LOGO_BUFFER) {
+
+      if (logoBuffer) {
         try {
-          // pdfkit auto-scales image to fit width while preserving aspect ratio
-          doc.image(LOGO_BUFFER, M, y, { fit: [logoMaxW, logoMaxH], align: 'left' });
+          doc.image(logoBuffer, M, y, { fit: [logoMaxW, logoMaxH], align: 'left' });
         } catch (e) {
-          // Fallback to text wordmark if image embedding fails
           doc.font('Helvetica-Bold').fontSize(20).fillColor('#1A1A1A')
              .text('Selected Frame', M, y);
           logoBottomY = y + 26;
         }
       } else {
-        // No logo file available - use text wordmark
         doc.font('Helvetica-Bold').fontSize(20).fillColor('#1A1A1A')
            .text('Selected Frame', M, y);
         logoBottomY = y + 26;
       }
-      // Tagline below logo
+
       doc.font('Helvetica').fontSize(7).fillColor('#8A8D8F')
          .text('[ A FRAME FOR THE BUSINESS WE SHARE ]', M, logoBottomY + 6, { characterSpacing: 1.5 });
 
-      // Right: meta block
+      // Right meta block
       const metaX = M + CW * 0.55;
       const metaW = CW * 0.45;
       doc.font('Helvetica-Bold').fontSize(13).fillColor('#1A1A1A')
@@ -113,17 +110,15 @@ async function generatePdfBuffer(data) {
       if (salesArea) metaRow('Sales area', `${salesArea} sqm`);
       if (gender) metaRow('Gender', gender);
 
-      // Header divider
       y = Math.max(logoBottomY + 24, metaY + 8);
       doc.moveTo(M, y).lineTo(W - M, y).strokeColor('#1A1A1A').lineWidth(2).stroke();
       y += 28;
 
-      // --- COST BREAKDOWN HEADING ---
+      // --- COST BREAKDOWN ---
       doc.font('Times-Roman').fontSize(16).fillColor('#1A1A1A')
          .text('Project Cost incl. construction, shopfitting and logistics', M, y);
       y += 28;
 
-      // Table header
       doc.rect(M, y, CW, 22).fillColor('#F5F4F1').fill();
       doc.font('Helvetica-Bold').fontSize(8).fillColor('#6B6B6B')
          .text('CATEGORY', M + 10, y + 7, { characterSpacing: 0.5 });
@@ -143,16 +138,14 @@ async function generatePdfBuffer(data) {
       row('Specific Project Cost', proj);
       doc.moveTo(M, y).lineTo(W - M, y).strokeColor('#ECEAE5').lineWidth(0.5).stroke();
       row('Total', supTotal, true);
-
       y += 8;
 
-      // --- ADD-ONS TABLE ---
+      // --- ADD-ONS ---
       if (addOnItems && addOnItems.length > 0) {
         doc.font('Times-Roman').fontSize(14).fillColor('#1A1A1A').text('Add-ons', M, y);
         y += 22;
         doc.rect(M, y, CW, 20).fillColor('#F5F4F1').fill();
-        doc.font('Helvetica-Bold').fontSize(8).fillColor('#6B6B6B')
-           .text('ITEM', M + 10, y + 6);
+        doc.font('Helvetica-Bold').fontSize(8).fillColor('#6B6B6B').text('ITEM', M + 10, y + 6);
         doc.text('QTY', M, y + 6, { width: CW - 100, align: 'right' });
         doc.text('TOTAL', M, y + 6, { width: CW - 10, align: 'right' });
         y += 20;
@@ -171,13 +164,12 @@ async function generatePdfBuffer(data) {
         y += 30;
       }
 
-      // --- CUSTOM ITEMS TABLE ---
+      // --- CUSTOM ITEMS ---
       if (customItems && customItems.length > 0) {
         doc.font('Times-Roman').fontSize(14).fillColor('#1A1A1A').text('Additional Items', M, y);
         y += 22;
         doc.rect(M, y, CW, 20).fillColor('#F5F4F1').fill();
-        doc.font('Helvetica-Bold').fontSize(8).fillColor('#6B6B6B')
-           .text('ITEM', M + 10, y + 6);
+        doc.font('Helvetica-Bold').fontSize(8).fillColor('#6B6B6B').text('ITEM', M + 10, y + 6);
         doc.text('QTY', M, y + 6, { width: CW - 100, align: 'right' });
         doc.text('TOTAL', M, y + 6, { width: CW - 10, align: 'right' });
         y += 20;
@@ -206,14 +198,13 @@ async function generatePdfBuffer(data) {
          .text(fmtEur(grand), M, y + 22, { width: CW - 22, align: 'right' });
       y += totBoxH + 4;
 
-      // Sqm price below dark box
       if (sqmPrice && sqmPrice > 0) {
         doc.font('Helvetica').fontSize(9).fillColor('#8A8D8F')
            .text(`${fmtEur(sqmPrice)} / sqm`, M, y, { width: CW, align: 'right' });
         y += 16;
       }
 
-      // --- VALIDITY BLOCK ---
+      // --- VALIDITY ---
       y += 12;
       const valBoxH = 44;
       doc.rect(M, y, CW, valBoxH).fillColor('#F5F4F1').fill();
