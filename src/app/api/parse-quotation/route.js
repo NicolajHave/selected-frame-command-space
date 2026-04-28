@@ -80,8 +80,20 @@ export async function POST(request) {
       if (inSummary) {
         if (upper.includes('TOTAL EXCL') || upper.startsWith('TOTAL EXCL')) {
           const euros = extractEuros(t);
-          if (euros.length >= 1) grandTotal = euros[0];
-          if (euros.length >= 2) grandSqm = euros[1];
+          // Total excl. VAT line contains: grand total + sqm-price.
+          // Position-in-string ordering is unreliable across pdftotext vs pdf.js,
+          // and pdftotext may insert spurious values from broken digits like
+          // "€ 4 8.509" -> [48509, 8509]. Use magnitude logic:
+          // - grand total = largest value (always >€10k for any real project)
+          // - sqm-price = smallest plausible value (typically €100-€2000)
+          if (euros.length >= 1) {
+            const sorted = [...euros].sort((a, b) => b - a);
+            grandTotal = sorted[0];
+            // Find the smallest value that could plausibly be a sqm-price
+            // (must be <10% of grand total to rule out broken-digit artifacts)
+            const sqmCandidate = sorted.slice(1).find(v => v < grandTotal * 0.1);
+            if (sqmCandidate) grandSqm = sqmCandidate;
+          }
         }
         continue;
       }
@@ -97,13 +109,12 @@ export async function POST(request) {
 
       // Detect potential category headers we might have missed
       // (uppercase line of 3+ chars, no euros, not a known label)
+      // Exclusion list covers: PDF title ("QUOTATION"), header field labels,
+      // and section subtitles that are not categories
+      const HEADER_EXCLUDES = ['QUOTATION', 'PRODUCT', 'ITEM', 'PROJECT', 'SALES', 'GENDER', 'UPDATED', 'REVISION', 'DELIVERY', 'TARGET', 'SUPPLIER', 'CLIENT', 'BRAND', 'ADDRESS', 'CITY', 'CONTACT', 'DESIGN', 'LAYOUT', 'CONDITIONS', 'PAYMENT', 'HEADERS', 'TBC', 'NOT DEFINED', 'NOT INCLUDED', 'TRANSPORTATION', 'FREIGHT'];
       if (!currentCat && !t.includes('€') && t.length >= 3 && t.length <= 40 &&
           t === upper && !/^[\d\s._-]+$/.test(t) &&
-          !upper.includes('PRODUCT') && !upper.includes('ITEM') &&
-          !upper.includes('PROJECT') && !upper.includes('SALES') &&
-          !upper.includes('GENDER') && !upper.includes('UPDATED') &&
-          !upper.includes('REVISION') && !upper.includes('DELIVERY') &&
-          !upper.includes('TARGET') && !upper.includes('SUPPLIER')) {
+          !HEADER_EXCLUDES.some(ex => upper.includes(ex))) {
         addWarn('warn', `Possible unrecognised category: "${t}"`, { line: t });
       }
 

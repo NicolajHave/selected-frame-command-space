@@ -125,6 +125,10 @@ const QuotationPage=()=>{
   const [cats,setCats]=useState({inventory:"",selectedDeliveries:"",specificProjectCost:""});
   const [warnings,setWarnings]=useState([]);
   const [warningsCollapsed,setWarningsCollapsed]=useState(false);
+  const [emailOpen,setEmailOpen]=useState(false);
+  const [emailTo,setEmailTo]=useState("");
+  const [sending,setSending]=useState(false);
+  const [sendResult,setSendResult]=useState(null); // {ok, message}
   const fileRef=useRef(null);
 
   const loadPdfJs=useCallback(()=>new Promise((res,rej)=>{if(window.pdfjsLib)return res(window.pdfjsLib);const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';s.onload=()=>{window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';res(window.pdfjsLib)};s.onerror=rej;document.head.appendChild(s)}),[]);
@@ -178,7 +182,7 @@ const QuotationPage=()=>{
     const qDate=hdr.quotationDate?fmtDate(hdr.quotationDate):fmtDate(todayISO());
     const vDate=fmtDate(validUntil);
     const w=window.open('','_blank');
-    w.document.write(`<!DOCTYPE html><html><head><title>Quotation – ${hdr.project||'Selected Frame'}</title><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'DM Sans',sans-serif;color:#2C2C2C;padding:40px 60px;max-width:900px;margin:0 auto}.hd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:40px;padding-bottom:24px;border-bottom:2px solid #1A1A1A}.logo-wrap{display:flex;flex-direction:column}.logo-img{height:36px;margin-bottom:8px}.logo-tag{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#8A8D8F}.meta{text-align:right;font-size:12px;color:#6B6B6B}.meta strong{color:#2C2C2C;display:block;font-size:14px;margin-bottom:4px}.meta .row{margin-top:6px}.meta .lbl{display:inline-block;min-width:80px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#8A8D8F}h2{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:400;margin:32px 0 16px;padding-bottom:8px;border-bottom:1px solid #ECEAE5}table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:24px}th{text-align:left;padding:8px 12px;background:#F5F4F1;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#6B6B6B;border-bottom:1px solid #ECEAE5}td{padding:6px 12px;border-bottom:1px solid #F5F4F1}.r{text-align:right}.tot{background:#1A1A1A;color:#fff;padding:24px 28px;border-radius:8px;margin-top:32px;display:flex;justify-content:space-between;align-items:center}.tot .l{font-size:14px;color:#B8BBBE}.tot .a{font-size:28px;font-family:'Cormorant Garamond',serif;font-weight:300}.sq{font-size:11px;color:#B8BBBE;text-align:right;margin-top:4px}.validity{margin-top:20px;padding:14px 18px;background:#F5F4F1;border-radius:6;border-left:3px solid #C4944A;font-size:12px;color:#2C2C2C}.validity strong{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#6B6B6B;margin-bottom:4px}.ft{margin-top:48px;padding-top:20px;border-top:1px solid #ECEAE5;font-size:10px;color:#8A8D8F;display:flex;justify-content:space-between}@media print{body{padding:20px 40px}button{display:none!important}}</style></head><body>
+    w.document.write(`<!DOCTYPE html><html><head><title>Quotation – ${hdr.project||'Selected Frame'}</title><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'DM Sans',sans-serif;color:#2C2C2C;padding:40px 60px;max-width:900px;margin:0 auto;-webkit-print-color-adjust:exact;print-color-adjust:exact}.hd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:40px;padding-bottom:24px;border-bottom:2px solid #1A1A1A}.logo-wrap{display:flex;flex-direction:column;align-items:flex-start}.logo-img{height:36px;width:auto;max-width:240px;object-fit:contain;margin-bottom:8px;display:block}.logo-tag{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#8A8D8F}.meta{text-align:right;font-size:12px;color:#6B6B6B}.meta strong{color:#2C2C2C;display:block;font-size:14px;margin-bottom:4px}.meta .row{margin-top:6px}.meta .lbl{display:inline-block;min-width:80px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#8A8D8F}h2{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:400;margin:32px 0 16px;padding-bottom:8px;border-bottom:1px solid #ECEAE5}table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:24px}th{text-align:left;padding:8px 12px;background:#F5F4F1;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#6B6B6B;border-bottom:1px solid #ECEAE5;-webkit-print-color-adjust:exact;print-color-adjust:exact}td{padding:6px 12px;border-bottom:1px solid #F5F4F1}.r{text-align:right}.tot{background:#1A1A1A!important;color:#fff!important;padding:24px 28px;border-radius:8px;margin-top:32px;display:flex;justify-content:space-between;align-items:center;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.tot .l{font-size:14px;color:#B8BBBE!important}.tot .a{font-size:28px;font-family:'Cormorant Garamond',serif;font-weight:300;color:#fff!important}.sq{font-size:11px;color:#8A8D8F;text-align:right;margin-top:6px}.validity{margin-top:20px;padding:14px 18px;background:#F5F4F1;border-radius:6px;border-left:3px solid #C4944A;font-size:12px;color:#2C2C2C;-webkit-print-color-adjust:exact;print-color-adjust:exact}.validity strong{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#6B6B6B;margin-bottom:4px}.ft{margin-top:48px;padding-top:20px;border-top:1px solid #ECEAE5;font-size:10px;color:#8A8D8F;display:flex;justify-content:space-between}@media print{body{padding:20px 40px}button{display:none!important}.tot{background:#1A1A1A!important;color:#fff!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}</style></head><body>
 <div class="hd">
   <div class="logo-wrap"><img src="${LOGO_BLACK}" alt="Selected Frame" class="logo-img"/><span class="logo-tag">[ A frame for the business we share ]</span></div>
   <div class="meta">
@@ -206,26 +210,38 @@ ${sqm>0?`<div class="sq">${fmtEur(Math.round(grand/sqm))} / m²</div>`:''}
 <div class="ft"><span>Selected Frame · Brand Spaces</span><span>Confidential</span></div>
 </body></html>`);w.document.close()};
 
-  const sendEmail=()=>{
-    const subject=encodeURIComponent(`Selected Frame Quotation – ${hdr.project||'Project'}`);
-    const body=encodeURIComponent(
-`Dear partner,
-
-Please find attached the Selected Frame quotation for ${hdr.project||'your project'}.
-
-Project: ${hdr.project||'—'}
-Sales area: ${hdr.salesArea?hdr.salesArea+' m²':'—'}
-Quotation date: ${fmtDate(hdr.quotationDate)}
-Valid until: ${fmtDate(validUntil)}
-
-Total excl. VAT: ${fmtEur(grand)}${sqm>0?` (${fmtEur(Math.round(grand/sqm))} / m²)`:''}
-
-Please note: PDF attachment must be added manually after exporting.
-
-Best regards,
-Selected Frame · Brand Spaces`
-    );
-    window.location.href=`mailto:?subject=${subject}&body=${body}`;
+  const sendEmail=async()=>{
+    if(!emailTo||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTo)){
+      setSendResult({ok:false,message:"Please enter a valid email address"});
+      return;
+    }
+    setSending(true);setSendResult(null);
+    try{
+      const aoItems=Object.entries(addOns).map(([id,{qty}])=>{const a=ADD_ONS.find(x=>x.id===id);return a?{name:a.name,qty,total:a.price*qty}:null}).filter(Boolean);
+      const custItems=customs.filter(i=>i.name&&parseFloat(i.price)).map(i=>({name:i.name,qty:parseInt(i.qty)||1,total:(parseFloat(i.price)||0)*(parseInt(i.qty)||1)}));
+      const payload={
+        to:emailTo,
+        project:hdr.project,
+        salesArea:parseFloat(hdr.salesArea)||0,
+        gender:hdr.gender,
+        quotationDate:hdr.quotationDate,
+        validUntil,
+        inv,del,proj,supTotal,
+        addOnItems:aoItems,addOnTotal:aoTotal,
+        customItems:custItems,customTotal:custTotal,
+        grand,
+        sqmPrice:sqm>0?Math.round(grand/sqm):0,
+      };
+      const r=await fetch("/api/send-quote",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+      const data=await r.json();
+      if(!r.ok)throw new Error(data.error||"Send failed");
+      setSendResult({ok:true,message:`Quotation sent to ${emailTo}`});
+      setTimeout(()=>{setEmailOpen(false);setSendResult(null);setEmailTo("")},2500);
+    }catch(e){
+      setSendResult({ok:false,message:e.message||"Could not send email"});
+    }finally{
+      setSending(false);
+    }
   };
 
   return<div><Title sub="Upload a supplier quotation PDF to generate a branded project quotation">Quotation Builder</Title>
@@ -289,7 +305,16 @@ Selected Frame · Brand Spaces`
         </div>
         {grand>0&&<div style={{display:"flex",gap:8,marginTop:16}}>
           <button onClick={exportPDF} style={{flex:1,padding:"14px",borderRadius:8,border:"none",background:C.oak,color:C.white,fontSize:14,fontWeight:600,cursor:"pointer"}}>Export Quotation as PDF →</button>
-          <button onClick={sendEmail} style={{padding:"14px 20px",borderRadius:8,border:`1px solid ${C.oak}`,background:C.white,color:C.oak,fontSize:14,fontWeight:600,cursor:"pointer"}}>Send via Email ✉</button>
+          <button onClick={()=>setEmailOpen(o=>!o)} style={{padding:"14px 20px",borderRadius:8,border:`1px solid ${C.oak}`,background:emailOpen?C.oak+"15":C.white,color:C.oak,fontSize:14,fontWeight:600,cursor:"pointer"}}>Send via Email ✉</button>
+        </div>}
+        {grand>0&&emailOpen&&<div style={{marginTop:12,background:C.white,border:`1px solid ${C.surfaceD}`,borderRadius:8,padding:20}}>
+          <div style={{fontSize:13,fontWeight:600,marginBottom:4}}>Send quotation by email</div>
+          <div style={{fontSize:11,color:C.textS,marginBottom:14}}>From: Selected Frame &lt;selectedsis@selectedframe.com&gt; · Reply-to: selectedsis@bestseller.com · BCC kept on file</div>
+          <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
+            <input type="email" placeholder="recipient@partner.com" value={emailTo} onChange={e=>setEmailTo(e.target.value)} disabled={sending} style={{flex:1,padding:"10px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,outline:"none"}}/>
+            <button onClick={sendEmail} disabled={sending||!emailTo} style={{padding:"10px 18px",borderRadius:6,border:"none",background:sending||!emailTo?C.steelL:C.black,color:C.white,fontSize:13,fontWeight:600,cursor:sending||!emailTo?"not-allowed":"pointer",minWidth:90}}>{sending?"Sending…":"Send"}</button>
+          </div>
+          {sendResult&&<div style={{marginTop:10,padding:"8px 12px",borderRadius:6,fontSize:12,background:sendResult.ok?"#E8F2EA":"#FDEAE6",color:sendResult.ok?C.go:C.danger}}>{sendResult.ok?"✓ ":""}{sendResult.message}</div>}
         </div>}
       </div>
     </div></div>};
@@ -306,7 +331,7 @@ export default function Home(){const [page,setPage]=useState("overview");const [
   useEffect(()=>{const f=async()=>{try{const r=await fetch("/api/projects");if(r.ok){const d=await r.json();if(d.projects?.length>0)setProjects(d.projects)}}catch(e){}};f();const i=setInterval(f,15*60*1000);return()=>clearInterval(i)},[]);
   const nav=[{id:"overview",label:"Overview",icon:"◈"},{id:"projects",label:"Projects",icon:"▦"},{id:"quotation",label:"Quotation",icon:"📋"},{id:"roi",label:"ROI Tool",icon:"◇"},{id:"flow",label:"Project Flow",icon:"⟳"},{id:"installed",label:"Installed Base",icon:"⊞"},{id:"standards",label:"Standards",icon:"☰"},{id:"admin",label:"Admin",icon:"⚙"}];
   return<div style={{display:"flex",minHeight:"100vh",background:C.surface}}>
-    <div style={{width:220,background:C.black,color:C.white,flexShrink:0,display:"flex",flexDirection:"column",padding:"28px 0",position:"sticky",top:0,height:"100vh"}}><div style={{padding:"0 24px",marginBottom:36}}><img src={LOGO_WHITE} alt="" style={{height:28,marginBottom:8}}/><div style={{fontSize:9,color:C.steel,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:4}}>Command Space</div></div><div style={{flex:1}}>{nav.map(it=><div key={it.id} style={{padding:"10px 24px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontSize:13,fontWeight:page===it.id?600:400,background:page===it.id?C.steelD+"33":hover===it.id?"rgba(255,255,255,.04)":"transparent",color:page===it.id?C.white:C.steelL,borderLeft:page===it.id?`3px solid ${C.oak}`:"3px solid transparent"}} onClick={()=>{setPage(it.id);setDetail(null)}} onMouseEnter={()=>setHover(it.id)} onMouseLeave={()=>setHover(null)}><span style={{fontSize:16,width:20,textAlign:"center",opacity:.7}}>{it.icon}</span>{it.label}</div>)}</div><div style={{padding:"16px 24px",borderTop:`1px solid ${C.steelD}33`}}><div style={{fontSize:10,color:C.steel}}>v2.0</div><div style={{fontSize:10,color:C.steel,marginTop:2}}>[ A frame for the business we share ]</div></div></div>
+    <div style={{width:220,background:C.black,color:C.white,flexShrink:0,display:"flex",flexDirection:"column",padding:"28px 0",position:"sticky",top:0,height:"100vh"}}><div style={{padding:"0 24px",marginBottom:36}}><img src={LOGO_WHITE} alt="" style={{height:28,marginBottom:8}}/><div style={{fontSize:9,color:C.steel,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:4}}>Command Space</div></div><div style={{flex:1}}>{nav.map(it=><div key={it.id} style={{padding:"10px 24px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontSize:13,fontWeight:page===it.id?600:400,background:page===it.id?C.steelD+"33":hover===it.id?"rgba(255,255,255,.04)":"transparent",color:page===it.id?C.white:C.steelL,borderLeft:page===it.id?`3px solid ${C.oak}`:"3px solid transparent"}} onClick={()=>{setPage(it.id);setDetail(null)}} onMouseEnter={()=>setHover(it.id)} onMouseLeave={()=>setHover(null)}><span style={{fontSize:16,width:20,textAlign:"center",opacity:.7}}>{it.icon}</span>{it.label}</div>)}</div><div style={{padding:"16px 24px",borderTop:`1px solid ${C.steelD}33`}}><div style={{fontSize:10,color:C.steel}}>v2.1</div><div style={{fontSize:10,color:C.steel,marginTop:2}}>[ A frame for the business we share ]</div></div></div>
     <div style={{flex:1,overflow:"auto"}}><div style={{padding:"14px 40px",background:C.white,borderBottom:`1px solid ${C.surfaceD}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{fontSize:13,color:C.textS}}>{nav.find(n=>n.id===page)?.label}</div><div style={{fontSize:12,color:C.textS}}>{new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div></div>
       <div style={{padding:"32px 40px",maxWidth:1200}}>
         {page==="overview"&&<OverviewPage projects={projects} setPage={setPage} setDetail={setDetail}/>}
