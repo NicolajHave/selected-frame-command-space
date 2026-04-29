@@ -276,9 +276,26 @@ function parseSalesQuoteFormat(lines) {
   }
 
   // Build pillar mapping
-  // Inventory: items starting with 105- or 112_ (excluding _SLT delivery)
+  // Inventory: items with 105- or 112_ prefix (standard product codes)
+  //            OR items with custom prefix (0325) that are physical products by name pattern
   // Selected Deliveries: name contains "_SLT delivery"
-  // Specific Project Cost: everything else (services, paint, freight, etc.)
+  // Specific Project Cost: services (0421/0500/0540/0432/0459/0600), materials, and all other 0325 items
+  const isPhysicalProductByName = (name) => {
+    const n = name.toLowerCase();
+    // Service-keyword guard: anything that is clearly an action/service goes to Specific Project Cost
+    // even if the name happens to mention a product like "LED logo" or "wall panels"
+    if (n.match(/\b(installation|inspection|paint works|works|mounting|removal|freight|transport|travel|disposal|warehouse|project manager|packaging|hours)\b/)) return false;
+    // Logo (LED, corona, brushed steel) - physical signage
+    if (n.includes("logo") && (n.includes("light") || n.includes("corona") || n.includes("brushed steel") || n.match(/\bled\b/))) return true;
+    // Backwall panels - physical wall material
+    if (n.includes("backwall panel")) return true;
+    // Screen - physical AV product (size like 55", 65", 75", 85" suggests physical product)
+    if (n.includes("screen") && n.match(/\b(55|65|75|85)\b/)) return true;
+    // Carpet - physical floor material
+    if (n.includes("carpet") && !n.includes("delivery")) return true;
+    return false;
+  };
+
   const inventoryItems = [];
   const selectedDeliveryItems = [];
   const projectCostItems = [];
@@ -287,6 +304,8 @@ function parseSalesQuoteFormat(lines) {
     if (it.name.match(/_SLT delivery/i)) {
       selectedDeliveryItems.push(it);
     } else if (it.itemNo.match(/^(105|112)/)) {
+      inventoryItems.push(it);
+    } else if (isPhysicalProductByName(it.name)) {
       inventoryItems.push(it);
     } else {
       projectCostItems.push(it);

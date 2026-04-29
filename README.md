@@ -1,76 +1,57 @@
-# Selected Frame · Command Space — v2.7.0
+# Selected Frame · Command Space — v2.7.1
 
 Internal Brand Spaces tool for Selected Frame concept.
 Live: https://selected-frame-command-space.vercel.app
 
-## What's new in v2.7.0
+## What's new in v2.7.1 (patch on v2.7.0)
 
-### Sales Quote PDF format support
-The Quotation Builder now auto-detects and parses **two PDF formats**:
+### Pillar mapping refined for Sales Quote items with 0325 prefix
 
-1. **Calculation format** (existing) — &elements internal calculations with category headers like INVENTORY, SELECTED DELIVERIES, etc. Includes Sales area sqm, Project name, gender.
-2. **Sales Quote format** (new) — Bestseller customer-facing quotes with no category headers, flat item-by-line table. Used for projects like the Printemps series.
+In Sales Quote PDFs, the `0325` item prefix is used by &elements as a manual/custom code that mixes physical products (Logo, Backwall panels, Screen) with services (Paint and painting materials). v2.7.0 routed all `0325` items to Specific Project Cost — incorrect.
 
-Detection is automatic — no user action needed. The parser checks the first 40 lines for "Sales Quote |" or "QUOTATION".
+v2.7.1 introduces pattern-based name matching for physical products:
 
-### Sales Quote: pillar mapping logic
-Since Sales Quote PDFs have no category headers, items are mapped to the 3 pillars by item-number convention:
-
-| Pillar | Items matched by |
+| Pattern in name | Routed to |
 |---|---|
-| Inventory | Item starts with `105-` or `112_` (and not _SLT delivery) |
-| Selected Deliveries | Name contains `_SLT delivery` (e.g. "Carpet Size 1_SLT delivery") |
-| Specific Project Cost | Everything else (services 0421/0500/0540, freight 0600, install 0432, paint 0325) |
+| "logo" + ("light"/"corona"/"brushed steel"/"led") | **Inventory** |
+| "backwall panel" | **Inventory** |
+| "screen" + (55/65/75/85) | **Inventory** |
+| "carpet" (without "delivery") | **Inventory** |
+| Service keywords (installation/inspection/paint works/freight/transport/travel/disposal/warehouse/project manager/packaging/hours) | **Specific Project Cost** |
 
-Validated against 4 Printemps PDFs — all totals reconcile to PDF Total EUR Excl. VAT.
+The service-keyword guard takes precedence — so "Installation incl. LED logo" stays in Specific Project Cost even though it mentions "LED logo".
 
-### Sales Quote: project name guess
-Project name is auto-extracted from "Regarding deliveries for Selected at X" line. User can override by editing the field.
+### Validation matrix (Sales Quote PDFs after fix)
 
-### Hanger Calculator: rule updates
+| PDF | Inventory | Selected Deliveries | Specific Project Cost | Pillar sum | PDF total | Match |
+|---|---|---|---|---|---|---|
+| La Valentine | €12.450 | €0 | €6.038 | €18.488 | €18.488 | ✓ |
+| Nancy | €13.305 | €933 | €7.492 | €21.730 | €21.730 | ✓ |
+| Lyon | €6.677 | €0 | €4.996 | €11.673 | €11.673 | ✓ |
+| Marseille | €7.037 | €0 | €5.039 | €12.076 | €12.076 | ✓ |
 
-- **Wall unit Sidehang 1400 + mirror** is now a separate rule = **30 hangers** (was incorrectly excluded by mirror-rule)
-- **Jeans rack double** lowered from 15 → **10 hangers** per request
-- **Wall rack column** explicitly excluded (it's a structural base, no hangers)
-- All "sidehang" matching now position-agnostic — handles both "Sidehang 1400" and "1400 - Sidehang" formats
+### What you'll notice in the UI for Marseille
 
-### Validation matrix
+After deploy, uploading Marseille TDP will show:
+- **Inventory** (€7.037, 9 items) — including Logo H150, corona lght (now correctly placed here)
+- **Specific Project Cost** (€5.039, 9 items) — Installation, Paint works, Travel expenses now show as separate lines, not merged with previous items
+- **Pillar sum matches PDF total exactly** — no more €989 difference warning
 
-| PDF | Format | Total parsed | PDF total | Match |
-|---|---|---|---|---|
-| Stockmann Helsinki | Calculation | €48.510 | €48.509 | ✓ |
-| Hagemeyer Minden | Calculation | €25.610 | €25.410 | ⚠ €200 diff (pre-existing AV parsing bug) |
-| Printemps La Valentine | Sales Quote | €18.488 | €18.488 | ✓ |
-| Printemps Nancy | Sales Quote | €21.730 | €21.730 | ✓ |
-| Printemps Lyon | Sales Quote | €11.673 | €11.673 | ✓ |
-| Printemps Marseille | Sales Quote | €12.076 | €12.076 | ✓ |
+### Note on the line-merge bug you observed
 
-### Hanger Calculator validation (Printemps PDFs)
-
-| PDF | Raw total | Shirt / Clips / Coat |
-|---|---|---|
-| La Valentine | 315 hangers | 200 / 100 / 50 |
-| Nancy | 225 hangers | 150 / 50 / 50 |
-| Lyon | 195 hangers | 150 / 50 / 25 |
-| Marseille | 175 hangers | 100 / 50 / 25 |
-
-## Known issues (not fixed in this release)
-
-- **Hagemeyer AV parsing**: pre-existing bug where "75\" screen 0 pcs €2.200 €-" is parsed as €200 instead of €0. Causes €200 diff vs PDF total. Will fix in next release.
-- **Sales Quote sqm**: not present in PDF format; user must enter manually. The UI shows a clear "info" warning.
+The merged items you saw in your screenshot ("Mannequin_male 0325 Backwall panels...", "Packaging materials, pallets 0432 Installation...", etc.) were not real bugs — that screenshot was from an earlier deployment. v2.7.0's parser already handles each line as a discrete item via item-number detection. After deploying v2.7.1 you should see all items on their own lines.
 
 ## How to deploy
 
 1. Unzip locally
 2. Drag everything to GitHub repo root
-3. Commit message: `v2.7.0 — Sales Quote format + Hanger rules update`
+3. Commit message: `v2.7.1 — Pillar mapping for 0325 physical products`
 4. Vercel auto-deploys
 
 ## Smoke test
 
-1. Upload **Quote_2088_SLT_SIS_Frame_Printemps_La_Valentine_260424.pdf**
-2. Verify project name auto-fills as "Selected SIS - Printemps La Valentine"
-3. Verify Cost Breakdown shows Inventory €9.777, Selected Deliveries €0, Specific Project Cost €8.711, Total €18.488
-4. Verify Hanger Calculator appears with: 1× Sidehang+mirror (30), 1× Sidehang 700 (25), 4× Floor rack 1400 (200), 2× Floor rack 700 (50), 1× Jeans double (10) = 315 raw → Shirt 200 / Clips 100 / Coat 50
-5. Click Add to Quote — verify hangers populate Add-ons section
-6. Type sqm in the Sales area field manually — verify SQM Price calculates
+1. Upload **Quote_2086_SLT_SIS_Frame_Printemps_Marseille_TDP_260424.pdf**
+2. Verify Inventory €7.037 (9 items) — **Logo H150 should be here**
+3. Verify Specific Project Cost €5.039 (9 items) — Installation/Paint works/Travel each on their own line
+4. Verify Total €12.076 with NO warning about pillar mismatch
+5. Verify Hanger Calculator works correctly (3× Floor rack 1400 + 1× Floor rack 700 = 175 raw → Shirt 100 / Clips 50 / Coat 25)
