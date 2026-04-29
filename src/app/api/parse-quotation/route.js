@@ -232,10 +232,40 @@ function parseSalesQuoteFormat(lines) {
   const items = [];
   let pendingMulti = null; // for items whose description spans 2 lines
 
+  // Pre-processing: PDF.js may merge two adjacent items into one line if they are
+  // vertically close on the page. Detect lines with 2+ item-number markers and split them.
+  // Item-no pattern: 3-4 digit prefix, optionally followed by - or _ and more chars,
+  // then a space and a CAPITAL letter starting the description.
+  const ITEM_NO_RE = /(?:^|\s)(\d{3,4}[-_][\dA-Za-z\-_]+|\d{4})\s+[A-Z]/g;
+  const splitMergedLine = (line) => {
+    const matches = [];
+    let mm;
+    const re = new RegExp(ITEM_NO_RE.source, 'g');
+    while ((mm = re.exec(line)) !== null) {
+      matches.push({ index: mm.index });
+    }
+    if (matches.length <= 1) return [line];
+    const splits = [];
+    for (let j = 0; j < matches.length; j++) {
+      const start = matches[j].index === 0 ? 0 : matches[j].index + 1;
+      const end = j + 1 < matches.length ? matches[j + 1].index + 1 : line.length;
+      splits.push(line.substring(start, end).trim());
+    }
+    return splits;
+  };
+
+  // Build flat list of logical lines (post-split)
+  const logicalLines = [];
   for (let i = tableStart; i < tableEnd; i++) {
     const t = lines[i].trim();
     if (!t) continue;
     if (t.startsWith('Ordered by:')) break;
+    const splitParts = splitMergedLine(t);
+    for (const p of splitParts) logicalLines.push(p);
+  }
+
+  for (const t of logicalLines) {
+    if (!t) continue;
     if (t.startsWith('Fees for')) continue;
     if (t.startsWith('Planned delivery')) continue;
 
