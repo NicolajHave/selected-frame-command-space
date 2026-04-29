@@ -135,18 +135,22 @@ const ADD_ONS=[{id:"screen55",name:'55" Screen (wall mounted)',price:1370,cat:"A
 
 // Hanger Calculator: matching rules ordered by specificity (first match wins)
 // Each rule: test function on lowercased item name -> hangers per unit
+// Note: "1400" can appear before OR after "sidehang" depending on supplier format
 const HANGER_RULES=[
-  {label:"Wall unit Sidehang 1400",hangers:50,test:n=>n.includes("sidehang 1400")},
-  {label:"Wall unit Sidehang 700",hangers:25,test:n=>n.includes("sidehang 700")},
+  // Specific subtype FIRST: sidehang+mirror has special hanger count
+  {label:"Wall unit Sidehang 1400 + mirror",hangers:30,test:n=>n.includes("sidehang")&&n.includes("1400")&&n.includes("mirror")},
+  {label:"Wall unit Sidehang 1400",hangers:50,test:n=>n.includes("sidehang")&&n.includes("1400")},
+  {label:"Wall unit Sidehang 700",hangers:25,test:n=>n.includes("sidehang")&&n.includes("700")},
   {label:"Wall unit Jeans unit",hangers:10,test:n=>n.includes("wall unit")&&n.includes("jeans")},
   {label:"Wall unit Front hang",hangers:12,test:n=>n.includes("front hang")},
   {label:"Floor rack 1400",hangers:50,test:n=>n.includes("floor rack 1400")},
   {label:"Floor rack 700",hangers:25,test:n=>n.includes("floor rack 700")},
-  {label:"Jeans rack double",hangers:15,test:n=>n.includes("jeans")&&n.includes("double")},
+  {label:"Jeans rack double",hangers:10,test:n=>n.includes("jeans")&&n.includes("double")},
   {label:"Jeans rack single",hangers:30,test:n=>n.includes("jeans")&&n.includes("single")},
   // Generic Wall unit 1400 / 700 - LAST so specific rules above win first
-  {label:"Wall unit 1400",hangers:50,test:n=>n.includes("wall unit")&&n.includes("1400")&&!n.includes("bracket")&&!n.includes("mirror")&&!n.includes("screen")&&!n.includes("connector")},
-  {label:"Wall unit 700",hangers:25,test:n=>n.includes("wall unit")&&n.includes("700")&&!n.includes("bracket")&&!n.includes("connector")},
+  // Wall rack column = base structural element, NO hangers (excluded by !wall rack)
+  {label:"Wall unit 1400",hangers:50,test:n=>n.includes("wall unit")&&n.includes("1400")&&!n.includes("bracket")&&!n.includes("mirror")&&!n.includes("screen")&&!n.includes("connector")&&!n.includes("wall rack")},
+  {label:"Wall unit 700",hangers:25,test:n=>n.includes("wall unit")&&n.includes("700")&&!n.includes("bracket")&&!n.includes("connector")&&!n.includes("wall rack")},
 ];
 
 const matchHangerRule=(itemName)=>{
@@ -810,7 +814,7 @@ export default function Home(){const [page,setPage]=useState("overview");const [
   useEffect(()=>{const f=async()=>{try{const r=await fetch("/api/projects");if(r.ok){const d=await r.json();if(d.projects?.length>0)setProjects(d.projects)}}catch(e){}};f();const i=setInterval(f,15*60*1000);return()=>clearInterval(i)},[]);
   const nav=[{id:"overview",label:"Overview",icon:"◈"},{id:"projects",label:"Projects",icon:"▦"},{id:"roi",label:"ROI Engine",icon:"◇"},{id:"quotation",label:"Quotation",icon:"📋"},{id:"flow",label:"Project Flow",icon:"⟳"},{id:"installed",label:"Installed Base",icon:"⊞"},{id:"standards",label:"Standards",icon:"☰"},{id:"admin",label:"Admin",icon:"⚙"}];
   return<div style={{display:"flex",minHeight:"100vh",background:C.surface}}>
-    <div style={{width:220,background:C.black,color:C.white,flexShrink:0,display:"flex",flexDirection:"column",padding:"28px 0",position:"sticky",top:0,height:"100vh"}}><div style={{padding:"0 24px",marginBottom:36}}><img src={LOGO_WHITE} alt="" style={{height:28,marginBottom:8}}/><div style={{fontSize:9,color:C.steel,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:4}}>Command Space</div></div><div style={{flex:1}}>{nav.map(it=><div key={it.id} style={{padding:"10px 24px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontSize:13,fontWeight:page===it.id?600:400,background:page===it.id?C.steelD+"33":hover===it.id?"rgba(255,255,255,.04)":"transparent",color:page===it.id?C.white:C.steelL,borderLeft:page===it.id?`3px solid ${C.oak}`:"3px solid transparent"}} onClick={()=>{setPage(it.id);setDetail(null)}} onMouseEnter={()=>setHover(it.id)} onMouseLeave={()=>setHover(null)}><span style={{fontSize:16,width:20,textAlign:"center",opacity:.7}}>{it.icon}</span>{it.label}</div>)}</div><div style={{padding:"16px 24px",borderTop:`1px solid ${C.steelD}33`}}><div style={{fontSize:10,color:C.steel}}>v2.6.0</div><div style={{fontSize:10,color:C.steel,marginTop:2}}>[ A frame for the business we share ]</div></div></div>
+    <div style={{width:220,background:C.black,color:C.white,flexShrink:0,display:"flex",flexDirection:"column",padding:"28px 0",position:"sticky",top:0,height:"100vh"}}><div style={{padding:"0 24px",marginBottom:36}}><img src={LOGO_WHITE} alt="" style={{height:28,marginBottom:8}}/><div style={{fontSize:9,color:C.steel,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:4}}>Command Space</div></div><div style={{flex:1}}>{nav.map(it=><div key={it.id} style={{padding:"10px 24px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontSize:13,fontWeight:page===it.id?600:400,background:page===it.id?C.steelD+"33":hover===it.id?"rgba(255,255,255,.04)":"transparent",color:page===it.id?C.white:C.steelL,borderLeft:page===it.id?`3px solid ${C.oak}`:"3px solid transparent"}} onClick={()=>{setPage(it.id);setDetail(null)}} onMouseEnter={()=>setHover(it.id)} onMouseLeave={()=>setHover(null)}><span style={{fontSize:16,width:20,textAlign:"center",opacity:.7}}>{it.icon}</span>{it.label}</div>)}</div><div style={{padding:"16px 24px",borderTop:`1px solid ${C.steelD}33`}}><div style={{fontSize:10,color:C.steel}}>v2.7.0</div><div style={{fontSize:10,color:C.steel,marginTop:2}}>[ A frame for the business we share ]</div></div></div>
     <div style={{flex:1,overflow:"auto"}}><div style={{padding:"14px 40px",background:C.white,borderBottom:`1px solid ${C.surfaceD}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{fontSize:13,color:C.textS}}>{nav.find(n=>n.id===page)?.label}</div><div style={{fontSize:12,color:C.textS}}>{new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div></div>
       <div style={{padding:"32px 40px",maxWidth:1200}}>
         {page==="overview"&&<OverviewPage projects={projects} setPage={setPage} setDetail={setDetail}/>}

@@ -1,56 +1,76 @@
-# Selected Frame · Command Space — v2.6.0
+# Selected Frame · Command Space — v2.7.0
 
 Internal Brand Spaces tool for Selected Frame concept.
 Live: https://selected-frame-command-space.vercel.app
 
-## What's new in v2.6.0
+## What's new in v2.7.0
 
-### Menu reordering: ROI before Quotation
-Sidebar order changed to reflect actual workflow: ROI Engine now sits above Quotation Tool. ROI is renamed from "ROI Tool" to "ROI Engine" to match the Decision Engine framing introduced in v2.4.0.
+### Sales Quote PDF format support
+The Quotation Builder now auto-detects and parses **two PDF formats**:
 
-### Project Flow rebuilt as accordion
-The phase list is now a click-to-expand accordion:
-- **Closed state**: phase number, name, and short tagline
-- **Open state**: full description + project count + (Phase 2 only) cross-link buttons to ROI Engine and Quotation Builder
-- **One open at a time**: clicking another phase closes the current one
-- **Default open**: Phase 0 (Qualification)
+1. **Calculation format** (existing) — &elements internal calculations with category headers like INVENTORY, SELECTED DELIVERIES, etc. Includes Sales area sqm, Project name, gender.
+2. **Sales Quote format** (new) — Bestseller customer-facing quotes with no category headers, flat item-by-line table. Used for projects like the Printemps series.
 
-### Updated phase descriptions
-All 11 phases (0–10) now use the longer, more descriptive copy you provided. Each phase has both a one-line tagline (closed state) and a full paragraph (open state).
+Detection is automatic — no user action needed. The parser checks the first 40 lines for "Sales Quote |" or "QUOTATION".
 
-### Live phase counts from Asana
-Each phase shows a small badge with the count of active projects currently in that phase, e.g. "3 projects". When expanded, this is restated as "Currently 3 active projects in this phase." Counts auto-update from `/api/projects` and only count non-completed tasks.
+### Sales Quote: pillar mapping logic
+Since Sales Quote PDFs have no category headers, items are mapped to the 3 pillars by item-number convention:
 
-### Phase 2 cross-links
-When Phase 2 (Internal Budget & ROI Commitment) is expanded, two action buttons appear:
-- 📊 Open ROI Engine
-- 📋 Open Quotation Builder
+| Pillar | Items matched by |
+|---|---|
+| Inventory | Item starts with `105-` or `112_` (and not _SLT delivery) |
+| Selected Deliveries | Name contains `_SLT delivery` (e.g. "Carpet Size 1_SLT delivery") |
+| Specific Project Cost | Everything else (services 0421/0500/0540, freight 0600, install 0432, paint 0325) |
 
-These are direct navigation shortcuts, no data passing — keeps things simple while encouraging the right workflow sequence (ROI before Quotation).
+Validated against 4 Printemps PDFs — all totals reconcile to PDF Total EUR Excl. VAT.
+
+### Sales Quote: project name guess
+Project name is auto-extracted from "Regarding deliveries for Selected at X" line. User can override by editing the field.
+
+### Hanger Calculator: rule updates
+
+- **Wall unit Sidehang 1400 + mirror** is now a separate rule = **30 hangers** (was incorrectly excluded by mirror-rule)
+- **Jeans rack double** lowered from 15 → **10 hangers** per request
+- **Wall rack column** explicitly excluded (it's a structural base, no hangers)
+- All "sidehang" matching now position-agnostic — handles both "Sidehang 1400" and "1400 - Sidehang" formats
+
+### Validation matrix
+
+| PDF | Format | Total parsed | PDF total | Match |
+|---|---|---|---|---|
+| Stockmann Helsinki | Calculation | €48.510 | €48.509 | ✓ |
+| Hagemeyer Minden | Calculation | €25.610 | €25.410 | ⚠ €200 diff (pre-existing AV parsing bug) |
+| Printemps La Valentine | Sales Quote | €18.488 | €18.488 | ✓ |
+| Printemps Nancy | Sales Quote | €21.730 | €21.730 | ✓ |
+| Printemps Lyon | Sales Quote | €11.673 | €11.673 | ✓ |
+| Printemps Marseille | Sales Quote | €12.076 | €12.076 | ✓ |
+
+### Hanger Calculator validation (Printemps PDFs)
+
+| PDF | Raw total | Shirt / Clips / Coat |
+|---|---|---|
+| La Valentine | 315 hangers | 200 / 100 / 50 |
+| Nancy | 225 hangers | 150 / 50 / 50 |
+| Lyon | 195 hangers | 150 / 50 / 25 |
+| Marseille | 175 hangers | 100 / 50 / 25 |
+
+## Known issues (not fixed in this release)
+
+- **Hagemeyer AV parsing**: pre-existing bug where "75\" screen 0 pcs €2.200 €-" is parsed as €200 instead of €0. Causes €200 diff vs PDF total. Will fix in next release.
+- **Sales Quote sqm**: not present in PDF format; user must enter manually. The UI shows a clear "info" warning.
 
 ## How to deploy
 
 1. Unzip locally
 2. Drag everything to GitHub repo root
-3. Commit message: `v2.6.0 — Menu reorder, Project Flow accordion`
+3. Commit message: `v2.7.0 — Sales Quote format + Hanger rules update`
 4. Vercel auto-deploys
-
-No new API routes, no deletions needed.
 
 ## Smoke test
 
-1. Sidebar — verify ROI Engine appears above Quotation
-2. Open Project Flow — verify Phase 0 is expanded by default with description + project count
-3. Click Phase 3 — verify Phase 0 closes and Phase 3 opens
-4. Click expanded phase header again — verify it closes (so all are collapsed)
-5. Open Phase 2 — verify "Open ROI Engine" and "Open Quotation Builder" buttons appear
-6. Click "Open ROI Engine" — verify it navigates to ROI Engine page
-7. Verify project counts on each phase reflect actual Asana data (use Admin to compare totals)
-
-## Inherited from earlier versions
-
-- v2.5.0 ROI ↔ Asana integration (linked project + push to comment)
-- v2.4.1 Asana write access test
-- v2.4.0 ROI Decision Engine
-- v2.3.0 Hanger Calculator
-- v2.2.0 3-pillar mapping, mailto flow, focus fix
+1. Upload **Quote_2088_SLT_SIS_Frame_Printemps_La_Valentine_260424.pdf**
+2. Verify project name auto-fills as "Selected SIS - Printemps La Valentine"
+3. Verify Cost Breakdown shows Inventory €9.777, Selected Deliveries €0, Specific Project Cost €8.711, Total €18.488
+4. Verify Hanger Calculator appears with: 1× Sidehang+mirror (30), 1× Sidehang 700 (25), 4× Floor rack 1400 (200), 2× Floor rack 700 (50), 1× Jeans double (10) = 315 raw → Shirt 200 / Clips 100 / Coat 50
+5. Click Add to Quote — verify hangers populate Add-ons section
+6. Type sqm in the Sales area field manually — verify SQM Price calculates

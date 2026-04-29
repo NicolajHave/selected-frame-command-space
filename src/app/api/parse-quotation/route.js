@@ -1,5 +1,7 @@
 export const dynamic = 'force-dynamic';
 
+// ─── SHARED HELPERS ────────────────────────────────────────────────────────────
+
 function parseEuro(raw) {
   if (!raw) return 0;
   let s = raw.replace(/€/g, '').trim();
@@ -11,9 +13,7 @@ function parseEuro(raw) {
   return parseFloat(s) || 0;
 }
 
-// Extract ALL euro amounts from a line - handles BOTH formats:
-// Format A (pdftotext): "€ 3 7.225" - € before number
-// Format B (pdf.js):    "37.225€"   - € after number
+// Extract ALL euro amounts - handles both "€ X.XXX" and "X.XXX €" formats
 function extractEuros(line) {
   const matches = [];
   const regexA = /€\s*([\d\s.,]+)/g;
@@ -30,222 +30,354 @@ function extractEuros(line) {
   return matches;
 }
 
+// Parse Sales Quote decimal-only numbers like "18.488,00" or "419,00"
+// (no € sign in column-based table layout)
+function parseDecimalOnly(s) {
+  if (!s) return 0;
+  s = s.replace(/\s+/g, '').trim();
+  if (s === '-' || s === '') return 0;
+  // European format: dot = thousand separator, comma = decimal
+  if (/,\d{1,2}$/.test(s)) {
+    s = s.replace(/\.(\d{3})/g, '$1').replace(',', '.');
+    return parseFloat(s) || 0;
+  }
+  s = s.replace(/\./g, '').replace(/,/g, '');
+  return parseFloat(s) || 0;
+}
+
+// ─── FORMAT DETECTION ─────────────────────────────────────────────────────────
+
+function detectFormat(lines) {
+  const firstChunk = lines.slice(0, 40).join('\n').toUpperCase();
+  if (firstChunk.includes('SALES QUOTE |') || firstChunk.includes('SALES QUOTE  |')) {
+    return 'sales-quote';
+  }
+  if (firstChunk.includes('QUOTATION') && firstChunk.includes('PROJECT:')) {
+    return 'calculation';
+  }
+  // Default to calculation format - has been the historical format
+  return 'calculation';
+}
+
+// ─── CALCULATION FORMAT PARSER (original &elements internal format) ──────────
+
+function parseCalculationFormat(lines) {
+  const warnings = [];
+  const addWarn = (severity, message, context = null) => warnings.push({ severity, message, context });
+
+  const fullText = lines.join('\n');
+  const get = (p) => { const m = fullText.match(p); return m ? m[1].trim() : null; };
+  const header = {
+    project: get(/Project:\s*(.+)/),
+    salesArea: parseInt(get(/Sales area,?\s*sqm:\s*(\d+)/) || '0'),
+    gender: get(/Gender:\s*(\w+)/),
+    updated: get(/Updated:\s*(.+)/),
+    revision: get(/Revision:\s*(.+)/),
+    deliveryDate: get(/Delivery date:\s*(.+)/) || 'TBC',
+    openingDate: get(/Target opening date:\s*(.+)/) || 'TBC',
+    supplier: '&elements ApS',
+  };
+
+  if (!header.project) addWarn('warn', 'Project name not found in PDF header');
+  if (!header.salesArea) addWarn('warn', 'Sales area (sqm) not found - SQM price will be missing');
+  if (!header.gender) addWarn('info', 'Gender not specified in PDF');
+
+  const categories = [];
+  let currentCat = null;
+  const catNames = ['INVENTORY', 'SELECTED DELIVERIES', 'SPECIFIC PROJECT COST', 'SPECIAL ELEMENTS', 'FITTING ROOMS', 'FLOOR', 'AV & HIFI', 'CONSTRUCTION', 'LIGHT'];
+  let grandTotal = 0, grandSqm = 0;
+  let inSummary = false;
+
+  let unmatchedItemLines = 0;
+  let droppedItems = 0;
+  const seenCategoryHeaders = new Set();
+
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t) continue;
+    const upper = t.toUpperCase();
+
+    if (t.includes('Project cost overview') || upper.includes('HEADERS')) { inSummary = true; continue; }
+    if (t.startsWith('Conditions:') || t.startsWith('Payment terms')) break;
+
+    if (inSummary) {
+      if (upper.includes('TOTAL EXCL') || upper.startsWith('TOTAL EXCL')) {
+        const euros = extractEuros(t);
+        if (euros.length >= 1) {
+          const sorted = [...euros].sort((a, b) => b - a);
+          grandTotal = sorted[0];
+          const sqmCandidate = sorted.slice(1).find(v => v < grandTotal * 0.1);
+          if (sqmCandidate) grandSqm = sqmCandidate;
+        }
+      }
+      continue;
+    }
+
+    const matchedCat = catNames.find(c => upper === c || upper.startsWith(c));
+    if (matchedCat && !t.includes('€')) {
+      currentCat = { name: matchedCat, items: [], total: 0 };
+      categories.push(currentCat);
+      seenCategoryHeaders.add(matchedCat);
+      continue;
+    }
+
+    if (!currentCat) {
+      if (upper.match(/^[A-Z\s&]{4,}$/) && upper.length < 40 && !upper.includes('SLT') && !upper.includes('QUOTATION')) {
+        addWarn('warn', `Possible unrecognised category: "${t}"`, { line: t });
+      }
+      continue;
+    }
+
+    if (upper.startsWith('TOTAL') && t.includes('€')) {
+      const euros = extractEuros(t);
+      if (euros.length > 0) currentCat.total = euros[0];
+      currentCat = null;
+      continue;
+    }
+
+    if (t.startsWith('item no.') || t.startsWith('Product Name') || t.startsWith('Item no.')) continue;
+
+    const euros = extractEuros(t);
+    if (euros.length === 0) {
+      const isPrettyText = upper.match(/^[A-Z]/) && t.length > 5;
+      if (isPrettyText && !t.startsWith('-') && !t.includes(':')) {
+        unmatchedItemLines++;
+      }
+      continue;
+    }
+
+    const qtyMatch = t.match(/(\d+)\s+(pcs|pack|Hours?|km|Pack)/i);
+    const qty = qtyMatch ? parseInt(qtyMatch[1]) : 0;
+    const last = euros.length - 1;
+    const totalPrice = euros[last];
+    const unitPrice = euros.length >= 2 ? euros[last - 1] : totalPrice;
+
+    let name = t.replace(/€[\s\d.,-]+/g, ' ').replace(/\s+/g, ' ');
+    name = name.replace(/^[\d.\-_]+/, '').replace(/\s+\d+\s+(pcs|pack|Hours?|km|Pack).*/i, '').trim();
+    if (name.length < 3 && totalPrice > 0) {
+      droppedItems++;
+      continue;
+    }
+    if (name.length >= 3) {
+      currentCat.items.push({ name, qty, unitPrice, totalPrice });
+      currentCat.total += totalPrice;
+    }
+  }
+
+  if (unmatchedItemLines > 5) addWarn('info', `${unmatchedItemLines} text lines couldn't be parsed (may be notes or descriptions)`);
+  if (droppedItems > 0) addWarn('warn', `${droppedItems} items dropped because the name was too short to be valid`);
+
+  return buildSummary({ header, categories, grandTotal, grandSqm, warnings, addWarn, format: 'calculation' });
+}
+
+// ─── SALES QUOTE PARSER (Bestseller-customer-facing, item-by-line, no categories) ─
+
+function parseSalesQuoteFormat(lines) {
+  const warnings = [];
+  const addWarn = (severity, message, context = null) => warnings.push({ severity, message, context });
+
+  const fullText = lines.join('\n');
+
+  // Header extraction
+  // Project name guess: "Regarding deliveries for Selected at X" or "Selected at X"
+  let projectName = null;
+  const m1 = fullText.match(/Regarding deliveries for\s+(.+?)(?:\n|$|3D layout)/i);
+  if (m1) {
+    projectName = `Selected SIS - ${m1[1].replace(/^Selected at\s+/i, '').trim()}`;
+  } else {
+    // Fallback: try delivery address (PRIMTEMPS NANCY etc.)
+    const m2 = fullText.match(/\(Delivery Address\)\s*\n\s*([A-Z][A-Z\s_-]+)/);
+    if (m2) {
+      projectName = `Selected SIS - ${m2[1].trim()}`;
+    }
+  }
+  // Quote number for fallback ID
+  const quoteNum = fullText.match(/Sales Quote\s*\|\s*(\d+)/);
+
+  const header = {
+    project: projectName,
+    salesArea: 0, // Not available in Sales Quote format
+    gender: null,
+    updated: null,
+    revision: quoteNum ? `Quote ${quoteNum[1]}` : null,
+    deliveryDate: (fullText.match(/Planned delivery date:\s*(.+)/) || [])[1]?.trim() || 'TBC',
+    openingDate: 'TBC',
+    supplier: '&elements ApS',
+  };
+
+  if (!header.project) addWarn('warn', 'Project name not found - please enter manually');
+  addWarn('info', 'Sales area (sqm) not in Sales Quote format - please enter manually');
+
+  // Find the table boundaries
+  let tableStart = -1, tableEnd = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (t.match(/^Regarding deliveries/i) && tableStart === -1) tableStart = i + 1;
+    if (t.match(/^Total EUR Excl/i)) { tableEnd = i; break; }
+  }
+  if (tableStart === -1) tableStart = 0;
+  if (tableEnd === -1) tableEnd = lines.length;
+
+  // Grand total
+  let grandTotal = 0;
+  const totalLine = lines.slice(tableEnd, tableEnd + 3).join(' ');
+  const totalMatch = totalLine.match(/Total EUR Excl\.?\s*VAT\s+([\d.,]+)/i);
+  if (totalMatch) grandTotal = parseDecimalOnly(totalMatch[1]);
+
+  // Parse items between tableStart and tableEnd
+  // Format: "ITEM-NO  Description  QTY  Unit  UnitPrice  LinePrice"
+  // ITEM-NO can be: 105-XX-XXX-X, 112_XX_XXX, 0421, 0500, etc.
+  // Multi-line descriptions: continuation lines have no item-no at start
+
+  const items = [];
+  let pendingMulti = null; // for items whose description spans 2 lines
+
+  for (let i = tableStart; i < tableEnd; i++) {
+    const t = lines[i].trim();
+    if (!t) continue;
+    if (t.startsWith('Ordered by:')) break;
+    if (t.startsWith('Fees for')) continue;
+    if (t.startsWith('Planned delivery')) continue;
+
+    // Detect: starts with item number followed by space
+    const itemMatch = t.match(/^([\d]+(?:[-_][\dA-Za-z]+)*)\s+(.+)$/);
+    if (!itemMatch) {
+      // This might be a continuation line (e.g. "to mount on existing wall")
+      // or a description-only follow-up. Append to last item if pending.
+      if (pendingMulti) {
+        pendingMulti.name += ' ' + t;
+      }
+      continue;
+    }
+
+    const itemNo = itemMatch[1];
+    const rest = itemMatch[2];
+
+    // Try to split rest into: description + qty + unit + unit-price + line-price
+    // Numbers are at the end. Try to peel them off from the right.
+    // Pattern: "Description... QTY Unit X.XXX,XX X.XXX,XX"
+    const tail = rest.match(/^(.+?)\s+(\d+)\s+(Pcs|Hour|Pallet|Pack|km)\s+([\d.,]+)\s+([\d.,]+)$/i);
+    if (tail) {
+      const item = {
+        itemNo,
+        name: tail[1].trim(),
+        qty: parseInt(tail[2]),
+        unit: tail[3],
+        unitPrice: parseDecimalOnly(tail[4]),
+        totalPrice: parseDecimalOnly(tail[5]),
+      };
+      items.push(item);
+      pendingMulti = item; // in case description continues on next line
+    } else {
+      // Description-only line that started with what looked like a number prefix?
+      // Treat as continuation of previous item
+      if (pendingMulti) pendingMulti.name += ' ' + t;
+    }
+  }
+
+  // Build pillar mapping
+  // Inventory: items starting with 105- or 112_ (excluding _SLT delivery)
+  // Selected Deliveries: name contains "_SLT delivery"
+  // Specific Project Cost: everything else (services, paint, freight, etc.)
+  const inventoryItems = [];
+  const selectedDeliveryItems = [];
+  const projectCostItems = [];
+
+  for (const it of items) {
+    if (it.name.match(/_SLT delivery/i)) {
+      selectedDeliveryItems.push(it);
+    } else if (it.itemNo.match(/^(105|112)/)) {
+      inventoryItems.push(it);
+    } else {
+      projectCostItems.push(it);
+    }
+  }
+
+  const sumPrice = (arr) => arr.reduce((s, x) => s + x.totalPrice, 0);
+  const categories = [
+    { name: 'INVENTORY', items: inventoryItems, total: sumPrice(inventoryItems) },
+    { name: 'SELECTED DELIVERIES', items: selectedDeliveryItems, total: sumPrice(selectedDeliveryItems) },
+    { name: 'SPECIFIC PROJECT COST', items: projectCostItems, total: sumPrice(projectCostItems) },
+  ].filter(c => c.items.length > 0);
+
+  return buildSummary({ header, categories, grandTotal, grandSqm: 0, warnings, addWarn, format: 'sales-quote' });
+}
+
+// ─── SHARED SUMMARY BUILDER (3-pillar mapping) ────────────────────────────────
+
+function buildSummary({ header, categories, grandTotal, grandSqm, warnings, addWarn, format }) {
+  const getCat = (n) => categories.find(c => c.name === n)?.total || 0;
+
+  const inventoryGroup = ['INVENTORY', 'FLOOR', 'SPECIAL ELEMENTS', 'FITTING ROOMS'];
+  const deliveriesGroup = ['SELECTED DELIVERIES'];
+  const projectCostGroup = ['SPECIFIC PROJECT COST', 'AV & HIFI', 'LIGHT', 'CONSTRUCTION'];
+
+  const sumGroup = (group) => group.reduce((s, n) => s + getCat(n), 0);
+  const groupBreakdown = (group) => group.map(n => ({ name: n, value: getCat(n) })).filter(x => x.value > 0);
+
+  const summary = {
+    inventory: sumGroup(inventoryGroup),
+    selectedDeliveries: sumGroup(deliveriesGroup),
+    specificProjectCost: sumGroup(projectCostGroup),
+    inventoryRaw: getCat('INVENTORY'),
+    selectedDeliveriesRaw: getCat('SELECTED DELIVERIES'),
+    specificProjectCostRaw: getCat('SPECIFIC PROJECT COST'),
+    specialElements: getCat('SPECIAL ELEMENTS'),
+    fittingRooms: getCat('FITTING ROOMS'),
+    floor: getCat('FLOOR'),
+    avHifi: getCat('AV & HIFI'),
+    light: getCat('LIGHT'),
+    construction: getCat('CONSTRUCTION'),
+    inventoryBreakdown: groupBreakdown(inventoryGroup),
+    projectCostBreakdown: groupBreakdown(projectCostGroup),
+    totalExclVat: grandTotal || 0,
+    sqmPrice: grandSqm || 0,
+  };
+
+  // Sanity check
+  if (summary.totalExclVat > 0) {
+    const sumOfPillars = summary.inventory + summary.selectedDeliveries + summary.specificProjectCost;
+    const diff = Math.abs(summary.totalExclVat - sumOfPillars);
+    const tolerance = Math.max(50, summary.totalExclVat * 0.02);
+    if (sumOfPillars > 0 && diff > tolerance) {
+      addWarn('warn', `Pillar totals (€${sumOfPillars.toLocaleString('de-DE')}) don't match grand total (€${summary.totalExclVat.toLocaleString('de-DE')}) - difference €${Math.round(diff).toLocaleString('de-DE')}`);
+    }
+  }
+
+  if (!summary.totalExclVat) {
+    summary.totalExclVat = summary.inventory + summary.selectedDeliveries + summary.specificProjectCost;
+    addWarn('info', 'Grand total not found in PDF - calculated from pillar sums');
+  }
+  if (!summary.sqmPrice && header.salesArea > 0 && summary.totalExclVat > 0) {
+    summary.sqmPrice = Math.round(summary.totalExclVat / header.salesArea);
+  }
+
+  return Response.json({
+    success: true,
+    format,
+    project: header.project,
+    header,
+    categories,
+    summary,
+    parseStats: { categoriesFound: categories.length, totalItems: categories.reduce((s, c) => s + c.items.length, 0) },
+    parseWarnings: warnings,
+  });
+}
+
+// ─── ROUTE HANDLER ────────────────────────────────────────────────────────────
+
 export async function POST(request) {
   try {
     const { lines } = await request.json();
     if (!lines?.length) return Response.json({ error: 'No lines' }, { status: 400 });
 
-    // Collect warnings - non-blocking issues that user should review
-    const warnings = [];
-    const addWarn = (severity, message, context = null) => warnings.push({ severity, message, context });
-
-    const fullText = lines.join('\n');
-    const get = (p) => { const m = fullText.match(p); return m ? m[1].trim() : null; };
-    const header = {
-      project: get(/Project:\s*(.+)/),
-      salesArea: parseInt(get(/Sales area,?\s*sqm:\s*(\d+)/) || '0'),
-      gender: get(/Gender:\s*(\w+)/),
-      updated: get(/Updated:\s*(.+)/),
-      revision: get(/Revision:\s*(.+)/),
-      deliveryDate: get(/Delivery date:\s*(.+)/) || 'TBC',
-      openingDate: get(/Target opening date:\s*(.+)/) || 'TBC',
-      supplier: '&elements ApS',
-    };
-
-    // Header warnings
-    if (!header.project) addWarn('warn', 'Project name not found in PDF header');
-    if (!header.salesArea) addWarn('warn', 'Sales area (sqm) not found - SQM price will be missing');
-    if (!header.gender) addWarn('info', 'Gender not specified in PDF');
-
-    const categories = [];
-    let currentCat = null;
-    const catNames = ['INVENTORY', 'SELECTED DELIVERIES', 'SPECIFIC PROJECT COST', 'SPECIAL ELEMENTS', 'FITTING ROOMS', 'FLOOR', 'AV & HIFI', 'CONSTRUCTION', 'LIGHT'];
-    let grandTotal = 0, grandSqm = 0;
-    let inSummary = false;
-
-    // Track unmatched lines for warnings
-    let unmatchedItemLines = 0;
-    let droppedItems = 0;
-    const seenCategoryHeaders = new Set();
-
-    for (const line of lines) {
-      const t = line.trim();
-      if (!t) continue;
-      const upper = t.toUpperCase();
-
-      // Summary section
-      if (t.includes('Project cost overview') || upper.includes('HEADERS')) { inSummary = true; continue; }
-      if (t.startsWith('Conditions:') || t.startsWith('Payment terms')) break;
-
-      if (inSummary) {
-        if (upper.includes('TOTAL EXCL') || upper.startsWith('TOTAL EXCL')) {
-          const euros = extractEuros(t);
-          // Total excl. VAT line contains: grand total + sqm-price.
-          // Position-in-string ordering is unreliable across pdftotext vs pdf.js,
-          // and pdftotext may insert spurious values from broken digits like
-          // "€ 4 8.509" -> [48509, 8509]. Use magnitude logic:
-          // - grand total = largest value (always >€10k for any real project)
-          // - sqm-price = smallest plausible value (typically €100-€2000)
-          if (euros.length >= 1) {
-            const sorted = [...euros].sort((a, b) => b - a);
-            grandTotal = sorted[0];
-            // Find the smallest value that could plausibly be a sqm-price
-            // (must be <10% of grand total to rule out broken-digit artifacts)
-            const sqmCandidate = sorted.slice(1).find(v => v < grandTotal * 0.1);
-            if (sqmCandidate) grandSqm = sqmCandidate;
-          }
-        }
-        continue;
-      }
-
-      // Category header (line that is just the category name, no €)
-      const matchedCat = catNames.find(c => upper === c || upper.startsWith(c));
-      if (matchedCat && !t.includes('€')) {
-        currentCat = { name: matchedCat, items: [], total: 0 };
-        categories.push(currentCat);
-        seenCategoryHeaders.add(matchedCat);
-        continue;
-      }
-
-      // Detect potential category headers we might have missed
-      // (uppercase line of 3+ chars, no euros, not a known label)
-      // Exclusion list covers: PDF title ("QUOTATION"), header field labels,
-      // and section subtitles that are not categories
-      const HEADER_EXCLUDES = ['QUOTATION', 'PRODUCT', 'ITEM', 'PROJECT', 'SALES', 'GENDER', 'UPDATED', 'REVISION', 'DELIVERY', 'TARGET', 'SUPPLIER', 'CLIENT', 'BRAND', 'ADDRESS', 'CITY', 'CONTACT', 'DESIGN', 'LAYOUT', 'CONDITIONS', 'PAYMENT', 'HEADERS', 'TBC', 'NOT DEFINED', 'NOT INCLUDED', 'TRANSPORTATION', 'FREIGHT'];
-      if (!currentCat && !t.includes('€') && t.length >= 3 && t.length <= 40 &&
-          t === upper && !/^[\d\s._-]+$/.test(t) &&
-          !HEADER_EXCLUDES.some(ex => upper.includes(ex))) {
-        addWarn('warn', `Possible unrecognised category: "${t}"`, { line: t });
-      }
-
-      if (upper.includes('PRODUCT NAME') || upper.includes('ITEM NO.')) continue;
-      if (!currentCat) continue;
-
-      // Total line for category
-      if (/^Total/i.test(t)) {
-        const euros = extractEuros(t);
-        if (euros.length > 0) currentCat.total = euros[euros.length - 1];
-        else addWarn('warn', `Total line found in ${currentCat.name} but no amount detected`, { line: t });
-        continue;
-      }
-
-      if (t.startsWith('Transportation & Accomodation') || t.startsWith('Freight & Logistic')) continue;
-
-      // Item line - must contain €
-      if (t.includes('€')) {
-        const euros = extractEuros(t);
-        const totalPrice = euros.length >= 1 ? euros[euros.length - 1] : 0;
-        const unitPrice = euros.length >= 2 ? euros[euros.length - 2] : 0;
-        const qtyMatch = t.match(/(\d+)\s*(pcs|Hours|hours|pack|Pack|km)/);
-        const qty = qtyMatch ? parseInt(qtyMatch[1]) : 0;
-        let name = qtyMatch ? t.substring(0, t.indexOf(qtyMatch[0])).trim() : t.split('€')[0].split(/\d+[.,]\d+€/).at(0)?.trim() || '';
-        name = name.replace(/^[\d._-]+[A-Za-z]?\s+/, '').trim();
-        if (!name || name.length < 2) {
-          const beforeNum = t.match(/^([\d._-]+[A-Za-z]?\s+)?(.+?)(?=\d+\s*(?:pcs|Hours|pack|km)|[\d.,]+\s*€)/);
-          name = beforeNum ? beforeNum[2].trim() : t.substring(0, 40).trim();
-        }
-        if (name && name.length > 1 && (totalPrice > 0 || qty > 0)) {
-          currentCat.items.push({ name, qty, unitPrice, totalPrice });
-        } else {
-          droppedItems++;
-          unmatchedItemLines++;
-          if (droppedItems <= 5) {
-            addWarn('warn', `Item line could not be parsed in ${currentCat.name}`, { line: t.substring(0, 80) });
-          }
-        }
-      }
+    const format = detectFormat(lines);
+    if (format === 'sales-quote') {
+      return parseSalesQuoteFormat(lines);
+    } else {
+      return parseCalculationFormat(lines);
     }
-
-    if (droppedItems > 5) {
-      addWarn('warn', `${droppedItems - 5} additional item lines could not be parsed (showing first 5 only)`);
-    }
-
-    // Validate: are there categories without totals?
-    categories.forEach(cat => {
-      if (cat.items.length > 0 && cat.total === 0) {
-        addWarn('warn', `${cat.name} has ${cat.items.length} items but Total line missing or zero`);
-      }
-      if (cat.items.length === 0 && cat.total === 0) {
-        addWarn('info', `${cat.name} category found but contained no parseable items`);
-      }
-    });
-
-    // Build summary from category Total lines
-    // Three-pillar mapping (consolidates &elements' 9 raw categories into the 3 we present):
-    //   Inventory pillar      = INVENTORY + FLOOR + SPECIAL ELEMENTS + FITTING ROOMS  (physical fixtures)
-    //   Selected Deliveries   = SELECTED DELIVERIES                                    (consumables)
-    //   Specific Project Cost = SPECIFIC PROJECT COST + AV & HIFI + LIGHT + CONSTRUCTION (services & install)
-    const getCat = (n) => categories.find(c => c.name === n)?.total || 0;
-
-    const inventoryGroup = ['INVENTORY', 'FLOOR', 'SPECIAL ELEMENTS', 'FITTING ROOMS'];
-    const deliveriesGroup = ['SELECTED DELIVERIES'];
-    const projectCostGroup = ['SPECIFIC PROJECT COST', 'AV & HIFI', 'LIGHT', 'CONSTRUCTION'];
-
-    const sumGroup = (group) => group.reduce((s, n) => s + getCat(n), 0);
-
-    // Track which raw categories contributed to each pillar (for transparency in UI)
-    const groupBreakdown = (group) => group
-      .map(n => ({ name: n, value: getCat(n) }))
-      .filter(x => x.value > 0);
-
-    const summary = {
-      inventory: sumGroup(inventoryGroup),
-      selectedDeliveries: sumGroup(deliveriesGroup),
-      specificProjectCost: sumGroup(projectCostGroup),
-      // Raw category totals kept for the detail breakdown UI
-      inventoryRaw: getCat('INVENTORY'),
-      selectedDeliveriesRaw: getCat('SELECTED DELIVERIES'),
-      specificProjectCostRaw: getCat('SPECIFIC PROJECT COST'),
-      specialElements: getCat('SPECIAL ELEMENTS'),
-      fittingRooms: getCat('FITTING ROOMS'),
-      floor: getCat('FLOOR'),
-      avHifi: getCat('AV & HIFI'),
-      light: getCat('LIGHT'),
-      construction: getCat('CONSTRUCTION'),
-      // Group composition for UI transparency
-      inventoryBreakdown: groupBreakdown(inventoryGroup),
-      projectCostBreakdown: groupBreakdown(projectCostGroup),
-      totalExclVat: grandTotal || 0,
-      sqmPrice: grandSqm || 0,
-    };
-
-    // Sanity check: do the 3 pillar totals add up to grand total?
-    // (No double-counting: each raw category appears in exactly one pillar)
-    if (summary.totalExclVat > 0) {
-      const sumOfPillars = summary.inventory + summary.selectedDeliveries + summary.specificProjectCost;
-      const diff = Math.abs(summary.totalExclVat - sumOfPillars);
-      const tolerance = Math.max(50, summary.totalExclVat * 0.02); // 2% or €50, whichever is larger
-      if (sumOfPillars > 0 && diff > tolerance) {
-        addWarn('warn', `Pillar totals (€${sumOfPillars.toLocaleString('de-DE')}) don't match grand total (€${summary.totalExclVat.toLocaleString('de-DE')}) - difference €${Math.round(diff).toLocaleString('de-DE')}`);
-      }
-    }
-
-    if (!summary.totalExclVat) {
-      summary.totalExclVat = summary.inventory + summary.selectedDeliveries + summary.specificProjectCost;
-      addWarn('info', 'Grand total not found in PDF - calculated from pillar sums');
-    }
-    if (!summary.sqmPrice && header.salesArea > 0 && summary.totalExclVat > 0) {
-      summary.sqmPrice = Math.round(summary.totalExclVat / header.salesArea);
-    }
-
-    // No categories at all = parse failure
-    if (categories.length === 0) {
-      addWarn('error', 'No categories detected - PDF format may have changed or file is not a supplier quotation');
-    }
-
-    return Response.json({
-      ...header,
-      categories,
-      summary,
-      parseWarnings: warnings,
-      parseStats: {
-        totalLines: lines.length,
-        categoriesFound: categories.length,
-        itemsExtracted: categories.reduce((s, c) => s + c.items.length, 0),
-        itemsDropped: droppedItems,
-      }
-    });
-  } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+  } catch (e) {
+    return Response.json({ error: e.message || 'Parse failed' }, { status: 500 });
   }
 }
