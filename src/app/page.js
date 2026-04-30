@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { SECTIONS as SF_SECTIONS, INTRO as SF_INTRO, DNA as SF_DNA, NON_NEGOTIABLES as SF_NON_NEGOTIABLES, SPACE_MANAGEMENT as SF_SPACE_MANAGEMENT, BRAND_APPLICATION as SF_BRAND_APPLICATION, FIXTURES as SF_FIXTURES, MERCHANDISING as SF_MERCHANDISING, PLAYBOOKS as SF_PLAYBOOKS, EXCEPTIONS as SF_EXCEPTIONS } from "./standards-content";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 
 const C={steel:"#8A8D8F",steelL:"#B8BBBE",steelD:"#5C5F61",oak:"#C4944A",sage:"#B5C4B1",surface:"#F5F4F1",surfaceD:"#ECEAE5",white:"#FFFFFF",black:"#1A1A1A",text:"#2C2C2C",textS:"#6B6B6B",accent:"#3D6B4F",warn:"#D4A843",danger:"#C75B4A",success:"#5A8F6A",go:"#4A7C5C",review:"#C4944A",nogo:"#C75B4A"};
 const PHASES=[
@@ -749,7 +750,207 @@ const FlowPage=({projects=[],setPage})=>{
   </div>;
 };
 const InstalledPage=({projects})=>{const c=projects.filter(p=>p.completed);return<div><Title sub="Completed">Installed Base</Title><div style={{display:"flex",gap:16,marginBottom:24}}><KPI label="Total" value={c.length}/></div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>{c.map(p=><div key={p.gid} style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`,borderTop:`4px solid ${C.accent}`}}><div style={{fontSize:16,fontWeight:400,fontFamily:"'Cormorant Garamond',serif",marginBottom:8}}>{p.name}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:12}}>{[["Type",p.type],["Completed",fmtDate(p.completedAt)]].map(([l,v])=><div key={l}><div style={{color:C.textS,fontSize:10,fontWeight:600,textTransform:"uppercase"}}>{l}</div><div style={{fontWeight:500}}>{v}</div></div>)}</div><a href={p.url} target="_blank" rel="noopener noreferrer" style={{display:"inline-block",marginTop:12,fontSize:11,color:C.oak,textDecoration:"none",fontWeight:500}}>Details →</a></div>)}</div></div>};
-const StandardsPage=()=><div><Title sub="Concept guidelines">Standards</Title><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:32,borderRadius:8,overflow:"hidden"}}><div style={{height:220}}><img src="/images/kh_selected_sis_032_web.jpg" alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div><div style={{height:220}}><img src="/images/kh_selected_sis_018_web.jpg" alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}>{[{t:"Selected Frame",d:"Flexible, modular, Scandinavian design.",i:["Steel – Industrial, minimalistic","Shapes – Softness, playfulness","Wood – Warmth, Scandinavian"]},{t:"Floor Plans",d:"Standard sizes.",i:["25 m²","40 m²","60 m²","80 m²"]},{t:"Design Pillars",d:"Core principles.",i:["Visibility","Consistency","Flexibility"]},{t:"Partnership",d:"Data-driven collaboration.",i:["Real-time data","Trade meetings","Budgets","Seasonal control"]}].map(s=><div key={s.t} style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}><div style={{fontSize:18,fontWeight:400,fontFamily:"'Cormorant Garamond',serif",marginBottom:6}}>{s.t}</div><p style={{fontSize:12,color:C.textS,margin:"0 0 12px"}}>{s.d}</p>{s.i.map(i=><div key={i} style={{fontSize:12,padding:"4px 0",borderBottom:`1px solid ${C.surfaceD}`}}>{i}</div>)}</div>)}</div></div>;
+const ReviewPill=()=><span style={{fontSize:9,fontWeight:700,color:C.review,background:"#FDF3E0",padding:"2px 6px",borderRadius:3,letterSpacing:".5px",marginLeft:8,verticalAlign:"middle",border:`1px solid ${C.review}33`}}>REVIEW</span>;
+
+const SectionHeader=({eyebrow,title,intro,id})=><div id={id} style={{paddingTop:24,marginBottom:24,scrollMarginTop:24}}>
+  <div style={{fontSize:10,fontWeight:600,color:C.oak,textTransform:"uppercase",letterSpacing:"1.5px",marginBottom:8}}>{eyebrow}</div>
+  <h2 style={{fontSize:32,fontWeight:400,fontFamily:"'Cormorant Garamond',serif",margin:"0 0 12px",color:C.text,lineHeight:1.1}}>{title}</h2>
+  {intro&&<p style={{fontSize:13,color:C.textS,maxWidth:680,lineHeight:1.6,margin:0}}>{intro}</p>}
+</div>;
+
+const StandardsPage=()=>{
+  const [active,setActive]=useState("intro");
+  // Track scroll for active section highlighting
+  React.useEffect(()=>{
+    const onScroll=()=>{
+      let current="intro";
+      for(const s of SF_SECTIONS){
+        const el=document.getElementById(s.id);
+        if(el&&el.getBoundingClientRect().top<200)current=s.id;
+      }
+      setActive(current);
+    };
+    window.addEventListener("scroll",onScroll,{passive:true});
+    return ()=>window.removeEventListener("scroll",onScroll);
+  },[]);
+
+  return <div style={{display:"grid",gridTemplateColumns:"180px 1fr",gap:48,maxWidth:1100}}>
+    {/* Sticky sidebar nav */}
+    <nav style={{position:"sticky",top:24,alignSelf:"start",height:"fit-content"}}>
+      <div style={{fontSize:10,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:"1.5px",marginBottom:14}}>Sections</div>
+      {SF_SECTIONS.map(s=><a key={s.id} href={`#${s.id}`} onClick={e=>{e.preventDefault();document.getElementById(s.id)?.scrollIntoView({behavior:"smooth"})}} style={{display:"block",padding:"6px 0 6px 12px",fontSize:12,color:active===s.id?C.oak:C.textS,fontWeight:active===s.id?600:400,borderLeft:`2px solid ${active===s.id?C.oak:C.surfaceD}`,textDecoration:"none",transition:"all .2s",cursor:"pointer"}}>{s.label}</a>)}
+    </nav>
+
+    {/* Content column */}
+    <div>
+
+      {/* INTRO */}
+      <section id="intro" style={{marginBottom:48,scrollMarginTop:24}}>
+        <div style={{fontSize:10,fontWeight:600,color:C.oak,textTransform:"uppercase",letterSpacing:"1.5px",marginBottom:8}}>{SF_INTRO.kicker}</div>
+        <h1 style={{fontSize:42,fontWeight:400,fontFamily:"'Cormorant Garamond',serif",margin:"0 0 16px",color:C.text,lineHeight:1.1}}>{SF_INTRO.title}</h1>
+        <p style={{fontSize:14,color:C.text,maxWidth:680,lineHeight:1.7,margin:"0 0 24px"}}>{SF_INTRO.body}</p>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16,padding:"20px 24px",background:C.white,borderRadius:8,border:`1px solid ${C.surfaceD}`}}>
+          {SF_INTRO.meta.map(m=><div key={m.label}>
+            <div style={{fontSize:10,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>{m.label}</div>
+            <div style={{fontSize:12,color:C.text,fontWeight:500}}>{m.value}</div>
+          </div>)}
+        </div>
+      </section>
+
+      {/* DNA */}
+      <SectionHeader id="dna" eyebrow="01" title="Concept DNA" intro={SF_DNA.intro}/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:16,marginBottom:48}}>
+        {SF_DNA.principles.map((p,i)=><div key={i} style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`,position:"relative"}}>
+          <div style={{fontSize:10,fontWeight:600,color:C.oak,letterSpacing:"1px",marginBottom:8}}>0{i+1}</div>
+          <div style={{fontSize:18,fontWeight:400,fontFamily:"'Cormorant Garamond',serif",marginBottom:10,color:C.text}}>{p.title}{p.review&&<ReviewPill/>}</div>
+          <p style={{fontSize:12,color:C.textS,lineHeight:1.6,margin:0}}>{p.body}</p>
+        </div>)}
+      </div>
+
+      {/* NON-NEGOTIABLES */}
+      <SectionHeader id="non-negotiables" eyebrow="02 · Fixed rules" title="Non-Negotiables" intro={SF_NON_NEGOTIABLES.intro}/>
+      <div style={{background:C.black,borderRadius:8,padding:"4px 0",marginBottom:48}}>
+        {SF_NON_NEGOTIABLES.rules.map((r,i)=><div key={i} style={{display:"flex",gap:20,padding:"18px 24px",borderBottom:i<SF_NON_NEGOTIABLES.rules.length-1?`1px solid #2A2A2A`:"none"}}>
+          <div style={{fontSize:14,color:C.oak,fontWeight:600,minWidth:32,fontFamily:"'DM Mono',monospace"}}>{String(i+1).padStart(2,"0")}</div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:13,fontWeight:600,color:C.white,marginBottom:4}}>{r.title}{r.review&&<ReviewPill/>}</div>
+            <div style={{fontSize:12,color:C.steelL,lineHeight:1.6}}>{r.body}</div>
+          </div>
+        </div>)}
+      </div>
+
+      {/* SPACE MANAGEMENT */}
+      <SectionHeader id="space" eyebrow="03" title="Space Management" intro={SF_SPACE_MANAGEMENT.intro}/>
+      <div style={{display:"flex",flexDirection:"column",gap:14,marginBottom:48}}>
+        {SF_SPACE_MANAGEMENT.zones.map((z,i)=><details key={i} style={{background:C.white,borderRadius:8,border:`1px solid ${C.surfaceD}`,overflow:"hidden"}}>
+          <summary style={{cursor:"pointer",padding:"18px 24px",listStyle:"none",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <div style={{fontSize:15,fontWeight:500,color:C.text}}>{z.title}{z.review&&<ReviewPill/>}</div>
+            </div>
+            <div style={{fontSize:14,color:C.textS}}>+</div>
+          </summary>
+          <div style={{padding:"0 24px 24px"}}>
+            <p style={{fontSize:12,color:C.textS,lineHeight:1.7,margin:"0 0 18px",borderTop:`1px solid ${C.surfaceD}`,paddingTop:16}}>{z.body}</p>
+            {(z.dos||z.donts)&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+              {z.dos&&<div style={{padding:"14px 16px",background:"#F0F7F2",borderRadius:6,borderLeft:`3px solid ${C.go}`}}>
+                <div style={{fontSize:10,fontWeight:700,color:C.go,letterSpacing:"1px",marginBottom:8}}>DO</div>
+                {z.dos.map((d,j)=><div key={j} style={{fontSize:11,color:C.text,padding:"3px 0",lineHeight:1.5}}>· {d}</div>)}
+              </div>}
+              {z.donts&&<div style={{padding:"14px 16px",background:"#FBF0EE",borderRadius:6,borderLeft:`3px solid ${C.nogo}`}}>
+                <div style={{fontSize:10,fontWeight:700,color:C.nogo,letterSpacing:"1px",marginBottom:8}}>DON'T</div>
+                {z.donts.map((d,j)=><div key={j} style={{fontSize:11,color:C.text,padding:"3px 0",lineHeight:1.5}}>· {d}</div>)}
+              </div>}
+            </div>}
+          </div>
+        </details>)}
+      </div>
+
+      {/* BRAND APPLICATION */}
+      <SectionHeader id="brand" eyebrow="04 · Mini CI guide" title="Brand Application" intro={SF_BRAND_APPLICATION.intro}/>
+      <div style={{background:C.white,borderRadius:8,padding:"8px 0",border:`1px solid ${C.surfaceD}`,marginBottom:24}}>
+        {SF_BRAND_APPLICATION.rules.map((r,i)=><div key={i} style={{display:"grid",gridTemplateColumns:"180px 1fr",gap:24,padding:"14px 24px",borderBottom:i<SF_BRAND_APPLICATION.rules.length-1?`1px solid ${C.surfaceD}`:"none"}}>
+          <div style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px"}}>{r.label}{r.review&&<ReviewPill/>}</div>
+          <div style={{fontSize:12,color:C.text,lineHeight:1.6}}>{r.value}</div>
+        </div>)}
+      </div>
+      <div style={{padding:"18px 24px",background:"#FBF0EE",borderRadius:8,borderLeft:`3px solid ${C.nogo}`,marginBottom:48}}>
+        <div style={{fontSize:10,fontWeight:700,color:C.nogo,letterSpacing:"1px",marginBottom:10}}>LOGO MISUSE — NOT APPROVED</div>
+        {SF_BRAND_APPLICATION.misuse.map((m,j)=><div key={j} style={{fontSize:12,color:C.text,padding:"3px 0",lineHeight:1.5}}>· {m}</div>)}
+      </div>
+
+      {/* FIXTURES */}
+      <SectionHeader id="fixtures" eyebrow="05" title="Fixtures & Modules" intro={SF_FIXTURES.intro}/>
+      {SF_FIXTURES.review&&<div style={{padding:"10px 14px",background:"#FDF3E0",borderRadius:6,borderLeft:`3px solid ${C.review}`,fontSize:11,color:C.text,marginBottom:14}}>This whole section is a working draft — capacities and codes need a final review pass.</div>}
+      <div style={{background:C.white,borderRadius:8,border:`1px solid ${C.surfaceD}`,marginBottom:24,overflow:"hidden"}}>
+        <div style={{display:"grid",gridTemplateColumns:"140px 1fr 200px",gap:16,padding:"12px 24px",background:C.surface,fontSize:10,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px"}}>
+          <div>Item code</div><div>Module</div><div>Capacity / use</div>
+        </div>
+        {SF_FIXTURES.approved.map((f,i)=><div key={i} style={{display:"grid",gridTemplateColumns:"140px 1fr 200px",gap:16,padding:"12px 24px",borderTop:`1px solid ${C.surfaceD}`,fontSize:12}}>
+          <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:C.textS}}>{f.code}</div>
+          <div style={{color:C.text,fontWeight:500}}>{f.name}</div>
+          <div style={{color:C.textS}}>{f.capacity}</div>
+        </div>)}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:48}}>
+        <div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>
+          <div style={{fontSize:10,fontWeight:700,color:C.go,letterSpacing:"1px",marginBottom:12}}>COMBINATION RULES</div>
+          {SF_FIXTURES.combinationRules.map((r,i)=><div key={i} style={{fontSize:12,color:C.text,padding:"6px 0",borderBottom:i<SF_FIXTURES.combinationRules.length-1?`1px solid ${C.surfaceD}`:"none",lineHeight:1.5}}>· {r}</div>)}
+        </div>
+        <div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>
+          <div style={{fontSize:10,fontWeight:700,color:C.nogo,letterSpacing:"1px",marginBottom:12}}>DO NOT COMBINE</div>
+          {SF_FIXTURES.doNotCombine.map((r,i)=><div key={i} style={{fontSize:12,color:C.text,padding:"6px 0",borderBottom:i<SF_FIXTURES.doNotCombine.length-1?`1px solid ${C.surfaceD}`:"none",lineHeight:1.5}}>· {r}</div>)}
+        </div>
+      </div>
+
+      {/* MERCHANDISING */}
+      <SectionHeader id="vm" eyebrow="06" title="Merchandising" intro={SF_MERCHANDISING.intro}/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:14,marginBottom:24}}>
+        {SF_MERCHANDISING.principles.map((p,i)=><div key={i} style={{background:C.white,borderRadius:8,padding:20,border:`1px solid ${C.surfaceD}`}}>
+          <div style={{fontSize:14,fontWeight:500,color:C.text,marginBottom:8}}>{p.title}{p.review&&<ReviewPill/>}</div>
+          <div style={{fontSize:11,color:C.textS,lineHeight:1.6}}>{p.body}</div>
+        </div>)}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:48}}>
+        <div style={{padding:"18px 22px",background:"#F0F7F2",borderRadius:8,borderLeft:`3px solid ${C.go}`}}>
+          <div style={{fontSize:10,fontWeight:700,color:C.go,letterSpacing:"1px",marginBottom:10}}>DO</div>
+          {SF_MERCHANDISING.dos.map((d,i)=><div key={i} style={{fontSize:12,color:C.text,padding:"4px 0",lineHeight:1.5}}>· {d}</div>)}
+        </div>
+        <div style={{padding:"18px 22px",background:"#FBF0EE",borderRadius:8,borderLeft:`3px solid ${C.nogo}`}}>
+          <div style={{fontSize:10,fontWeight:700,color:C.nogo,letterSpacing:"1px",marginBottom:10}}>DON'T</div>
+          {SF_MERCHANDISING.donts.map((d,i)=><div key={i} style={{fontSize:12,color:C.text,padding:"4px 0",lineHeight:1.5}}>· {d}</div>)}
+        </div>
+      </div>
+
+      {/* PLAYBOOKS */}
+      <SectionHeader id="playbooks" eyebrow="07" title="Store Size Playbooks" intro={SF_PLAYBOOKS.intro}/>
+      <div style={{display:"flex",flexDirection:"column",gap:14,marginBottom:48}}>
+        {SF_PLAYBOOKS.sizes.map((s,i)=><div key={i} style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`,display:"grid",gridTemplateColumns:"160px 1fr",gap:24}}>
+          <div>
+            <div style={{fontSize:42,fontWeight:300,fontFamily:"'Cormorant Garamond',serif",color:C.text,lineHeight:1}}>{s.sqm}<span style={{fontSize:18,color:C.textS}}> m²</span></div>
+            <div style={{fontSize:11,color:C.oak,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase",marginTop:6}}>{s.name}{s.review&&<ReviewPill/>}</div>
+          </div>
+          <div>
+            <div style={{fontSize:11,color:C.textS,marginBottom:12,fontStyle:"italic"}}>{s.bestFor}</div>
+            <div style={{display:"grid",gridTemplateColumns:"110px 1fr",gap:"6px 16px",fontSize:11,marginBottom:10}}>
+              <div style={{color:C.textS,fontWeight:600,textTransform:"uppercase",letterSpacing:".5px",fontSize:9}}>Key fixtures</div>
+              <div style={{color:C.text,lineHeight:1.5}}>{s.keyFixtures}</div>
+              <div style={{color:C.textS,fontWeight:600,textTransform:"uppercase",letterSpacing:".5px",fontSize:9}}>Hangers</div>
+              <div style={{color:C.text,fontFamily:"'DM Mono',monospace"}}>{s.hangerTarget}</div>
+            </div>
+            <div style={{fontSize:11,color:C.textS,lineHeight:1.6,padding:"10px 12px",background:C.surface,borderRadius:6}}>{s.notes}</div>
+          </div>
+        </div>)}
+      </div>
+
+      {/* EXCEPTIONS */}
+      <SectionHeader id="exceptions" eyebrow="08" title="Exceptions & Approval" intro={SF_EXCEPTIONS.intro}/>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:24}}>
+        <div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>
+          <div style={{fontSize:10,fontWeight:700,color:C.nogo,letterSpacing:"1px",marginBottom:12}}>FIXED — NO DEVIATION</div>
+          {SF_EXCEPTIONS.fixed.map((r,i)=><div key={i} style={{fontSize:12,color:C.text,padding:"6px 0",borderBottom:i<SF_EXCEPTIONS.fixed.length-1?`1px solid ${C.surfaceD}`:"none",lineHeight:1.5}}>· {r}</div>)}
+        </div>
+        <div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>
+          <div style={{fontSize:10,fontWeight:700,color:C.go,letterSpacing:"1px",marginBottom:12}}>FLEXIBLE — LOCAL ADAPTATION OK</div>
+          {SF_EXCEPTIONS.flexible.map((r,i)=><div key={i} style={{fontSize:12,color:C.text,padding:"6px 0",borderBottom:i<SF_EXCEPTIONS.flexible.length-1?`1px solid ${C.surfaceD}`:"none",lineHeight:1.5}}>· {r}</div>)}
+        </div>
+      </div>
+      <div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`,marginBottom:24}}>
+        <div style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:"1px",marginBottom:18}}>Approval process</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16}}>
+          {SF_EXCEPTIONS.process.map(p=><div key={p.step} style={{position:"relative"}}>
+            <div style={{width:32,height:32,borderRadius:"50%",background:C.oak,color:C.white,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:600,marginBottom:10}}>{p.step}</div>
+            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>{p.title}{p.review&&<ReviewPill/>}</div>
+            <div style={{fontSize:11,color:C.textS,lineHeight:1.5}}>{p.body}</div>
+          </div>)}
+        </div>
+      </div>
+      <div style={{padding:"14px 20px",background:C.black,borderRadius:8,fontSize:12,color:C.steelL,marginBottom:48}}>
+        <span style={{color:C.oak,fontWeight:600,marginRight:8}}>Approver:</span>{SF_EXCEPTIONS.approver}{SF_EXCEPTIONS.review&&<ReviewPill/>}
+      </div>
+
+    </div>
+  </div>;
+};
 const AdminPage=({projects})=>{
   const [testing,setTesting]=useState(false);
   const [result,setResult]=useState(null);
@@ -814,7 +1015,7 @@ export default function Home(){const [page,setPage]=useState("overview");const [
   useEffect(()=>{const f=async()=>{try{const r=await fetch("/api/projects");if(r.ok){const d=await r.json();if(d.projects?.length>0)setProjects(d.projects)}}catch(e){}};f();const i=setInterval(f,15*60*1000);return()=>clearInterval(i)},[]);
   const nav=[{id:"overview",label:"Overview",icon:"◈"},{id:"projects",label:"Projects",icon:"▦"},{id:"roi",label:"ROI Engine",icon:"◇"},{id:"quotation",label:"Quotation",icon:"📋"},{id:"flow",label:"Project Flow",icon:"⟳"},{id:"installed",label:"Installed Base",icon:"⊞"},{id:"standards",label:"Standards",icon:"☰"},{id:"admin",label:"Admin",icon:"⚙"}];
   return<div style={{display:"flex",minHeight:"100vh",background:C.surface}}>
-    <div style={{width:220,background:C.black,color:C.white,flexShrink:0,display:"flex",flexDirection:"column",padding:"28px 0",position:"sticky",top:0,height:"100vh"}}><div style={{padding:"0 24px",marginBottom:36}}><img src={LOGO_WHITE} alt="" style={{height:28,marginBottom:8}}/><div style={{fontSize:9,color:C.steel,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:4}}>Command Space</div></div><div style={{flex:1}}>{nav.map(it=><div key={it.id} style={{padding:"10px 24px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontSize:13,fontWeight:page===it.id?600:400,background:page===it.id?C.steelD+"33":hover===it.id?"rgba(255,255,255,.04)":"transparent",color:page===it.id?C.white:C.steelL,borderLeft:page===it.id?`3px solid ${C.oak}`:"3px solid transparent"}} onClick={()=>{setPage(it.id);setDetail(null)}} onMouseEnter={()=>setHover(it.id)} onMouseLeave={()=>setHover(null)}><span style={{fontSize:16,width:20,textAlign:"center",opacity:.7}}>{it.icon}</span>{it.label}</div>)}</div><div style={{padding:"16px 24px",borderTop:`1px solid ${C.steelD}33`}}><div style={{fontSize:10,color:C.steel}}>v2.7.3</div><div style={{fontSize:10,color:C.steel,marginTop:2}}>[ A frame for the business we share ]</div></div></div>
+    <div style={{width:220,background:C.black,color:C.white,flexShrink:0,display:"flex",flexDirection:"column",padding:"28px 0",position:"sticky",top:0,height:"100vh"}}><div style={{padding:"0 24px",marginBottom:36}}><img src={LOGO_WHITE} alt="" style={{height:28,marginBottom:8}}/><div style={{fontSize:9,color:C.steel,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:4}}>Command Space</div></div><div style={{flex:1}}>{nav.map(it=><div key={it.id} style={{padding:"10px 24px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontSize:13,fontWeight:page===it.id?600:400,background:page===it.id?C.steelD+"33":hover===it.id?"rgba(255,255,255,.04)":"transparent",color:page===it.id?C.white:C.steelL,borderLeft:page===it.id?`3px solid ${C.oak}`:"3px solid transparent"}} onClick={()=>{setPage(it.id);setDetail(null)}} onMouseEnter={()=>setHover(it.id)} onMouseLeave={()=>setHover(null)}><span style={{fontSize:16,width:20,textAlign:"center",opacity:.7}}>{it.icon}</span>{it.label}</div>)}</div><div style={{padding:"16px 24px",borderTop:`1px solid ${C.steelD}33`}}><div style={{fontSize:10,color:C.steel}}>v2.8.0</div><div style={{fontSize:10,color:C.steel,marginTop:2}}>[ A frame for the business we share ]</div></div></div>
     <div style={{flex:1,overflow:"auto"}}><div style={{padding:"14px 40px",background:C.white,borderBottom:`1px solid ${C.surfaceD}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{fontSize:13,color:C.textS}}>{nav.find(n=>n.id===page)?.label}</div><div style={{fontSize:12,color:C.textS}}>{new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div></div>
       <div style={{padding:"32px 40px",maxWidth:1200}}>
         {page==="overview"&&<OverviewPage projects={projects} setPage={setPage} setDetail={setDetail}/>}
