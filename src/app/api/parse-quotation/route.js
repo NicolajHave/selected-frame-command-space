@@ -48,12 +48,20 @@ function parseDecimalOnly(s) {
 // ─── FORMAT DETECTION ─────────────────────────────────────────────────────────
 
 function detectFormat(lines) {
-  const firstChunk = lines.slice(0, 40).join('\n').toUpperCase();
-  if (firstChunk.includes('SALES QUOTE |') || firstChunk.includes('SALES QUOTE  |')) {
+  const fullText = lines.join('\n').toUpperCase();
+  // Sales Quote format markers - look anywhere in document
+  if (fullText.includes('SALES QUOTE |') || fullText.includes('SALES QUOTE  |')) {
     return 'sales-quote';
   }
+  // Calculation format has explicit category headers like INVENTORY, FLOOR, etc.
+  // alongside "QUOTATION" and "Project:" header lines
+  const firstChunk = lines.slice(0, 40).join('\n').toUpperCase();
   if (firstChunk.includes('QUOTATION') && firstChunk.includes('PROJECT:')) {
     return 'calculation';
+  }
+  // Heuristic: if "Regarding deliveries for Selected" appears, it's a Sales Quote
+  if (fullText.includes('REGARDING DELIVERIES FOR SELECTED')) {
+    return 'sales-quote';
   }
   // Default to calculation format - has been the historical format
   return 'calculation';
@@ -230,80 +238,67 @@ function parseSalesQuoteFormat(lines) {
   // Multi-line descriptions: continuation lines have no item-no at start
 
   const items = [];
-  let pendingMulti = null; // for items whose description spans 2 lines
 
-  // Pre-processing: PDF.js may merge two adjacent items into one line if they are
-  // vertically close on the page. Detect lines with 2+ item-number markers and split them.
-  // Item-no pattern: 3-4 digit prefix, optionally followed by - or _ and more chars,
-  // then a space and a CAPITAL letter starting the description.
-  const ITEM_NO_RE = /(?:^|\s)(\d{3,4}[-_][\dA-Za-z\-_]+|\d{4})\s+[A-Z]/g;
-  const splitMergedLine = (line) => {
-    const matches = [];
-    let mm;
-    const re = new RegExp(ITEM_NO_RE.source, 'g');
-    while ((mm = re.exec(line)) !== null) {
-      matches.push({ index: mm.index });
-    }
-    if (matches.length <= 1) return [line];
-    const splits = [];
-    for (let j = 0; j < matches.length; j++) {
-      const start = matches[j].index === 0 ? 0 : matches[j].index + 1;
-      const end = j + 1 < matches.length ? matches[j + 1].index + 1 : line.length;
-      splits.push(line.substring(start, end).trim());
-    }
-    return splits;
-  };
+  // PDF.js may split a single item across multiple lines. Example from production:
+  //   line N:   "0325  Backwall panels: NOT included, existing wall will be"
+  //   line N+1: "painted"
+  //   line N+2: "1  Pcs  0,00  0,00"
+  // Strategy: walk through table lines, accumulate text from item-no line forward,
+  // looking ahead until we find the qty/unit/price tail. Then commit the item.
 
-  // Build flat list of logical lines (post-split)
-  const logicalLines = [];
+  // Pattern to detect tail of an item: "QTY Unit UnitPrice LinePrice"
+  const TAIL_RE = /^(.*?)\s+(\d+)\s+(Pcs|Hour|Pallet|Pack|km)\s+([\d.,]+)\s+([\d.,]+)\s*$/i;
+  // Pattern to detect start of item (item-no at line start)
+  const ITEM_START_RE = /^(\d{3,4}(?:[-_][\dA-Za-z\-_]+)?)\s+(.+)$/;
+
+  // Filter and trim relevant table lines first
+  const tableLines = [];
   for (let i = tableStart; i < tableEnd; i++) {
     const t = lines[i].trim();
     if (!t) continue;
     if (t.startsWith('Ordered by:')) break;
-    const splitParts = splitMergedLine(t);
-    for (const p of splitParts) logicalLines.push(p);
-  }
-
-  for (const t of logicalLines) {
-    if (!t) continue;
     if (t.startsWith('Fees for')) continue;
     if (t.startsWith('Planned delivery')) continue;
+    tableLines.push(t);
+  }
 
-    // Detect: starts with item number followed by space
-    const itemMatch = t.match(/^([\d]+(?:[-_][\dA-Za-z]+)*)\s+(.+)$/);
-    if (!itemMatch) {
-      // This might be a continuation line (e.g. "to mount on existing wall")
-      // or a description-only follow-up. Append to last item if pending.
-      if (pendingMulti) {
-        pendingMulti.name += ' ' + t;
-      }
-      continue;
-    }
-
-    const itemNo = itemMatch[1];
-    const rest = itemMatch[2];
-
-    // Try to split rest into: description + qty + unit + unit-price + line-price
-    // Numbers are at the end. Try to peel them off from the right.
-    // Pattern: "Description... QTY Unit X.XXX,XX X.XXX,XX"
-    const tail = rest.match(/^(.+?)\s+(\d+)\s+(Pcs|Hour|Pallet|Pack|km)\s+([\d.,]+)\s+([\d.,]+)$/i);
+  let buffer = null; // { itemNo, parts: [...] }
+  const tryCommit = () => {
+    if (!buffer) return;
+    const combined = buffer.parts.join(' ');
+    const tail = combined.match(TAIL_RE);
     if (tail) {
-      const item = {
-        itemNo,
+      items.push({
+        itemNo: buffer.itemNo,
         name: tail[1].trim(),
         qty: parseInt(tail[2]),
         unit: tail[3],
         unitPrice: parseDecimalOnly(tail[4]),
         totalPrice: parseDecimalOnly(tail[5]),
-      };
-      items.push(item);
-      pendingMulti = item; // in case description continues on next line
-    } else {
-      // Description-only line that started with what looked like a number prefix?
-      // Treat as continuation of previous item
-      if (pendingMulti) pendingMulti.name += ' ' + t;
+      });
     }
+    buffer = null;
+  };
+
+  for (const t of tableLines) {
+    const startMatch = t.match(ITEM_START_RE);
+    if (startMatch) {
+      // New item starts. Commit any previous buffer first.
+      tryCommit();
+      buffer = { itemNo: startMatch[1], parts: [startMatch[2]] };
+      // If this single line already has the tail, commit immediately
+      const tail = startMatch[2].match(TAIL_RE);
+      if (tail) tryCommit();
+    } else if (buffer) {
+      // Continuation - append to current buffer
+      buffer.parts.push(t);
+      // After appending, check if combined now has a tail
+      const combined = buffer.parts.join(' ');
+      if (TAIL_RE.test(combined)) tryCommit();
+    }
+    // else: stray line before any item - ignore
   }
+  tryCommit(); // commit last item if any
 
   // Build pillar mapping
   // Inventory: items with 105- or 112_ prefix (standard product codes)
