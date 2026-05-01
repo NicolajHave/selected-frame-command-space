@@ -22,35 +22,35 @@ export const INTRO = {
   kicker: "Concept Standards",
   body: "The internal operational guide for executing the Selected Frame concept across wholesale partners. Use this page to brief project owners, partner teams, and shopfitters on how the concept must be applied — and where local adaptation is allowed.",
   meta: [
-    { label: "Concept owner", value: "Nicolaj Have Østergaard" },
     { label: "Last reviewed", value: "April 2026" },
     { label: "Applies to", value: "All Selected SIS, Brand Spaces, Showroom installations" },
   ],
 };
 
 export const DNA = {
-  intro: "The five principles that define every Selected Frame installation. Each one is a design instinct AND an executional rule.",
+  intro: "The five principles that define every Selected Frame installation. Together they express both the concept logic and the design language behind the space.",
+  image: "/images/kh_selected_sis_032_web.jpg",
+  imageCaption: "Stainless steel grit 240, solid oak edges, brushed Selected wordmark — the meeting of materials that defines the frame.",
   principles: [
     {
       title: "Scandinavian Clarity",
-      body: "Calm material palette, neutral tones, generous negative space. Visual silence is what makes the product speak. If a surface, fixture, or sign isn't earning its place, it doesn't belong.",
+      body: "A light-toned, refined foundation where product, fixture and brand each have room to breathe. Selected Frame should feel calm and legible, never crowded or visually noisy.",
+    },
+    {
+      title: "Visibility",
+      body: "Selected must read clearly in the partner environment. The concept creates distinct brand presence through strong sightlines, clear focal points and immediately recognisable brand territory.",
+    },
+    {
+      title: "Consistency",
+      body: "Selected Frame must feel unmistakably Selected across markets, partners and store sizes. The expression can scale and adapt, but the core visual identity and concept logic must remain coherent.",
     },
     {
       title: "Modular Flexibility",
-      body: "Every fixture is part of a system. Standard modules combine into 25, 40, 60, and 80 sqm setups without bespoke engineering. Local adaptation happens through configuration, not custom builds.",
+      body: "Every fixture is part of a scalable system. Standard modules combine into 25, 40, 60 and 80 sqm setups, allowing adaptation through configuration rather than custom-built reinvention.",
     },
     {
-      title: "Elevated Wholesale Presentation",
-      body: "Selected Frame raises the floor of how Selected is shown inside multi-brand environments. The space should hold its own next to flagship-grade neighbours without competing visually.",
-      review: true,
-    },
-    {
-      title: "Commercial Visibility",
-      body: "The frame exists to drive sell-through. Logo, hero wall, and lead product placement are positioned for sightline impact from the partner's main customer flow — never tucked into the rear.",
-    },
-    {
-      title: "Controlled Calmness",
-      body: "Density is engineered, not maximised. Hanging volumes, fold tables, and podiums follow rhythm rules so the eye can rest. Calm is a commercial choice, not a styling preference.",
+      title: "Controlled Contrast",
+      body: "The concept is defined by the meeting of cool steel, warm wood and soft sculptural form. Contrast is not decoration — it is what gives the space character, warmth and memorability without losing control.",
     },
   ],
 };
