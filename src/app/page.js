@@ -19,6 +19,7 @@ const PHASES=[
 const FALLBACK_PROJECTS=[{gid:"1",name:"Salling / Kultorvet",type:"SIS",sex:null,phaseNum:0,region:null,dueOn:null,completed:false,completedAt:null,notes:"",url:"#",created:"2026-03-20"},{gid:"2",name:"Magasin, Lyngby",type:"Soft Shop",sex:"WOMENS",phaseNum:0,region:"NORTH",dueOn:"2026-04-09",completed:false,completedAt:null,notes:"",url:"#",created:"2026-02-12"},{gid:"3",name:"Heppel, Rosenheim",type:"SIS",sex:"MENS",phaseNum:11,region:null,dueOn:"2025-03-21",completed:true,completedAt:"2025-03-25",notes:"",url:"#",created:"2025-01-29"}];
 const fmtDate=(d)=>d?new Date(d).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):"—";
 const fmtEur=(n)=>typeof n==="number"&&n>0?`€${n.toLocaleString("de-DE",{minimumFractionDigits:0,maximumFractionDigits:0})}`:"—";
+const fmtEurSigned=(n)=>{if(typeof n!=="number"||n===0)return"—";const abs=Math.abs(n).toLocaleString("de-DE",{minimumFractionDigits:0,maximumFractionDigits:0});return n<0?`−€${abs}`:`€${abs}`};
 const todayISO=()=>new Date().toISOString().split("T")[0];
 const addDaysISO=(iso,days)=>{const d=new Date(iso);d.setDate(d.getDate()+days);return d.toISOString().split("T")[0]};
 const IMG=["/images/kh_selected_sis_018_web.jpg","/images/kh_selected_sis_075_web.jpg","/images/kh_selected_sis_023_web.jpg","/images/kh_selected_sis_032_web.jpg","/images/kh_selected_sis_048_web.jpg","/images/kh_selected_sis_029_web.jpg"];
@@ -224,7 +225,7 @@ const QuotationPage=()=>{
 
   const exportPDF=()=>{
     const aoItems=Object.entries(addOns).map(([id,{qty}])=>{const a=ADD_ONS.find(x=>x.id===id);return a?{name:a.name,qty,total:a.price*qty}:null}).filter(Boolean);
-    const custItems=customs.filter(i=>i.name&&parseLooseEur(i.price)>0).map(i=>({name:i.name,qty:parseInt(i.qty)||1,total:parseLooseEur(i.price)*(parseInt(i.qty)||1)}));
+    const custItems=customs.filter(i=>i.name&&parseLooseEur(i.price)!==0).map(i=>({name:i.name,qty:parseInt(i.qty)||1,total:parseLooseEur(i.price)*(parseInt(i.qty)||1)}));
     const qDate=hdr.quotationDate?fmtDate(hdr.quotationDate):fmtDate(todayISO());
     const vDate=fmtDate(validUntil);
     const w=window.open('','_blank');
@@ -249,7 +250,7 @@ const QuotationPage=()=>{
 <tr style="font-weight:600;border-top:2px solid #ECEAE5"><td>Total</td><td class="r">${fmtEur(supTotal)}</td></tr>
 </tbody></table>
 ${aoItems.length?`<h2>Add-ons</h2><table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Total</th></tr></thead><tbody>${aoItems.map(a=>`<tr><td>${a.name}</td><td class="r">${a.qty}</td><td class="r">${fmtEur(a.total)}</td></tr>`).join('')}<tr style="font-weight:600;border-top:2px solid #ECEAE5"><td colspan="2">Add-ons Total</td><td class="r">${fmtEur(aoTotal)}</td></tr></tbody></table>`:''}
-${custItems.length?`<h2>Additional Items</h2><table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Total</th></tr></thead><tbody>${custItems.map(a=>`<tr><td>${a.name}</td><td class="r">${a.qty}</td><td class="r">${fmtEur(a.total)}</td></tr>`).join('')}<tr style="font-weight:600;border-top:2px solid #ECEAE5"><td colspan="2">Total</td><td class="r">${fmtEur(custTotal)}</td></tr></tbody></table>`:''}
+${custItems.length?`<h2>Additional Items</h2><table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Total</th></tr></thead><tbody>${custItems.map(a=>`<tr><td>${a.name}</td><td class="r">${a.qty}</td><td class="r">${fmtEurSigned(a.total)}</td></tr>`).join('')}<tr style="font-weight:600;border-top:2px solid #ECEAE5"><td colspan="2">Total</td><td class="r">${fmtEurSigned(custTotal)}</td></tr></tbody></table>`:''}
 <div class="tot"><div class="l">Total excl. VAT</div><div class="a">${fmtEur(grand)}</div></div>
 ${sqm>0?`<div class="sq">${fmtEur(Math.round(grand/sqm))} / m²</div>`:''}
 <div class="validity"><strong>Validity</strong>This quotation is valid until ${vDate} (14 days from quotation date).</div>
@@ -415,12 +416,12 @@ Bestseller A/S`;
     })()}
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginBottom:32}}>
       <div><Title sub="Select optional elements">2. Add-ons</Title><div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>{ADD_ONS.map(a=>{const sel=addOns[a.id];return<div key={a.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:`1px solid ${C.surfaceD}`}}><input type="checkbox" checked={!!sel} onChange={()=>toggleAO(a.id)} style={{width:16,height:16,accentColor:C.oak}}/><div style={{flex:1}}><div style={{fontSize:13}}>{a.name}</div><div style={{fontSize:11,color:C.textS}}>{a.cat} · {fmtEur(a.price)} / pc</div></div>{sel&&<PM value={sel.qty} onChange={v=>setAOQty(a.id,v)}/>}{sel&&<div style={{fontSize:13,fontWeight:600,minWidth:60,textAlign:"right"}}>{fmtEur(a.price*sel.qty)}</div>}</div>})}</div></div>
-      <div><Title sub="Additional costs">3. Custom Items</Title><div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>{customs.map((it,i)=><div key={i} style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}><input placeholder="Description" value={it.name} onChange={e=>setCustoms(p=>p.map((x,j)=>j===i?{...x,name:e.target.value}:x))} style={{flex:2,padding:"8px 10px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,outline:"none"}}/><input placeholder="€" type="text" inputMode="decimal" value={it.price} onChange={e=>setCustoms(p=>p.map((x,j)=>j===i?{...x,price:e.target.value}:x))} style={{width:80,padding:"8px 10px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,outline:"none"}}/><input placeholder="Qty" type="text" inputMode="numeric" value={it.qty} onChange={e=>setCustoms(p=>p.map((x,j)=>j===i?{...x,qty:e.target.value}:x))} style={{width:48,padding:"8px 10px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,textAlign:"center",outline:"none"}}/><div style={{minWidth:60,textAlign:"right",fontSize:12,fontWeight:600,color:parseLooseEur(it.price)>0?C.text:C.textS}}>{fmtEur(parseLooseEur(it.price)*(parseInt(it.qty)||1))}</div><button onClick={()=>setCustoms(p=>p.filter((_,j)=>j!==i))} style={{background:"none",border:"none",color:C.danger,cursor:"pointer",fontSize:16}}>×</button></div>)}<button onClick={()=>setCustoms(p=>[...p,{name:"",price:"",qty:"1"}])} style={{width:"100%",padding:"10px",borderRadius:6,border:`1px dashed ${C.surfaceD}`,background:"transparent",cursor:"pointer",fontSize:13,color:C.textS}}>+ Add custom item</button>{custTotal>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"12px 4px 0",marginTop:12,borderTop:`1px solid ${C.surfaceD}`,fontSize:12}}><span style={{color:C.textS}}>Custom Items subtotal</span><span style={{fontWeight:600,color:C.text}}>{fmtEur(custTotal)}</span></div>}</div>
+      <div><Title sub="Additional costs">3. Custom Items</Title><div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>{customs.map((it,i)=><div key={i} style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}><input placeholder="Description" value={it.name} onChange={e=>setCustoms(p=>p.map((x,j)=>j===i?{...x,name:e.target.value}:x))} style={{flex:2,padding:"8px 10px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,outline:"none"}}/><input placeholder="€" type="text" inputMode="decimal" value={it.price} onChange={e=>setCustoms(p=>p.map((x,j)=>j===i?{...x,price:e.target.value}:x))} style={{width:80,padding:"8px 10px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,outline:"none"}}/><input placeholder="Qty" type="text" inputMode="numeric" value={it.qty} onChange={e=>setCustoms(p=>p.map((x,j)=>j===i?{...x,qty:e.target.value}:x))} style={{width:48,padding:"8px 10px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,textAlign:"center",outline:"none"}}/><div style={{minWidth:60,textAlign:"right",fontSize:12,fontWeight:600,color:parseLooseEur(it.price)!==0?(parseLooseEur(it.price)<0?C.danger:C.text):C.textS}}>{fmtEurSigned(parseLooseEur(it.price)*(parseInt(it.qty)||1))}</div><button onClick={()=>setCustoms(p=>p.filter((_,j)=>j!==i))} style={{background:"none",border:"none",color:C.danger,cursor:"pointer",fontSize:16}}>×</button></div>)}<button onClick={()=>setCustoms(p=>[...p,{name:"",price:"",qty:"1"}])} style={{width:"100%",padding:"10px",borderRadius:6,border:`1px dashed ${C.surfaceD}`,background:"transparent",cursor:"pointer",fontSize:13,color:C.textS}}>+ Add custom item</button>{custTotal!==0&&<div style={{display:"flex",justifyContent:"space-between",padding:"12px 4px 0",marginTop:12,borderTop:`1px solid ${C.surfaceD}`,fontSize:12}}><span style={{color:C.textS}}>Custom Items subtotal</span><span style={{fontWeight:600,color:custTotal<0?C.danger:C.text}}>{fmtEurSigned(custTotal)}</span></div>}</div>
         <div style={{background:C.black,borderRadius:8,padding:24,marginTop:20,color:C.white}}>
           <div style={{fontSize:11,color:C.steelL,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase",marginBottom:12}}>Quotation Summary</div>
           {supTotal>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.1)"}}><span style={{color:C.steelL}}>Project Cost</span><span>{fmtEur(supTotal)}</span></div>}
           {aoTotal>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.1)"}}><span style={{color:C.steelL}}>Add-ons</span><span>{fmtEur(aoTotal)}</span></div>}
-          {custTotal>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.1)"}}><span style={{color:C.steelL}}>Custom</span><span>{fmtEur(custTotal)}</span></div>}
+          {custTotal!==0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.1)"}}><span style={{color:C.steelL}}>Custom</span><span>{fmtEurSigned(custTotal)}</span></div>}
           <div style={{display:"flex",justifyContent:"space-between",fontSize:20,paddingTop:12,fontFamily:"'Cormorant Garamond',serif"}}><span>Total excl. VAT</span><span>{fmtEur(grand)}</span></div>
           {sqm>0&&<div style={{fontSize:12,color:C.steelL,marginTop:4,textAlign:"right"}}>{fmtEur(Math.round(grand/sqm))} / m²</div>}
           {grand>0&&hdr.quotationDate&&<div style={{fontSize:11,color:C.steelL,marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,.1)"}}>Valid until {fmtDate(validUntil)}</div>}
@@ -815,13 +816,22 @@ const StandardsPage=()=>{
       {/* NON-NEGOTIABLES */}
       <SectionHeader id="non-negotiables" eyebrow="02 · Fixed rules" title="Non-Negotiables" intro={SF_NON_NEGOTIABLES.intro}/>
       <div style={{background:C.black,borderRadius:8,padding:"4px 0",marginBottom:48}}>
-        {SF_NON_NEGOTIABLES.rules.map((r,i)=><div key={i} style={{display:"flex",gap:20,padding:"18px 24px",borderBottom:i<SF_NON_NEGOTIABLES.rules.length-1?`1px solid #2A2A2A`:"none"}}>
-          <div style={{fontSize:14,color:C.oak,fontWeight:600,minWidth:32,fontFamily:"'DM Mono',monospace"}}>{String(i+1).padStart(2,"0")}</div>
-          <div style={{flex:1}}>
-            <div style={{fontSize:13,fontWeight:600,color:C.white,marginBottom:4}}>{r.title}{r.review&&<ReviewPill/>}</div>
-            <div style={{fontSize:12,color:C.steelL,lineHeight:1.6}}>{r.body}</div>
+        {(()=>{let counter=0;return SF_NON_NEGOTIABLES.groups.map((g,gi)=><div key={gi}>
+          <div style={{padding:"22px 24px 14px",borderBottom:"1px solid #2A2A2A",display:"flex",justifyContent:"space-between",alignItems:"baseline",borderTop:gi>0?"1px solid #2A2A2A":"none"}}>
+            <div>
+              <div style={{fontSize:16,fontWeight:500,color:C.white,letterSpacing:".3px"}}>{g.title}</div>
+              <div style={{fontSize:10,fontWeight:600,color:C.oak,textTransform:"uppercase",letterSpacing:"1.5px",marginTop:4}}>{g.kicker}</div>
+            </div>
+            <div style={{fontSize:10,color:C.steel,fontFamily:"'DM Mono',monospace"}}>{String(counter+1).padStart(2,"0")}–{String(counter+g.rules.length).padStart(2,"0")}</div>
           </div>
-        </div>)}
+          {g.rules.map((r,i)=>{counter++;return <div key={i} style={{display:"flex",gap:20,padding:"16px 24px",borderBottom:i<g.rules.length-1?"1px solid #2A2A2A":"none"}}>
+            <div style={{fontSize:14,color:C.oak,fontWeight:600,minWidth:32,fontFamily:"'DM Mono',monospace"}}>{String(counter).padStart(2,"0")}</div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:13,fontWeight:600,color:C.white,marginBottom:4}}>{r.title}</div>
+              <div style={{fontSize:12,color:C.steelL,lineHeight:1.6}}>{r.body}</div>
+            </div>
+          </div>})}
+        </div>)})()}
       </div>
 
       {/* SPACE MANAGEMENT */}
@@ -949,9 +959,6 @@ const StandardsPage=()=>{
           </div>)}
         </div>
       </div>
-      <div style={{padding:"14px 20px",background:C.black,borderRadius:8,fontSize:12,color:C.steelL,marginBottom:48}}>
-        <span style={{color:C.oak,fontWeight:600,marginRight:8}}>Approver:</span>{SF_EXCEPTIONS.approver}{SF_EXCEPTIONS.review&&<ReviewPill/>}
-      </div>
 
     </div>
   </div>;
@@ -1020,7 +1027,7 @@ export default function Home(){const [page,setPage]=useState("overview");const [
   useEffect(()=>{const f=async()=>{try{const r=await fetch("/api/projects");if(r.ok){const d=await r.json();if(d.projects?.length>0)setProjects(d.projects)}}catch(e){}};f();const i=setInterval(f,15*60*1000);return()=>clearInterval(i)},[]);
   const nav=[{id:"overview",label:"Overview",icon:"◈"},{id:"projects",label:"Projects",icon:"▦"},{id:"roi",label:"ROI Engine",icon:"◇"},{id:"quotation",label:"Quotation",icon:"📋"},{id:"flow",label:"Project Flow",icon:"⟳"},{id:"installed",label:"Installed Base",icon:"⊞"},{id:"standards",label:"Standards",icon:"☰"},{id:"admin",label:"Admin",icon:"⚙"}];
   return<div style={{display:"flex",minHeight:"100vh",background:C.surface}}>
-    <div style={{width:220,background:C.black,color:C.white,flexShrink:0,display:"flex",flexDirection:"column",padding:"28px 0",position:"sticky",top:0,height:"100vh"}}><div style={{padding:"0 24px",marginBottom:36}}><img src={LOGO_WHITE} alt="" style={{height:28,marginBottom:8}}/><div style={{fontSize:9,color:C.steel,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:4}}>Command Space</div></div><div style={{flex:1}}>{nav.map(it=><div key={it.id} style={{padding:"10px 24px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontSize:13,fontWeight:page===it.id?600:400,background:page===it.id?C.steelD+"33":hover===it.id?"rgba(255,255,255,.04)":"transparent",color:page===it.id?C.white:C.steelL,borderLeft:page===it.id?`3px solid ${C.oak}`:"3px solid transparent"}} onClick={()=>{setPage(it.id);setDetail(null)}} onMouseEnter={()=>setHover(it.id)} onMouseLeave={()=>setHover(null)}><span style={{fontSize:16,width:20,textAlign:"center",opacity:.7}}>{it.icon}</span>{it.label}</div>)}</div><div style={{padding:"16px 24px",borderTop:`1px solid ${C.steelD}33`}}><div style={{fontSize:10,color:C.steel}}>v2.8.1</div><div style={{fontSize:10,color:C.steel,marginTop:2}}>[ A frame for the business we share ]</div></div></div>
+    <div style={{width:220,background:C.black,color:C.white,flexShrink:0,display:"flex",flexDirection:"column",padding:"28px 0",position:"sticky",top:0,height:"100vh"}}><div style={{padding:"0 24px",marginBottom:36}}><img src={LOGO_WHITE} alt="" style={{height:28,marginBottom:8}}/><div style={{fontSize:9,color:C.steel,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:4}}>Command Space</div></div><div style={{flex:1}}>{nav.map(it=><div key={it.id} style={{padding:"10px 24px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontSize:13,fontWeight:page===it.id?600:400,background:page===it.id?C.steelD+"33":hover===it.id?"rgba(255,255,255,.04)":"transparent",color:page===it.id?C.white:C.steelL,borderLeft:page===it.id?`3px solid ${C.oak}`:"3px solid transparent"}} onClick={()=>{setPage(it.id);setDetail(null)}} onMouseEnter={()=>setHover(it.id)} onMouseLeave={()=>setHover(null)}><span style={{fontSize:16,width:20,textAlign:"center",opacity:.7}}>{it.icon}</span>{it.label}</div>)}</div><div style={{padding:"16px 24px",borderTop:`1px solid ${C.steelD}33`}}><div style={{fontSize:10,color:C.steel}}>v2.8.2</div><div style={{fontSize:10,color:C.steel,marginTop:2}}>[ A frame for the business we share ]</div></div></div>
     <div style={{flex:1,overflow:"auto"}}><div style={{padding:"14px 40px",background:C.white,borderBottom:`1px solid ${C.surfaceD}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{fontSize:13,color:C.textS}}>{nav.find(n=>n.id===page)?.label}</div><div style={{fontSize:12,color:C.textS}}>{new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div></div>
       <div style={{padding:"32px 40px",maxWidth:1200}}>
         {page==="overview"&&<OverviewPage projects={projects} setPage={setPage} setDetail={setDetail}/>}

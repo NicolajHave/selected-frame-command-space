@@ -56,37 +56,69 @@ export const DNA = {
 };
 
 export const NON_NEGOTIABLES = {
-  intro: "Fixed rules. These apply to every installation regardless of size, partner, or local condition. Deviation requires explicit approval (see Exceptions).",
-  rules: [
+  intro: "These rules apply to every Selected Frame installation. Some define the concept itself, while others govern approved specifications and in-store execution.",
+  groups: [
     {
-      title: "Logo placement",
-      body: "Selected logo (H150 corona light) is always left-aligned on the back wall, positioned above the final wall module. No exceptions for ceiling height or layout asymmetry.",
+      title: "Core Non-Negotiables",
+      kicker: "Concept law",
+      rules: [
+        {
+          title: "Clear brand visibility",
+          body: "Selected must read clearly and immediately in the partner environment. Primary sightlines into the SIS must remain clean, legible and visibly brand-led.",
+        },
+        {
+          title: "Approved fixture language only",
+          body: "Only approved Selected Frame fixtures and concept elements may exist inside the Selected Frame footprint. The space must not be mixed with partner-supplied or third-party fixture language.",
+        },
+        {
+          title: "Approved material expression only",
+          body: "The concept may only be executed using approved Selected Frame materials, finishes and colour directions. Unapproved substitutions are not allowed without prior concept approval.",
+        },
+        {
+          title: "Protected concept hierarchy",
+          body: "No local signage, promotional messaging or retail add-ons may disrupt the internal hierarchy of the Selected Frame space. Brand communication must remain controlled and concept-led.",
+        },
+        {
+          title: "Approved logo application",
+          body: "Logo placement must always follow the approved master application logic for Selected Frame. Brand marking is part of the concept structure, not a decorative add-on.",
+        },
+      ],
     },
     {
-      title: "Approved material palette only",
-      body: "Stainless steel grit 240 (fixtures), solid oak (warm accents, podiums), NCS S 1005-G30Y (wall paint), NCS S 2010-G20Y (table surface). No substitutions without concept owner approval.",
+      title: "Technical Standards",
+      kicker: "Approved master spec",
+      rules: [
+        {
+          title: "Back wall logo placement",
+          body: "The Selected logo is positioned left-aligned on the back wall above the final wall module, following the approved master layout logic.",
+        },
+        {
+          title: "Approved material references",
+          body: "Use approved stainless steel, selected oak details, approved wall paint and approved table-surface specifications only. Technical references must follow the current concept master.",
+        },
+        {
+          title: "Closed fixture system",
+          body: "The fixture system is modular and closed. Approved modules must be configured within the system logic rather than replaced with locally improvised alternatives.",
+        },
+      ],
     },
     {
-      title: "Customer sightline integrity",
-      body: "The main sightline from the partner's customer flow into the SIS must remain visually clean. No mid-floor signage, dump bins, or tall mannequins blocking the entry view.",
-      review: true,
-    },
-    {
-      title: "Single fixture language",
-      body: "Selected Frame fixtures are not mixed with partner-supplied or third-party fixtures inside the SIS footprint. The frame is closed at its perimeter.",
-    },
-    {
-      title: "Walkway clearance",
-      body: "Minimum 900 mm clearance between fixtures on primary walkways, 700 mm on secondary. Applies even when partner store is denser than typical Selected Frame spec.",
-      review: true,
-    },
-    {
-      title: "No local signage interference",
-      body: "Promotional, sale, or partner-branded signage may not be added inside the Selected Frame perimeter without prior approval. Hierarchy stays brand-led, not retail-led.",
-    },
-    {
-      title: "Approved hanger system only",
-      body: "Selected branded hangers (shirt 50-pack, clip 50-pack, coat 25-pack) are mandatory. Mixed hangers from partner stock are not permitted on display.",
+      title: "Planning & VM Controls",
+      kicker: "Execution-level enforcement",
+      rules: [
+        {
+          title: "Walkway protection",
+          body: "Primary circulation through the Selected Frame space must remain open and commercially readable. Fixtures, VM elements and local additions must never block the intended customer flow.",
+        },
+        {
+          title: "Sightline protection",
+          body: "Mid-floor messaging, oversized dump bins, tall blocking elements or ad hoc local inserts must not interrupt the main visual approach into the space.",
+        },
+        {
+          title: "Approved hanger system",
+          body: "Only approved Selected hanger systems may be used on display. Mixed hanger expressions from partner stock are not permitted inside the Selected Frame presentation.",
+        },
+      ],
     },
   ],
 };
@@ -316,6 +348,4 @@ export const EXCEPTIONS = {
       body: "Approved deviations are implemented and reviewed at Phase 10 (Close & Learning). Recurring deviations may inform updates to the guidelines themselves.",
     },
   ],
-  approver: "Concept owner: Nicolaj Have Østergaard. In absence: B2B Communications / Brand Spaces lead.",
-  review: true,
 };
