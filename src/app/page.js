@@ -840,12 +840,20 @@ const StandardsPage=()=>{
         {SF_SPACE_MANAGEMENT.zones.map((z,i)=><details key={i} style={{background:C.white,borderRadius:8,border:`1px solid ${C.surfaceD}`,overflow:"hidden"}}>
           <summary style={{cursor:"pointer",padding:"18px 24px",listStyle:"none",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div>
-              <div style={{fontSize:15,fontWeight:500,color:C.text}}>{z.title}{z.review&&<ReviewPill/>}</div>
+              <div style={{fontSize:15,fontWeight:500,color:C.text}}>{z.title}</div>
             </div>
             <div style={{fontSize:14,color:C.textS}}>+</div>
           </summary>
           <div style={{padding:"0 24px 24px"}}>
-            <p style={{fontSize:12,color:C.textS,lineHeight:1.7,margin:"0 0 18px",borderTop:`1px solid ${C.surfaceD}`,paddingTop:16}}>{z.body}</p>
+            <p style={{fontSize:12,color:C.textS,lineHeight:1.7,margin:"0 0 14px",borderTop:`1px solid ${C.surfaceD}`,paddingTop:16}}>{z.body}</p>
+            {z.supporting&&<p style={{fontSize:12,color:C.textS,lineHeight:1.7,margin:"0 0 18px",fontStyle:"italic",paddingLeft:14,borderLeft:`2px solid ${C.surfaceD}`}}>{z.supporting}</p>}
+            {z.commercialZones&&<div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12,marginBottom:18}}>{z.commercialZones.map(cz=><div key={cz.number} style={{padding:"14px 16px",background:C.surface,borderRadius:6,borderLeft:`3px solid ${C.oak}`}}>
+              <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:6}}>
+                <span style={{fontSize:10,color:C.oak,fontWeight:700,fontFamily:"'DM Mono',monospace",letterSpacing:".5px"}}>ZONE {cz.number}</span>
+                <span style={{fontSize:14,fontWeight:500,color:C.text}}>{cz.name}</span>
+              </div>
+              <div style={{fontSize:11,color:C.textS,lineHeight:1.5}}>{cz.body}</div>
+            </div>)}</div>}
             {(z.dos||z.donts)&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
               {z.dos&&<div style={{padding:"14px 16px",background:"#F0F7F2",borderRadius:6,borderLeft:`3px solid ${C.go}`}}>
                 <div style={{fontSize:10,fontWeight:700,color:C.go,letterSpacing:"1px",marginBottom:8}}>DO</div>
@@ -1027,7 +1035,7 @@ export default function Home(){const [page,setPage]=useState("overview");const [
   useEffect(()=>{const f=async()=>{try{const r=await fetch("/api/projects");if(r.ok){const d=await r.json();if(d.projects?.length>0)setProjects(d.projects)}}catch(e){}};f();const i=setInterval(f,15*60*1000);return()=>clearInterval(i)},[]);
   const nav=[{id:"overview",label:"Overview",icon:"◈"},{id:"projects",label:"Projects",icon:"▦"},{id:"roi",label:"ROI Engine",icon:"◇"},{id:"quotation",label:"Quotation",icon:"📋"},{id:"flow",label:"Project Flow",icon:"⟳"},{id:"installed",label:"Installed Base",icon:"⊞"},{id:"standards",label:"Standards",icon:"☰"},{id:"admin",label:"Admin",icon:"⚙"}];
   return<div style={{display:"flex",minHeight:"100vh",background:C.surface}}>
-    <div style={{width:220,background:C.black,color:C.white,flexShrink:0,display:"flex",flexDirection:"column",padding:"28px 0",position:"sticky",top:0,height:"100vh"}}><div style={{padding:"0 24px",marginBottom:36}}><img src={LOGO_WHITE} alt="" style={{height:28,marginBottom:8}}/><div style={{fontSize:9,color:C.steel,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:4}}>Command Space</div></div><div style={{flex:1}}>{nav.map(it=><div key={it.id} style={{padding:"10px 24px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontSize:13,fontWeight:page===it.id?600:400,background:page===it.id?C.steelD+"33":hover===it.id?"rgba(255,255,255,.04)":"transparent",color:page===it.id?C.white:C.steelL,borderLeft:page===it.id?`3px solid ${C.oak}`:"3px solid transparent"}} onClick={()=>{setPage(it.id);setDetail(null)}} onMouseEnter={()=>setHover(it.id)} onMouseLeave={()=>setHover(null)}><span style={{fontSize:16,width:20,textAlign:"center",opacity:.7}}>{it.icon}</span>{it.label}</div>)}</div><div style={{padding:"16px 24px",borderTop:`1px solid ${C.steelD}33`}}><div style={{fontSize:10,color:C.steel}}>v2.8.2</div><div style={{fontSize:10,color:C.steel,marginTop:2}}>[ A frame for the business we share ]</div></div></div>
+    <div style={{width:220,background:C.black,color:C.white,flexShrink:0,display:"flex",flexDirection:"column",padding:"28px 0",position:"sticky",top:0,height:"100vh"}}><div style={{padding:"0 24px",marginBottom:36}}><img src={LOGO_WHITE} alt="" style={{height:28,marginBottom:8}}/><div style={{fontSize:9,color:C.steel,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:4}}>Command Space</div></div><div style={{flex:1}}>{nav.map(it=><div key={it.id} style={{padding:"10px 24px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontSize:13,fontWeight:page===it.id?600:400,background:page===it.id?C.steelD+"33":hover===it.id?"rgba(255,255,255,.04)":"transparent",color:page===it.id?C.white:C.steelL,borderLeft:page===it.id?`3px solid ${C.oak}`:"3px solid transparent"}} onClick={()=>{setPage(it.id);setDetail(null)}} onMouseEnter={()=>setHover(it.id)} onMouseLeave={()=>setHover(null)}><span style={{fontSize:16,width:20,textAlign:"center",opacity:.7}}>{it.icon}</span>{it.label}</div>)}</div><div style={{padding:"16px 24px",borderTop:`1px solid ${C.steelD}33`}}><div style={{fontSize:10,color:C.steel}}>v2.8.3</div><div style={{fontSize:10,color:C.steel,marginTop:2}}>[ A frame for the business we share ]</div></div></div>
     <div style={{flex:1,overflow:"auto"}}><div style={{padding:"14px 40px",background:C.white,borderBottom:`1px solid ${C.surfaceD}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{fontSize:13,color:C.textS}}>{nav.find(n=>n.id===page)?.label}</div><div style={{fontSize:12,color:C.textS}}>{new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div></div>
       <div style={{padding:"32px 40px",maxWidth:1200}}>
         {page==="overview"&&<OverviewPage projects={projects} setPage={setPage} setDetail={setDetail}/>}
