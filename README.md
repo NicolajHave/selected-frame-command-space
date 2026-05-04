@@ -1,52 +1,45 @@
-# Selected Frame · Command Space — v2.8.3
+# Selected Frame · Command Space — v2.8.4
 
 Internal Brand Spaces tool for Selected Frame concept.
 Live: https://selected-frame-command-space.vercel.app
 
-## What's new in v2.8.3
+## What's new in v2.8.4
 
-### Standards Section 03: Space Management — full content rewrite
+### Standards Section 04: Brand Application — full rewrite
 
-All 6 remaining subsections now use concept-true, operational copy.
+Section now reads as a clean in-store brand governance guide rather than a fabrication spec sheet.
 
-**Subsections kept and rewritten:**
-1. Entrance Zone
-2. Hero Wall / Focal Wall
-3. Product Density
-4. Sightlines
-5. Category Zoning
-6. Podium & Mannequin Usage
+**6 rows replacing the previous 8:**
+1. Primary logo — Selected wordmark, retail logo without crop marks
+2. Logo placement — left-aligned on back wall above final wall module
+3. Standard logo scale — 160 cm
+4. Approved logo solutions — multiple approved executions allowed via review
+5. Hanger branding — oiled oak hangers with Selected logo
+6. Custom solutions — possible via additional concept review and approval
 
-**Subsections removed:**
-- Rack Sequencing (deleted)
-- Outfit Storytelling (deleted)
+**Removed:**
+- All crop-mark references from in-store logic (crop marks belong to print/CI assets only)
+- H150 / H120 / corona light language
+- "Logo clear space" technical row
+- "Logo finish" fabrication row (dibond, butler finish, etc.)
+- "Hanger orientation" row
+- "Tag and Label Placement" row
+- All REVIEW pills
 
-### New rendering features
-
-Two new optional content fields for any zone:
-
-- **`supporting`**: italicised paragraph with left border, used for technical references that support but don't override the main definition. Used in Product Density, Sightlines, Category Zoning, and Podium & Mannequin Usage.
-- **`commercialZones`**: structured 2×2 grid with numbered cards (Zone 1–4). Currently used in Category Zoning to show Newness / Main / NOOS / Clearance commercial structure.
-
-### Content logic changes
-
-- "Double Shelf Floor Rack" replaces "Jeans denim rack double" everywhere in Space Management copy
-- Category Zoning is now structured around the 4-zone commercial logic (Newness / Main / NOOS / Clearance) for SIS spaces of 50 sqm and above
-- All REVIEW pills removed from Section 03
-- Specific measurements (700 mm clearance) removed from Space Management — those references live in the technical-master content layer
+**Logo misuse panel updated:** now flags crop-marked wordmark as misuse in-store (instead of the old wording that treated removing crop marks as misuse).
 
 ## How to deploy
 
 1. Unzip locally
 2. Drag everything to GitHub repo root
-3. Commit message: `v2.8.3 — Space Management section rewrite`
+3. Commit message: `v2.8.4 — Brand Application section rewrite`
 4. Vercel auto-deploys
 
 ## Smoke test
 
-1. Standards → scroll to Space Management
-2. Verify exactly 6 subsections in this order: Entrance Zone, Hero Wall, Product Density, Sightlines, Category Zoning, Podium & Mannequin Usage
-3. Verify Rack Sequencing and Outfit Storytelling are GONE
-4. Click Product Density → see body, italic supporting line about fixture capacities, then DO and DON'T blocks
-5. Click Category Zoning → see body, supporting line, then 4 numbered zone cards (Newness/Main/NOOS/Clearance), then DO and DON'T blocks
+1. Standards → Brand Application
+2. Verify exactly 6 rows in the order: Primary logo / Logo placement / Standard logo scale / Approved logo solutions / Hanger branding / Custom solutions
+3. Verify no mention of: crop marks (in main rows), H150, H120, corona light, dibond, butler finish, hanger orientation, tag/label placement
+4. Verify "Standard logo scale" reads "160 cm is the standard logo scale..."
+5. Verify Logo Misuse box at the bottom mentions "Crop-marked wordmark used in-store"
 6. Verify NO orange REVIEW pills anywhere in the section

@@ -270,22 +270,20 @@ export const SPACE_MANAGEMENT = {
 };
 
 export const BRAND_APPLICATION = {
-  intro: "How the Selected wordmark and brand assets are applied inside the frame. This section is the mini-CI guide for everything visible to the customer.",
+  intro: "How the Selected wordmark and visible brand assets are applied inside the frame. This section defines the approved in-store brand application logic.",
   rules: [
-    { label: "Primary logo",        value: "Selected wordmark with crop marks. The crop marks are part of the brand identity — never remove them." },
-    { label: "Logo placement",      value: "Always left-aligned on the back wall, above the final wall module. Centred placement is not approved." },
-    { label: "Logo size",           value: "H150 corona light is the standard. H120 reduced version is permitted only when ceiling height is below 2.6 m.", review: true },
-    { label: "Logo clear space",    value: "Minimum clear space equal to the height of the 'S' on all sides.", review: true },
-    { label: "Logo finish",         value: "Brushed steel (3mm dibond, butler finish) or LED-lit steel letters with acrylic front. No painted MDF substitutes." },
-    { label: "Hanger branding",     value: "Selected wordmark on all hangers. Wood hangers for outerwear and tailoring; metal clips for trousers and skirts." },
-    { label: "Hanger orientation",  value: "Hooks always face the same direction across one fixture. Standard: hooks facing the back wall." },
-    { label: "Tag and label placement", value: "Price tags hidden from customer-facing side. Care labels tucked into garment. No partner-supplied tags on display product.", review: true },
+    { label: "Primary logo",          value: "Selected wordmark only. In-store applications use the approved retail logo without crop marks." },
+    { label: "Logo placement",        value: "Always left-aligned on the back wall above the final wall module. Centred placement is not approved." },
+    { label: "Standard logo scale",   value: "160 cm is the standard logo scale. Any deviation must be reviewed against wall proportion, sightline and concept balance." },
+    { label: "Approved logo solutions", value: "Use approved Selected logo solutions only. Multiple approved logo executions may be used depending on project conditions, but all must follow concept review and approval logic." },
+    { label: "Hanger branding",       value: "Approved hangers use oiled oak with Selected logo application. Hanger expression must remain consistent across the installation." },
+    { label: "Custom solutions",      value: "Custom logo or branding solutions may be developed where required, but only through additional concept review and approval." },
   ],
   misuse: [
     "Logo centred on back wall",
     "Logo on side walls or columns",
-    "Crop marks removed from wordmark",
-    "Logo applied as decal on glass",
+    "Crop-marked wordmark used in-store (crop marks belong to print/CI assets only)",
+    "Logo applied as decal on glass without concept approval",
     "Logo paired with partner co-branding inside the frame",
   ],
 };
