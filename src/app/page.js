@@ -883,26 +883,28 @@ const StandardsPage=()=>{
 
       {/* FIXTURES */}
       <SectionHeader id="fixtures" eyebrow="05" title="Fixtures & Modules" intro={SF_FIXTURES.intro}/>
-      {SF_FIXTURES.review&&<div style={{padding:"10px 14px",background:"#FDF3E0",borderRadius:6,borderLeft:`3px solid ${C.review}`,fontSize:11,color:C.text,marginBottom:14}}>This whole section is a working draft — capacities and codes need a final review pass.</div>}
-      <div style={{background:C.white,borderRadius:8,border:`1px solid ${C.surfaceD}`,marginBottom:24,overflow:"hidden"}}>
-        <div style={{display:"grid",gridTemplateColumns:"140px 1fr 200px",gap:16,padding:"12px 24px",background:C.surface,fontSize:10,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px"}}>
-          <div>Item code</div><div>Module</div><div>Capacity / use</div>
-        </div>
-        {SF_FIXTURES.approved.map((f,i)=><div key={i} style={{display:"grid",gridTemplateColumns:"140px 1fr 200px",gap:16,padding:"12px 24px",borderTop:`1px solid ${C.surfaceD}`,fontSize:12}}>
-          <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:C.textS}}>{f.code}</div>
-          <div style={{color:C.text,fontWeight:500}}>{f.name}</div>
-          <div style={{color:C.textS}}>{f.capacity}</div>
+      {SF_FIXTURES.meta&&<div style={{fontSize:11,color:C.textS,fontStyle:"italic",marginBottom:20}}>{SF_FIXTURES.meta}</div>}
+      <div style={{marginBottom:48}}>
+        {SF_FIXTURES.categories.map((cat,ci)=><div key={ci} style={{marginBottom:32}}>
+          <div style={{display:"flex",alignItems:"baseline",gap:12,marginBottom:16,paddingBottom:10,borderBottom:`1px solid ${C.surfaceD}`}}>
+            <div style={{fontSize:20,fontWeight:400,fontFamily:"'Cormorant Garamond',serif",color:C.text}}>{cat.name}</div>
+            <div style={{fontSize:10,color:C.textS,fontFamily:"'DM Mono',monospace"}}>{cat.items.length} {cat.items.length===1?"item":"items"}</div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))",gap:14}}>
+            {cat.items.map((it,i)=><div key={i} style={{background:C.white,borderRadius:8,border:`1px solid ${C.surfaceD}`,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+              <div style={{aspectRatio:"1 / 1",background:C.surface,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
+                {it.image?<img src={it.image} alt={it.name} style={{width:"100%",height:"100%",objectFit:"contain"}}/>:<div style={{fontSize:10,color:C.textS,textTransform:"uppercase",letterSpacing:"1px"}}>No image</div>}
+              </div>
+              <div style={{padding:"12px 14px 14px",borderTop:`1px solid ${C.surfaceD}`}}>
+                <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:C.textS,marginBottom:4}}>{it.code}</div>
+                <div style={{fontSize:13,fontWeight:500,color:C.text,marginBottom:8,lineHeight:1.3,minHeight:34}}>{it.name}</div>
+                <div style={{fontSize:10,color:C.textS,fontFamily:"'DM Mono',monospace",lineHeight:1.5,marginBottom:4}}>{it.dims}</div>
+                <div style={{fontSize:10,color:C.textS,marginBottom:it.hangers?6:0}}>{it.material}</div>
+                {it.hangers&&<div style={{display:"inline-block",fontSize:10,fontWeight:600,color:C.oak,background:C.oak+"15",padding:"2px 8px",borderRadius:3,marginTop:4}}>{it.hangers} hangers</div>}
+              </div>
+            </div>)}
+          </div>
         </div>)}
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:48}}>
-        <div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>
-          <div style={{fontSize:10,fontWeight:700,color:C.go,letterSpacing:"1px",marginBottom:12}}>COMBINATION RULES</div>
-          {SF_FIXTURES.combinationRules.map((r,i)=><div key={i} style={{fontSize:12,color:C.text,padding:"6px 0",borderBottom:i<SF_FIXTURES.combinationRules.length-1?`1px solid ${C.surfaceD}`:"none",lineHeight:1.5}}>· {r}</div>)}
-        </div>
-        <div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>
-          <div style={{fontSize:10,fontWeight:700,color:C.nogo,letterSpacing:"1px",marginBottom:12}}>DO NOT COMBINE</div>
-          {SF_FIXTURES.doNotCombine.map((r,i)=><div key={i} style={{fontSize:12,color:C.text,padding:"6px 0",borderBottom:i<SF_FIXTURES.doNotCombine.length-1?`1px solid ${C.surfaceD}`:"none",lineHeight:1.5}}>· {r}</div>)}
-        </div>
       </div>
 
       {/* MERCHANDISING */}
@@ -1035,7 +1037,7 @@ export default function Home(){const [page,setPage]=useState("overview");const [
   useEffect(()=>{const f=async()=>{try{const r=await fetch("/api/projects");if(r.ok){const d=await r.json();if(d.projects?.length>0)setProjects(d.projects)}}catch(e){}};f();const i=setInterval(f,15*60*1000);return()=>clearInterval(i)},[]);
   const nav=[{id:"overview",label:"Overview",icon:"◈"},{id:"projects",label:"Projects",icon:"▦"},{id:"roi",label:"ROI Engine",icon:"◇"},{id:"quotation",label:"Quotation",icon:"📋"},{id:"flow",label:"Project Flow",icon:"⟳"},{id:"installed",label:"Installed Base",icon:"⊞"},{id:"standards",label:"Standards",icon:"☰"},{id:"admin",label:"Admin",icon:"⚙"}];
   return<div style={{display:"flex",minHeight:"100vh",background:C.surface}}>
-    <div style={{width:220,background:C.black,color:C.white,flexShrink:0,display:"flex",flexDirection:"column",padding:"28px 0",position:"sticky",top:0,height:"100vh"}}><div style={{padding:"0 24px",marginBottom:36}}><img src={LOGO_WHITE} alt="" style={{height:28,marginBottom:8}}/><div style={{fontSize:9,color:C.steel,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:4}}>Command Space</div></div><div style={{flex:1}}>{nav.map(it=><div key={it.id} style={{padding:"10px 24px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontSize:13,fontWeight:page===it.id?600:400,background:page===it.id?C.steelD+"33":hover===it.id?"rgba(255,255,255,.04)":"transparent",color:page===it.id?C.white:C.steelL,borderLeft:page===it.id?`3px solid ${C.oak}`:"3px solid transparent"}} onClick={()=>{setPage(it.id);setDetail(null)}} onMouseEnter={()=>setHover(it.id)} onMouseLeave={()=>setHover(null)}><span style={{fontSize:16,width:20,textAlign:"center",opacity:.7}}>{it.icon}</span>{it.label}</div>)}</div><div style={{padding:"16px 24px",borderTop:`1px solid ${C.steelD}33`}}><div style={{fontSize:10,color:C.steel}}>v2.8.4</div><div style={{fontSize:10,color:C.steel,marginTop:2}}>[ A frame for the business we share ]</div></div></div>
+    <div style={{width:220,background:C.black,color:C.white,flexShrink:0,display:"flex",flexDirection:"column",padding:"28px 0",position:"sticky",top:0,height:"100vh"}}><div style={{padding:"0 24px",marginBottom:36}}><img src={LOGO_WHITE} alt="" style={{height:28,marginBottom:8}}/><div style={{fontSize:9,color:C.steel,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:4}}>Command Space</div></div><div style={{flex:1}}>{nav.map(it=><div key={it.id} style={{padding:"10px 24px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontSize:13,fontWeight:page===it.id?600:400,background:page===it.id?C.steelD+"33":hover===it.id?"rgba(255,255,255,.04)":"transparent",color:page===it.id?C.white:C.steelL,borderLeft:page===it.id?`3px solid ${C.oak}`:"3px solid transparent"}} onClick={()=>{setPage(it.id);setDetail(null)}} onMouseEnter={()=>setHover(it.id)} onMouseLeave={()=>setHover(null)}><span style={{fontSize:16,width:20,textAlign:"center",opacity:.7}}>{it.icon}</span>{it.label}</div>)}</div><div style={{padding:"16px 24px",borderTop:`1px solid ${C.steelD}33`}}><div style={{fontSize:10,color:C.steel}}>v2.9.1</div><div style={{fontSize:10,color:C.steel,marginTop:2}}>[ A frame for the business we share ]</div></div></div>
     <div style={{flex:1,overflow:"auto"}}><div style={{padding:"14px 40px",background:C.white,borderBottom:`1px solid ${C.surfaceD}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{fontSize:13,color:C.textS}}>{nav.find(n=>n.id===page)?.label}</div><div style={{fontSize:12,color:C.textS}}>{new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div></div>
       <div style={{padding:"32px 40px",maxWidth:1200}}>
         {page==="overview"&&<OverviewPage projects={projects} setPage={setPage} setDetail={setDetail}/>}

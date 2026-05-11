@@ -289,34 +289,85 @@ export const BRAND_APPLICATION = {
 };
 
 export const FIXTURES = {
-  intro: "Approved fixtures and how they combine. This section is the working reference for shopfitters and project owners during layout and ordering.",
-  approved: [
-    { code: "105-01-001-20", name: "Wall unit – L-Beam Sidehang 1400", capacity: "50 hangers" },
-    { code: "105-01-001-21", name: "Wall unit – Front hang", capacity: "12 hangers (display)" },
-    { code: "105-06-001",    name: "Floor rack 1400",                  capacity: "50 hangers" },
-    { code: "105-06-002",    name: "Floor rack 700",                   capacity: "25 hangers" },
-    { code: "105-06-011",    name: "Jeans denim rack Double",          capacity: "10 hangers (folded)" },
-    { code: "105-09-002/003", name: "Wooden podium (low / high)",      capacity: "Footwear, accessories, folded anchors" },
-    { code: "105-13-015",    name: "Brushed steel logo 1200",          capacity: "Brand surface" },
-    { code: "105-15-001",    name: "Leather tray",                     capacity: "Accessory display" },
-    { code: "105-17-001",    name: "Volume table",                     capacity: "Entrance / focal anchor" },
-    { code: "105-17-002",    name: "Iconic table (large / medium)",    capacity: "Entrance / focal anchor" },
-    { code: "112_18_001",    name: "Long torso mannequin (M/W)",       capacity: "Outfit storytelling" },
+  intro: "All approved Selected Frame elements. Use this as the visual reference for fixtures, podiums, signage and inventory items during layout, ordering and partner alignment.",
+  meta: "Source: Selected SIS Catalog — Rev 1, March 2026",
+  categories: [
+    {
+      name: "Wall Units",
+      items: [
+        { code: "105-99-003", name: "Wall Unit Sidehang",            dims: "2288 H × 1496 W × 434 D", material: "Stainless Steel", hangers: 35, image: "/images/elements/wall_unit_sidehang.jpg" },
+        { code: "105-99-004", name: "Wall Unit 1400 — Shelves",      dims: "2288 H × 1496 W × 517 D", material: "Stainless Steel, Oak",        image: "/images/elements/wall_unit_1400_shelves.jpg" },
+        { code: "105-99-005", name: "Wall Unit 1400 — Single Shelf Sidehang", dims: "2288 H × 1496 W × 517 D", material: "Stainless Steel, Oak", hangers: 35, image: "/images/elements/wall_unit_1400_single_shelf_sidehang.jpg" },
+        { code: "105-99-006", name: "Wall Unit 1400 — 2-level Sidehang",     dims: "2288 H × 1496 W × 542 D", material: "Stainless Steel",     hangers: 40, image: "/images/elements/wall_unit_1400_2_level_sidehang.jpg" },
+        { code: "105-99-007", name: "Wall Unit 1400 — Mirror Sidehang",      dims: "2288 H × 1496 W × 434 D", material: "Stainless Steel",     hangers: 28, image: "/images/elements/wall_unit_1400_mirror_sidehang.jpg" },
+        { code: "105-99-008", name: "Wall Unit — Category Library",          dims: "2288 H × 1496 W × 529.5 D", material: "Stainless Steel",   hangers: 10, image: "/images/elements/wall_unit_category_library.jpg" },
+        { code: "105-99-009", name: "Wall Unit 1400 — Screen",               dims: "2288 H × 1496 W × 445 D",   material: "Stainless Steel",   image: "/images/elements/wall_unit_1400_screen.jpg" },
+        { code: "105-99-010", name: "Wall Unit 700 — Shelf",                 dims: "2288 H × 810 W × 517 D",    material: "Stainless Steel, Oak", image: "/images/elements/wall_unit_700_shelf.jpg" },
+        { code: "105-99-011", name: "Wall Unit 700 — 2-level Sidehang",      dims: "2288 H × 810 W × 389 D",    material: "Stainless Steel",   hangers: 26, image: "/images/elements/wall_unit_700_2_level_sidehang.jpg" },
+        { code: "105-99-012", name: "Wall Unit 700 — Sidehang",              dims: "2288 H × 810 W × 389 D",    material: "Stainless Steel",   hangers: 13, image: "/images/elements/wall_unit_700_sidehang.jpg" },
+      ],
+    },
+    {
+      name: "Racks",
+      items: [
+        { code: "105-06-001",        name: "Floor Rack 1400",               dims: "1758 H × 1310 W × 500 D", material: "Stainless Steel",      hangers: 50, image: "/images/elements/floor_rack_1400.jpg" },
+        { code: "105-06-002",        name: "Floor Rack 700",                dims: "1758 H × 800 W × 500 D",  material: "Stainless Steel",      hangers: 25, image: "/images/elements/floor_rack_700.jpg" },
+        { code: "105-06-014",        name: "Floor Rack 1400 H1700",         dims: "1708 H × 1310 W × 500 D", material: "Stainless Steel",      hangers: 50, image: "/images/elements/floor_rack_1400_h1700.jpg" },
+        { code: "105-06-014b",       name: "Floor Rack 700 H1700",          dims: "1708 H × 800 W × 500 D",  material: "Stainless Steel",      hangers: 25, image: "/images/elements/floor_rack_700_h1700.jpg" },
+        { code: "105-06-010",        name: "Jeans Rack Single",             dims: "1758 H × 1310 W × 500 D", material: "Stainless Steel, Oak", hangers: 25, image: "/images/elements/jeans_rack_single.jpg" },
+        { code: "105-06-011",        name: "Double Shelf Floor Rack",       dims: "1758 H × 1310 W × 500 D", material: "Stainless Steel, Oak", hangers: 10, image: "/images/elements/double_shelf_floor_rack.jpg" },
+        { code: "105-06-013",        name: "Triple Shelf Floor Rack",       dims: "1752 H × 1300 W × 500 D", material: "Stainless Steel, Oak", image: "/images/elements/triple_shelf_floor_rack.jpg" },
+        { code: "105-06-011-22-C",   name: "Floor Rack Acrylic Sign",       dims: "324.9 H × 148.5 W × 19.6 D", material: "Stainless Steel",   image: "/images/elements/floor_rack_acrylic_sign.jpg" },
+      ],
+    },
+    {
+      name: "Podiums",
+      items: [
+        { code: "105-09-001", name: "Iconic Podium",    dims: "750 H × Ø 450",          material: "MDF",  image: "/images/elements/iconic_podium.jpg" },
+        { code: "105-09-002", name: "Tall Oak Podium",  dims: "550 H × 400 W × 400 D",  material: "Oak",  image: "/images/elements/tall_oak_podium.jpg" },
+        { code: "105-09-003", name: "Short Oak Podium", dims: "400 H × 400 W × 400 D",  material: "Oak",  image: "/images/elements/short_oak_podium.jpg" },
+      ],
+    },
+    {
+      name: "Tables",
+      items: [
+        { code: "105-17-001", name: "Volume Table", dims: "430 / 815 H × 1800 W × 1280 D", material: "Stainless Steel, Oak", image: "/images/elements/volume_table.jpg" },
+        { code: "105-17-007", name: "Iconic Table", dims: "650 H × 1265 W × 1200 D",       material: "MDF",                  image: "/images/elements/iconic_table.jpg" },
+      ],
+    },
+    {
+      name: "Logos",
+      items: [
+        { code: "105-13-001", name: "Corona Light Logo",    dims: "225 H × 1200 W × 20 D", material: "Stainless Steel", image: "/images/elements/corona_light_logo.jpg" },
+        { code: "105-13-015", name: "Stainless Steel Logo", dims: "225 H × 1200 W × 20 D", material: "Stainless Steel", image: "/images/elements/stainless_steel_logo.jpg" },
+        { code: "—",          name: "LED Logo",             dims: "225 H × 1200 W × 20 D", material: "LED",             image: null },
+      ],
+    },
+    {
+      name: "Accessories",
+      items: [
+        { code: "105-13-023", name: "Table Sign A5 Portrait", dims: "210 H × 148 W × 50 D",     material: "Stainless Steel", image: "/images/elements/table_sign_a5.jpg" },
+        { code: "105-15-001", name: "Leather Tray",           dims: "28 H × 420 W × 275 D",     material: "Leather",         image: "/images/elements/leather_tray.jpg" },
+        { code: "105-15-002", name: "Accessories Rack",       dims: "1508 H × 756.2 W × 500 D", material: "Stainless Steel", image: "/images/elements/accessories_rack.jpg" },
+        { code: "105-15-003", name: "Accessories Tray 3×3",   dims: "70 H × 287 W × 287 D",     material: "Oak",             image: "/images/elements/accessories_tray_3x3.jpg" },
+        { code: "105-15-004", name: "Accessories Tray 3×5",   dims: "70 H × 469 W × 287 D",     material: "Oak",             image: "/images/elements/accessories_tray_3x5.jpg" },
+        { code: "105-18-001", name: "Floor Price Sign A5",    dims: "51.2 H × 180 W × 241 D",   material: "Stainless Steel", image: "/images/elements/floor_price_sign_a5.jpg" },
+      ],
+    },
+    {
+      name: "Mannequins",
+      items: [
+        { code: "112_18_001", name: "Long Torso — Female", dims: "Floor-standing", material: "—", image: "/images/elements/mannequin_female.jpg" },
+        { code: "112_18_002", name: "Long Torso — Male",   dims: "Floor-standing", material: "—", image: "/images/elements/mannequin_male.jpg" },
+      ],
+    },
+    {
+      name: "Carpets",
+      items: [
+        { code: "105-19-001", name: "Carpet Size 1", dims: "2424 W × 2809 D", material: "—", image: "/images/elements/carpet_size_1.jpg" },
+      ],
+    },
   ],
-  combinationRules: [
-    "Wall unit modules connect via standard L-beams — no gap, no overlap",
-    "Floor racks are placed in pairs or trios; never single in open floor",
-    "Sidehang 1400 and 700 may share the same wall but transition at module boundary",
-    "Volume table and iconic table are not used in the same room — pick one focal anchor per SIS",
-    "Mannequin tubes are always stainless grit 240; no chrome or matte finishes",
-  ],
-  doNotCombine: [
-    "Selected fixtures with partner-supplied fixtures in the same footprint",
-    "Stainless and chrome finishes on the same fixture",
-    "Oak and laminate edges on visible surfaces",
-    "Two-level sidehangs adjacent to single-level — disrupts horizontal rhythm",
-  ],
-  review: true,
 };
 
 export const MERCHANDISING = {
