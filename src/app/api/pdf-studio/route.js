@@ -1,54 +1,70 @@
+import { del } from '@vercel/blob';
 import { processPdf } from '../../../lib/pdf-studio';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-// Allow drafts up to ~25 MB; pdf-lib is happy well above that, but we cap to
-// keep Vercel function memory predictable.
 export const maxDuration = 60;
 
-const MAX_BYTES = 25 * 1024 * 1024;
+const MAX_BYTES = 50 * 1024 * 1024;
 
 function bad(message, status = 400, extra = {}) {
   return Response.json({ error: message, ...extra }, { status });
 }
 
 export async function POST(request) {
-  let form;
+  let payload;
   try {
-    form = await request.formData();
-  } catch (e) {
-    return bad('Could not read form data');
+    payload = await request.json();
+  } catch {
+    return bad('Invalid JSON body');
   }
 
-  const file = form.get('file');
-  if (!file || typeof file === 'string') return bad('No PDF uploaded');
-  if (file.type && file.type !== 'application/pdf') {
-    return bad('Only PDF files are accepted');
-  }
-  if (file.size > MAX_BYTES) {
-    return bad(`File too large (max ${Math.round(MAX_BYTES / 1024 / 1024)} MB)`, 413);
-  }
+  const {
+    blobUrl,
+    filename,
+    replaceLogos = false,
+    updateContact = false,
+    appendZoning = false,
+  } = payload || {};
 
-  const flag = (name) => form.get(name) === 'true' || form.get(name) === 'on';
-  const options = {
-    replaceLogos: flag('replaceLogos'),
-    updateContact: flag('updateContact'),
-    appendZoning: flag('appendZoning'),
-  };
-
-  if (!options.replaceLogos && !options.updateContact && !options.appendZoning) {
+  if (!blobUrl || typeof blobUrl !== 'string') return bad('Missing blobUrl');
+  if (!replaceLogos && !updateContact && !appendZoning) {
     return bad('Select at least one operation');
+  }
+
+  // Fetch the uploaded PDF from Vercel Blob.
+  let inputBytes;
+  try {
+    const res = await fetch(blobUrl);
+    if (!res.ok) return bad(`Could not fetch uploaded file (${res.status})`);
+    const contentLength = Number(res.headers.get('content-length') || 0);
+    if (contentLength > MAX_BYTES) return bad('File too large', 413);
+    const ab = await res.arrayBuffer();
+    if (ab.byteLength > MAX_BYTES) return bad('File too large', 413);
+    inputBytes = new Uint8Array(ab);
+  } catch (e) {
+    return bad(`Fetch failed: ${e.message || e}`, 502);
   }
 
   let bytes, report;
   try {
-    const inputBytes = new Uint8Array(await file.arrayBuffer());
-    ({ bytes, report } = await processPdf(inputBytes, options));
+    ({ bytes, report } = await processPdf(inputBytes, {
+      replaceLogos,
+      updateContact,
+      appendZoning,
+    }));
   } catch (e) {
     return bad(`PDF processing failed: ${e.message || e}`, 500);
   }
 
-  const sourceName = (file.name || 'document.pdf').replace(/\.pdf$/i, '');
+  // Clean up the upload — it has served its purpose.
+  try {
+    await del(blobUrl);
+  } catch {
+    // Non-fatal: blob will expire on its own retention policy.
+  }
+
+  const sourceName = (filename || 'document.pdf').replace(/\.pdf$/i, '');
   const outName = `${sourceName}__selected-frame.pdf`;
 
   return new Response(bytes, {
