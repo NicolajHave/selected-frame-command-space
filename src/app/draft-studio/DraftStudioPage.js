@@ -1,5 +1,6 @@
 "use client";
 import React, { useCallback, useRef, useState } from "react";
+import { upload } from "@vercel/blob/client";
 
 const C = {
   steel: "#8A8D8F",
@@ -312,6 +313,7 @@ export default function DraftStudioPage() {
     appendZoning: false,
   });
   const [busy, setBusy] = useState(false);
+  const [busyStage, setBusyStage] = useState(null); // "uploading" | "processing"
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
 
@@ -335,13 +337,27 @@ export default function DraftStudioPage() {
     setBusy(true);
     setError(null);
     try {
-      const form = new FormData();
-      form.append("file", file);
-      form.append("replaceLogos", String(opts.replaceLogos));
-      form.append("updateContact", String(opts.updateContact));
-      form.append("appendZoning", String(opts.appendZoning));
+      // 1. Upload PDF directly to Vercel Blob (bypasses 4.5 MB function limit).
+      setBusyStage("uploading");
+      const blob = await upload(`pdf-studio/${Date.now()}-${file.name}`, file, {
+        access: "public",
+        handleUploadUrl: "/api/pdf-studio/upload",
+        contentType: "application/pdf",
+      });
 
-      const res = await fetch("/api/pdf-studio", { method: "POST", body: form });
+      // 2. Ask the server to process the blob and stream the result back.
+      setBusyStage("processing");
+      const res = await fetch("/api/pdf-studio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          blobUrl: blob.url,
+          filename: file.name,
+          replaceLogos: opts.replaceLogos,
+          updateContact: opts.updateContact,
+          appendZoning: opts.appendZoning,
+        }),
+      });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         throw new Error(j.error || `Request failed (${res.status})`);
@@ -355,17 +371,18 @@ export default function DraftStudioPage() {
         } catch {}
       }
 
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+      const outBlob = await res.blob();
+      const url = URL.createObjectURL(outBlob);
       const filename = (file.name || "document.pdf").replace(
         /\.pdf$/i,
         "__selected-frame.pdf",
       );
-      setResult({ url, filename, size: blob.size, report });
+      setResult({ url, filename, size: outBlob.size, report });
     } catch (e) {
       setError(e.message || "Something went wrong");
     } finally {
       setBusy(false);
+      setBusyStage(null);
     }
   };
 
@@ -454,7 +471,11 @@ export default function DraftStudioPage() {
                 cursor: canSubmit ? "pointer" : "not-allowed",
               }}
             >
-              {busy ? "Generating…" : "Generate Updated PDF"}
+              {busy
+                ? busyStage === "uploading"
+                  ? "Uploading…"
+                  : "Generating…"
+                : "Generate Updated PDF"}
             </button>
             {file && !busy && (
               <button
