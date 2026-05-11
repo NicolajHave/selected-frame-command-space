@@ -371,45 +371,40 @@ export const FIXTURES = {
 };
 
 export const MERCHANDISING = {
-  intro: "Visual merchandising rules. The frame creates the calm; merchandising preserves it.",
+  intro: "Visual merchandising must protect the calm, clarity and commercial readability of the Selected Frame concept. The frame creates the structure; merchandising must preserve it.",
   principles: [
     {
-      title: "Density is engineered",
-      body: "Hanger capacity is the upper limit, not a target. Aim for 80–90% fill on visible fixtures. Empty fixtures or rods are not allowed even in low-stock periods.",
-      review: true,
+      title: "Density is controlled",
+      body: "Product density must feel intentional, not maximised. Fixtures should read full and commercially strong, but never overpacked, visually stressed or stock-room heavy.",
     },
     {
-      title: "Hanging-folded balance",
-      body: "Per 60 sqm: roughly 60% hanging volume, 25% folded on tables, 15% accessories and footwear on podiums. Adjust by category mix per partner.",
-      review: true,
-    },
-    {
-      title: "Outfit focus",
-      body: "Front-hang on each wall is a styled outfit, not a single product. The full outfit (top, bottom, layer) is visible from the customer's primary sightline.",
+      title: "Outfit-led presentation",
+      body: "The strongest customer-facing moments should read as outfit stories, not isolated items. Front-facing presentation must create a clear and styled expression from the primary sightline.",
     },
     {
       title: "Product rhythm",
-      body: "Within a sidehang, products group by colour story (light to dark, neutral to accent). Between sidehangs, separate by category or story chapter.",
+      body: "Merchandising should create visual rhythm through controlled repetition, spacing and grouping. The space must feel balanced and easy to read, not fragmented or noisy.",
     },
     {
-      title: "Storytelling hierarchy",
-      body: "Three layers: Hero wall = season's main story; Volume table = outfit anchor; Floor racks = depth and size availability. Stories rotate together, never on different cycles.",
-      review: true,
+      title: "Hierarchy before volume",
+      body: "Hero moments, key product and focal presentation must lead the space before volume does. Product quantity should support the concept hierarchy, never compete with it.",
     },
   ],
   dos: [
-    "Replenish daily during peak periods",
-    "Re-fold tables every morning before opening",
-    "Keep hooks facing back wall",
-    "Group by colour, then size",
-    "Audit sightlines weekly",
+    "Replenish customer-facing presentation before it reads depleted",
+    "Keep hanger direction and fixture expression consistent within each presentation",
+    "Group product with visual clarity and controlled progression",
+    "Use front-facing product to support one clear outfit or product story",
+    "Maintain calm table folding and clean product stacking",
+    "Audit merchandising against sightlines, focal hierarchy and density logic",
   ],
   donts: [
-    "Do not leave empty hangers on rods",
-    "Do not stack folded product above 8 pieces",
-    "Do not mix categories on one rack",
-    "Do not place sale signs inside the frame",
-    "Do not let mannequins stand undressed for more than 24 hours",
+    "Do not overfill fixtures beyond their readable presentation capacity",
+    "Do not let folded tables become stock-heavy or visually compressed",
+    "Do not mix unrelated product stories within the same focal presentation",
+    "Do not leave empty rods, broken size runs or visibly depleted key presentation during customer-facing hours",
+    "Do not let volume override hierarchy, calmness or first impression",
+    "Do not introduce local sale noise inside the Selected Frame presentation logic",
   ],
 };
 
