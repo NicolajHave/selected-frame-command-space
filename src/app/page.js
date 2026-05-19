@@ -1,6 +1,7 @@
 "use client";
 import { SECTIONS as SF_SECTIONS, INTRO as SF_INTRO, DNA as SF_DNA, NON_NEGOTIABLES as SF_NON_NEGOTIABLES, SPACE_MANAGEMENT as SF_SPACE_MANAGEMENT, BRAND_APPLICATION as SF_BRAND_APPLICATION, FIXTURES as SF_FIXTURES, MERCHANDISING as SF_MERCHANDISING, PLAYBOOKS as SF_PLAYBOOKS, EXCEPTIONS as SF_EXCEPTIONS } from "./standards-content";
 import DraftStudioPage from "./draft-studio/DraftStudioPage";
+import { NEWS } from "../data/news";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
 const C={steel:"#8A8D8F",steelL:"#B8BBBE",steelD:"#5C5F61",oak:"#C4944A",sage:"#B5C4B1",surface:"#F5F4F1",surfaceD:"#ECEAE5",white:"#FFFFFF",black:"#1A1A1A",text:"#2C2C2C",textS:"#6B6B6B",accent:"#3D6B4F",warn:"#D4A843",danger:"#C75B4A",success:"#5A8F6A",go:"#4A7C5C",review:"#C4944A",nogo:"#C75B4A"};
@@ -36,14 +37,66 @@ const PM=({value,onChange})=><div style={{display:"flex",alignItems:"center"}}><
 // Editable Total field (module-level for stable identity - prevents focus loss on every keystroke)
 const ET=({label,field,cats,setCats})=><div style={{padding:"10px 14px",background:C.surface,borderRadius:6}}><div style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>{label}</div><div style={{display:"flex",alignItems:"center",gap:4}}><span style={{fontSize:16,color:C.text}}>€</span><input type="text" inputMode="decimal" value={cats[field]} onChange={e=>setCats(p=>({...p,[field]:e.target.value}))} style={{fontSize:18,fontWeight:300,color:C.text,fontFamily:"'DM Mono',monospace",border:"none",borderBottom:`1px solid ${C.surfaceD}`,background:"transparent",outline:"none",width:100,padding:"2px 0"}}/></div></div>;
 
+// ─── NEWS ─────────────────────────────────────────────────
+const fmtNewsDate=(d)=>new Date(d).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
+
+const NewsMedia=({item,height})=>item.mediaType==="video"
+  ? <video src={item.mediaSrc} poster={item.poster} autoPlay muted loop playsInline preload="metadata" style={{width:"100%",height:height||"100%",objectFit:"cover",display:"block",background:C.surfaceD}}/>
+  : <img src={item.mediaSrc} alt={item.title} style={{width:"100%",height:height||"100%",objectFit:"cover",display:"block",background:C.surfaceD}}/>;
+
+const NewsMeta=({item,size="default"})=>{
+  const fs=size==="lg"?11:10;
+  return <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:size==="lg"?10:6}}>
+    <span style={{fontSize:fs,fontWeight:700,color:C.oak,textTransform:"uppercase",letterSpacing:"1.2px"}}>{item.category}</span>
+    <span style={{fontSize:fs,color:C.steelL}}>·</span>
+    <span style={{fontSize:fs,color:C.textS,fontFamily:"'DM Mono',monospace"}}>{fmtNewsDate(item.date)}</span>
+  </div>;
+};
+
+const FeaturedNewsCard=({item,onLink})=><div style={{background:C.white,borderRadius:10,border:`1px solid ${C.surfaceD}`,overflow:"hidden",display:"grid",gridTemplateColumns:"minmax(0,1.1fr) minmax(0,1fr)",cursor:item.link?"pointer":"default"}} onClick={()=>item.link&&onLink(item.link)}>
+  <div style={{aspectRatio:"16 / 10",overflow:"hidden"}}><NewsMedia item={item}/></div>
+  <div style={{padding:"28px 32px",display:"flex",flexDirection:"column",justifyContent:"center"}}>
+    <NewsMeta item={item} size="lg"/>
+    <div style={{fontSize:22,fontWeight:400,fontFamily:"'Cormorant Garamond',serif",color:C.text,lineHeight:1.25,marginBottom:10}}>{item.title}</div>
+    <div style={{fontSize:13,color:C.textS,lineHeight:1.65}}>{item.description}</div>
+    {item.link&&<div style={{marginTop:14,fontSize:12,fontWeight:600,color:C.oak,letterSpacing:".5px"}}>Open →</div>}
+  </div>
+</div>;
+
+const SmallNewsCard=({item,onLink})=><div style={{background:C.white,borderRadius:8,border:`1px solid ${C.surfaceD}`,overflow:"hidden",display:"flex",flexDirection:"column",cursor:item.link?"pointer":"default"}} onClick={()=>item.link&&onLink(item.link)}>
+  <div style={{aspectRatio:"16 / 10",overflow:"hidden"}}><NewsMedia item={item}/></div>
+  <div style={{padding:"16px 18px 20px",display:"flex",flexDirection:"column",flex:1}}>
+    <NewsMeta item={item}/>
+    <div style={{fontSize:14,fontWeight:500,color:C.text,lineHeight:1.35,marginBottom:8}}>{item.title}</div>
+    <div style={{fontSize:12,color:C.textS,lineHeight:1.6}}>{item.description}</div>
+  </div>
+</div>;
+
+const NewsSection=({setPage})=>{
+  if(!NEWS.length)return null;
+  const [featured,...rest]=NEWS;
+  const smalls=rest.slice(0,3);
+  const handleLink=(target)=>{
+    if(!target)return;
+    if(/^https?:/.test(target)){window.open(target,"_blank","noopener");return;}
+    setPage&&setPage(target);
+  };
+  return <div style={{marginBottom:36}}>
+    <Title sub="Latest Selected Frame updates">News</Title>
+    <div style={{marginBottom:smalls.length?16:0}}><FeaturedNewsCard item={featured} onLink={handleLink}/></div>
+    {smalls.length>0&&<div style={{display:"grid",gridTemplateColumns:`repeat(${smalls.length},1fr)`,gap:14}}>
+      {smalls.map((it,i)=><SmallNewsCard key={i} item={it} onLink={handleLink}/>)}
+    </div>}
+  </div>;
+};
+
 const OverviewPage=({projects,setPage,setDetail})=>{const active=projects.filter(p=>!p.completed);const comp=projects.filter(p=>p.completed);const upcoming=active.filter(p=>p.dueOn&&new Date(p.dueOn)>=new Date()).sort((a,b)=>new Date(a.dueOn)-new Date(b.dueOn));return<div>
   <div style={{background:`linear-gradient(135deg,${C.black},${C.steelD})`,borderRadius:12,padding:"40px 44px",marginBottom:32,position:"relative",overflow:"hidden"}}><div style={{position:"absolute",top:0,right:0,width:"50%",height:"100%",backgroundImage:"url(/images/kh_selected_sis_075_web.jpg)",backgroundSize:"cover",backgroundPosition:"center",opacity:.15}}/><div style={{position:"relative",zIndex:1}}><img src={LOGO_WHITE} alt="Selected Frame" style={{height:32,marginBottom:12}}/><div style={{fontSize:11,color:C.steelL,fontWeight:600,letterSpacing:"2px",textTransform:"uppercase",marginTop:8}}>[ Command Space ]</div><p style={{fontSize:14,color:C.steelL,margin:"8px 0 0"}}>A frame for the business we share</p></div></div>
   <div style={{display:"flex",gap:16,marginBottom:32,flexWrap:"wrap"}}><KPI label="Active" value={active.length} sub="In progress"/><KPI label="Completed" value={comp.length} sub="Installed"/><KPI label="Total" value={projects.length}/></div>
-  <Title sub="Selected Frame in action">The Concept</Title>
-  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:32}}>{IMG.slice(0,3).map((s,i)=><div key={i} style={{borderRadius:8,overflow:"hidden",height:180}}><img src={s} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div>)}</div>
+  <NewsSection setPage={setPage}/>
   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginBottom:32}}>
     <div><Title sub="Nearest deadlines">Upcoming</Title><div style={{background:C.white,borderRadius:8,border:`1px solid ${C.surfaceD}`}}>{upcoming.slice(0,6).map((p,i)=><div key={p.gid} style={{padding:"14px 20px",borderBottom:i<5?`1px solid ${C.surfaceD}`:"none",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}} onClick={()=>{setDetail(p);setPage("projects")}}><div><div style={{fontSize:13,fontWeight:500,color:C.text}}>{p.name}</div><div style={{fontSize:11,color:C.textS,marginTop:2}}>{p.type}</div></div><div style={{fontSize:13,fontWeight:500,color:C.oak}}>{fmtDate(p.dueOn)}</div></div>)}{!upcoming.length&&<div style={{padding:20,fontSize:13,color:C.textS,textAlign:"center"}}>No upcoming deadlines</div>}</div></div>
-    <div><Title sub="Tools">Quick Access</Title><div style={{display:"flex",flexDirection:"column",gap:12}}>{[{l:"ROI Engine",d:"Evaluate investment cases first",p:"roi",i:"📊"},{l:"Quotation Builder",d:"Parse supplier PDFs & create quotes",p:"quotation",i:"📋"},{l:"Project Flow",d:"Phase 0–10 overview",p:"flow",i:"🔄"},{l:"Installed Base",d:"Completed installations",p:"installed",i:"🏪"}].map(t=><div key={t.p} style={{background:C.white,borderRadius:8,padding:"14px 18px",border:`1px solid ${C.surfaceD}`,cursor:"pointer",display:"flex",alignItems:"center",gap:14}} onClick={()=>setPage(t.p)} onMouseEnter={e=>e.currentTarget.style.borderColor=C.oak} onMouseLeave={e=>e.currentTarget.style.borderColor=C.surfaceD}><div style={{fontSize:24}}>{t.i}</div><div><div style={{fontSize:13,fontWeight:500,color:C.text}}>{t.l}</div><div style={{fontSize:11,color:C.textS}}>{t.d}</div></div></div>)}</div></div>
+    <div><Title sub="Selected Frame in action">The Concept</Title><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>{IMG.slice(0,4).map((s,i)=><div key={i} style={{borderRadius:8,overflow:"hidden",aspectRatio:"4 / 3"}}><img src={s} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div>)}</div></div>
   </div></div>};
 
 // ─── PROJECTS ─────────────────────────────────────────────
