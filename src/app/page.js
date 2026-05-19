@@ -929,21 +929,32 @@ const StandardsPage=()=>{
 
       {/* PLAYBOOKS */}
       <SectionHeader id="playbooks" eyebrow="07" title="Store Size Playbooks" intro={SF_PLAYBOOKS.intro}/>
-      <div style={{display:"flex",flexDirection:"column",gap:14,marginBottom:48}}>
-        {SF_PLAYBOOKS.sizes.map((s,i)=><div key={i} style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`,display:"grid",gridTemplateColumns:"160px 1fr",gap:24}}>
-          <div>
-            <div style={{fontSize:42,fontWeight:300,fontFamily:"'Cormorant Garamond',serif",color:C.text,lineHeight:1}}>{s.sqm}<span style={{fontSize:18,color:C.textS}}> m²</span></div>
-            <div style={{fontSize:11,color:C.oak,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase",marginTop:6}}>{s.name}{s.review&&<ReviewPill/>}</div>
+      <div style={{display:"flex",flexDirection:"column",gap:18,marginBottom:48}}>
+        {SF_PLAYBOOKS.sizes.map((s,i)=><div key={i} style={{background:C.white,borderRadius:8,padding:28,border:`1px solid ${C.surfaceD}`,display:"grid",gridTemplateColumns:"180px 1fr",gap:32}}>
+          <div style={{borderRight:`1px solid ${C.surfaceD}`,paddingRight:24}}>
+            <div style={{fontSize:48,fontWeight:300,fontFamily:"'Cormorant Garamond',serif",color:C.text,lineHeight:1}}>{s.sqm}<span style={{fontSize:18,color:C.textS}}> m²</span></div>
+            <div style={{fontSize:11,color:C.oak,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase",marginTop:8,lineHeight:1.4}}>{s.name}</div>
           </div>
           <div>
-            <div style={{fontSize:11,color:C.textS,marginBottom:12,fontStyle:"italic"}}>{s.bestFor}</div>
-            <div style={{display:"grid",gridTemplateColumns:"110px 1fr",gap:"6px 16px",fontSize:11,marginBottom:10}}>
-              <div style={{color:C.textS,fontWeight:600,textTransform:"uppercase",letterSpacing:".5px",fontSize:9}}>Key fixtures</div>
-              <div style={{color:C.text,lineHeight:1.5}}>{s.keyFixtures}</div>
-              <div style={{color:C.textS,fontWeight:600,textTransform:"uppercase",letterSpacing:".5px",fontSize:9}}>Hangers</div>
-              <div style={{color:C.text,fontFamily:"'DM Mono',monospace"}}>{s.hangerTarget}</div>
+            <div style={{fontSize:13,color:C.text,lineHeight:1.6,marginBottom:20}}>{s.description}</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"18px 24px",marginBottom:18}}>
+              <div>
+                <div style={{fontSize:9,fontWeight:700,color:C.textS,textTransform:"uppercase",letterSpacing:"1px",marginBottom:8}}>Best used when</div>
+                <ul style={{margin:0,padding:0,listStyle:"none"}}>{s.bestUsedWhen.map((x,j)=><li key={j} style={{fontSize:12,color:C.text,lineHeight:1.55,paddingLeft:12,position:"relative",marginBottom:3}}><span style={{position:"absolute",left:0,color:C.textS}}>·</span>{x}</li>)}</ul>
+              </div>
+              <div>
+                <div style={{fontSize:9,fontWeight:700,color:C.textS,textTransform:"uppercase",letterSpacing:"1px",marginBottom:8}}>Key logic</div>
+                <ul style={{margin:0,padding:0,listStyle:"none"}}>{s.keyLogic.map((x,j)=><li key={j} style={{fontSize:12,color:C.text,lineHeight:1.55,paddingLeft:12,position:"relative",marginBottom:3}}><span style={{position:"absolute",left:0,color:C.textS}}>·</span>{x}</li>)}</ul>
+              </div>
             </div>
-            <div style={{fontSize:11,color:C.textS,lineHeight:1.6,padding:"10px 12px",background:C.surface,borderRadius:6}}>{s.notes}</div>
+            <div style={{marginBottom:18}}>
+              <div style={{fontSize:9,fontWeight:700,color:C.nogo,textTransform:"uppercase",letterSpacing:"1px",marginBottom:8}}>Avoid</div>
+              <ul style={{margin:0,padding:0,listStyle:"none"}}>{s.avoid.map((x,j)=><li key={j} style={{fontSize:12,color:C.text,lineHeight:1.55,paddingLeft:12,position:"relative",marginBottom:3}}><span style={{position:"absolute",left:0,color:C.textS}}>·</span>{x}</li>)}</ul>
+            </div>
+            <div style={{padding:"12px 16px",background:C.surface,borderLeft:`3px solid ${C.oak}`,borderRadius:4}}>
+              <div style={{fontSize:9,fontWeight:700,color:C.oak,textTransform:"uppercase",letterSpacing:"1px",marginBottom:6}}>Commercial role</div>
+              <div style={{fontSize:12,color:C.text,lineHeight:1.6,fontStyle:"italic"}}>{s.commercialRole}</div>
+            </div>
           </div>
         </div>)}
       </div>
