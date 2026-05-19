@@ -525,42 +525,44 @@ export const PLAYBOOKS = {
 };
 
 export const EXCEPTIONS = {
-  intro: "Selected Frame is a system, not a template. Local conditions vary — these guidelines clarify what is fixed and what is open to discussion.",
+  intro: "Selected Frame is a system, not a fixed template. Local conditions may require adaptation, but deviations must be controlled, approved and documented to protect the concept.",
   fixed: [
     "Approved material palette",
-    "Logo placement (left-aligned, above final wall module)",
+    "Logo placement logic",
     "Single fixture language inside the frame",
     "Approved hanger system",
     "No unapproved local signage",
+    "Core sightline and brand visibility principles",
   ],
   flexible: [
     "Total fixture count and arrangement",
     "Floor rack placement and grouping",
-    "Mannequin count (within zone density rules)",
-    "Outfit story content per cycle",
+    "Mannequin count within approved density logic",
+    "Outfit story and product focus by cycle",
     "Carpet size and colour within approved range",
+    "Space planning adjustments caused by local architectural conditions",
   ],
   process: [
     {
       step: 1,
       title: "Identify",
-      body: "Project owner identifies a local condition that conflicts with a guideline. Document the condition with photos and floor plan.",
+      body: "Project owner identifies a local condition that conflicts with the standard guideline. Document the condition with photos, floor plan and short explanation.",
     },
     {
       step: 2,
       title: "Propose",
-      body: "Propose the deviation in writing — what guideline, what alternative, what justification. Use the project's Asana task as the record.",
+      body: "Project owner proposes the deviation in writing, including what changes, why it is needed and how the concept will remain protected.",
     },
     {
       step: 3,
       title: "Approve",
-      body: "Concept owner reviews and approves, conditionally approves, or rejects. Approval is recorded as a task comment for audit history.",
-      review: true,
+      body: "Concept owner reviews the proposal and either approves, conditionally approves or rejects it. Approval must be documented before implementation.",
     },
     {
       step: 4,
-      title: "Implement and learn",
-      body: "Approved deviations are implemented and reviewed at Phase 10 (Close & Learning). Recurring deviations may inform updates to the guidelines themselves.",
+      title: "Implement & Learn",
+      body: "Approved deviations are implemented and documented in the project record. Relevant learnings may inform future updates to the guidelines.",
     },
   ],
+  callout: "No deviation is approved until it is documented.",
 };

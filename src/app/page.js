@@ -1024,26 +1024,34 @@ const StandardsPage=()=>{
 
       {/* EXCEPTIONS */}
       <SectionHeader id="exceptions" eyebrow="08" title="Exceptions & Approval" intro={SF_EXCEPTIONS.intro}/>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:24}}>
-        <div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>
-          <div style={{fontSize:10,fontWeight:700,color:C.nogo,letterSpacing:"1px",marginBottom:12}}>FIXED — NO DEVIATION</div>
-          {SF_EXCEPTIONS.fixed.map((r,i)=><div key={i} style={{fontSize:12,color:C.text,padding:"6px 0",borderBottom:i<SF_EXCEPTIONS.fixed.length-1?`1px solid ${C.surfaceD}`:"none",lineHeight:1.5}}>· {r}</div>)}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:20}}>
+        <div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`,borderTop:`3px solid ${C.nogo}`}}>
+          <div style={{fontSize:10,fontWeight:700,color:C.nogo,letterSpacing:"1.2px",marginBottom:6}}>FIXED — NO DEVIATION</div>
+          <div style={{fontSize:11,color:C.textS,marginBottom:14,lineHeight:1.5}}>Concept-defining rules. These cannot be changed at project level.</div>
+          {SF_EXCEPTIONS.fixed.map((r,i)=><div key={i} style={{fontSize:12,color:C.text,padding:"7px 0",borderTop:`1px solid ${C.surfaceD}`,lineHeight:1.5}}>· {r}</div>)}
         </div>
-        <div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>
-          <div style={{fontSize:10,fontWeight:700,color:C.go,letterSpacing:"1px",marginBottom:12}}>FLEXIBLE — LOCAL ADAPTATION OK</div>
-          {SF_EXCEPTIONS.flexible.map((r,i)=><div key={i} style={{fontSize:12,color:C.text,padding:"6px 0",borderBottom:i<SF_EXCEPTIONS.flexible.length-1?`1px solid ${C.surfaceD}`:"none",lineHeight:1.5}}>· {r}</div>)}
+        <div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`,borderTop:`3px solid ${C.oak}`}}>
+          <div style={{fontSize:10,fontWeight:700,color:C.oak,letterSpacing:"1.2px",marginBottom:6}}>FLEXIBLE — CONTROLLED ADAPTATION</div>
+          <div style={{fontSize:11,color:C.textS,marginBottom:14,lineHeight:1.5}}>Open to local adaptation within the concept logic — always reviewed.</div>
+          {SF_EXCEPTIONS.flexible.map((r,i)=><div key={i} style={{fontSize:12,color:C.text,padding:"7px 0",borderTop:`1px solid ${C.surfaceD}`,lineHeight:1.5}}>· {r}</div>)}
         </div>
       </div>
-      <div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`,marginBottom:24}}>
-        <div style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:"1px",marginBottom:18}}>Approval process</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16}}>
-          {SF_EXCEPTIONS.process.map(p=><div key={p.step} style={{position:"relative"}}>
-            <div style={{width:32,height:32,borderRadius:"50%",background:C.oak,color:C.white,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:600,marginBottom:10}}>{p.step}</div>
-            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>{p.title}{p.review&&<ReviewPill/>}</div>
-            <div style={{fontSize:11,color:C.textS,lineHeight:1.5}}>{p.body}</div>
+      <div style={{background:C.white,borderRadius:8,padding:28,border:`1px solid ${C.surfaceD}`,marginBottom:16}}>
+        <div style={{fontSize:11,fontWeight:700,color:C.text,textTransform:"uppercase",letterSpacing:"1.2px",marginBottom:4}}>Approval process</div>
+        <div style={{fontSize:11,color:C.textS,marginBottom:22,lineHeight:1.5}}>Every deviation follows the same four steps. No shortcuts.</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:24,position:"relative"}}>
+          {SF_EXCEPTIONS.process.map((p,idx)=><div key={p.step} style={{position:"relative"}}>
+            {idx<SF_EXCEPTIONS.process.length-1&&<div style={{position:"absolute",top:14,left:40,right:-24,height:1,background:C.surfaceD}}/>}
+            <div style={{width:28,height:28,borderRadius:"50%",background:C.oak,color:C.white,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:600,marginBottom:12,position:"relative",zIndex:1}}>{p.step}</div>
+            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>{p.title}</div>
+            <div style={{fontSize:11,color:C.textS,lineHeight:1.55}}>{p.body}</div>
           </div>)}
         </div>
       </div>
+      {SF_EXCEPTIONS.callout&&<div style={{padding:"16px 22px",background:C.black,color:C.white,borderRadius:8,marginBottom:24,display:"flex",alignItems:"center",gap:14}}>
+        <div style={{fontSize:9,fontWeight:700,color:C.oak,letterSpacing:"1.5px",textTransform:"uppercase",borderRight:`1px solid ${C.steelD}`,paddingRight:14}}>Rule</div>
+        <div style={{fontSize:13,fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",letterSpacing:".3px"}}>{SF_EXCEPTIONS.callout}</div>
+      </div>}
 
     </div>
   </div>;
