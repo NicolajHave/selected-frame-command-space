@@ -885,27 +885,32 @@ const StandardsPage=()=>{
       {/* FIXTURES */}
       <SectionHeader id="fixtures" eyebrow="05" title="Fixtures & Modules" intro={SF_FIXTURES.intro}/>
       {SF_FIXTURES.meta&&<div style={{fontSize:11,color:C.textS,fontStyle:"italic",marginBottom:20}}>{SF_FIXTURES.meta}</div>}
-      <div style={{marginBottom:48}}>
-        {SF_FIXTURES.categories.map((cat,ci)=><div key={ci} style={{marginBottom:32}}>
-          <div style={{display:"flex",alignItems:"baseline",gap:12,marginBottom:16,paddingBottom:10,borderBottom:`1px solid ${C.surfaceD}`}}>
-            <div style={{fontSize:20,fontWeight:400,fontFamily:"'Cormorant Garamond',serif",color:C.text}}>{cat.name}</div>
-            <div style={{fontSize:10,color:C.textS,fontFamily:"'DM Mono',monospace"}}>{cat.items.length} {cat.items.length===1?"item":"items"}</div>
+      <div style={{display:"flex",flexDirection:"column",gap:14,marginBottom:48}}>
+        {SF_FIXTURES.categories.map((cat,ci)=><details key={ci} style={{background:C.white,borderRadius:8,border:`1px solid ${C.surfaceD}`,overflow:"hidden"}}>
+          <summary style={{cursor:"pointer",padding:"18px 24px",listStyle:"none",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{display:"flex",alignItems:"baseline",gap:12}}>
+              <div style={{fontSize:15,fontWeight:500,color:C.text}}>{cat.name}</div>
+              <div style={{fontSize:10,color:C.textS,fontFamily:"'DM Mono',monospace"}}>{cat.items.length} {cat.items.length===1?"item":"items"}</div>
+            </div>
+            <div style={{fontSize:14,color:C.textS}}>+</div>
+          </summary>
+          <div style={{padding:"0 24px 24px"}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))",gap:14,borderTop:`1px solid ${C.surfaceD}`,paddingTop:18}}>
+              {cat.items.map((it,i)=><div key={i} style={{background:C.white,borderRadius:8,border:`1px solid ${C.surfaceD}`,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+                <div style={{aspectRatio:"1 / 1",background:C.surface,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
+                  {it.image?<img src={it.image} alt={it.name} style={{width:"100%",height:"100%",objectFit:"contain"}}/>:<div style={{fontSize:10,color:C.textS,textTransform:"uppercase",letterSpacing:"1px"}}>No image</div>}
+                </div>
+                <div style={{padding:"12px 14px 14px",borderTop:`1px solid ${C.surfaceD}`}}>
+                  <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:C.textS,marginBottom:4}}>{it.code}</div>
+                  <div style={{fontSize:13,fontWeight:500,color:C.text,marginBottom:8,lineHeight:1.3,minHeight:34}}>{it.name}</div>
+                  <div style={{fontSize:10,color:C.textS,fontFamily:"'DM Mono',monospace",lineHeight:1.5,marginBottom:4}}>{it.dims}</div>
+                  <div style={{fontSize:10,color:C.textS,marginBottom:it.hangers?6:0}}>{it.material}</div>
+                  {it.hangers&&<div style={{display:"inline-block",fontSize:10,fontWeight:600,color:C.oak,background:C.oak+"15",padding:"2px 8px",borderRadius:3,marginTop:4}}>{it.hangers} hangers</div>}
+                </div>
+              </div>)}
+            </div>
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))",gap:14}}>
-            {cat.items.map((it,i)=><div key={i} style={{background:C.white,borderRadius:8,border:`1px solid ${C.surfaceD}`,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-              <div style={{aspectRatio:"1 / 1",background:C.surface,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
-                {it.image?<img src={it.image} alt={it.name} style={{width:"100%",height:"100%",objectFit:"contain"}}/>:<div style={{fontSize:10,color:C.textS,textTransform:"uppercase",letterSpacing:"1px"}}>No image</div>}
-              </div>
-              <div style={{padding:"12px 14px 14px",borderTop:`1px solid ${C.surfaceD}`}}>
-                <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:C.textS,marginBottom:4}}>{it.code}</div>
-                <div style={{fontSize:13,fontWeight:500,color:C.text,marginBottom:8,lineHeight:1.3,minHeight:34}}>{it.name}</div>
-                <div style={{fontSize:10,color:C.textS,fontFamily:"'DM Mono',monospace",lineHeight:1.5,marginBottom:4}}>{it.dims}</div>
-                <div style={{fontSize:10,color:C.textS,marginBottom:it.hangers?6:0}}>{it.material}</div>
-                {it.hangers&&<div style={{display:"inline-block",fontSize:10,fontWeight:600,color:C.oak,background:C.oak+"15",padding:"2px 8px",borderRadius:3,marginTop:4}}>{it.hangers} hangers</div>}
-              </div>
-            </div>)}
-          </div>
-        </div>)}
+        </details>)}
       </div>
 
       {/* MERCHANDISING */}
@@ -929,34 +934,39 @@ const StandardsPage=()=>{
 
       {/* PLAYBOOKS */}
       <SectionHeader id="playbooks" eyebrow="07" title="Store Size Playbooks" intro={SF_PLAYBOOKS.intro}/>
-      <div style={{display:"flex",flexDirection:"column",gap:18,marginBottom:48}}>
-        {SF_PLAYBOOKS.sizes.map((s,i)=><div key={i} style={{background:C.white,borderRadius:8,padding:28,border:`1px solid ${C.surfaceD}`,display:"grid",gridTemplateColumns:"180px 1fr",gap:32}}>
-          <div style={{borderRight:`1px solid ${C.surfaceD}`,paddingRight:24}}>
-            <div style={{fontSize:48,fontWeight:300,fontFamily:"'Cormorant Garamond',serif",color:C.text,lineHeight:1}}>{s.sqm}<span style={{fontSize:18,color:C.textS}}> m²</span></div>
-            <div style={{fontSize:11,color:C.oak,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase",marginTop:8,lineHeight:1.4}}>{s.name}</div>
-          </div>
-          <div>
-            <div style={{fontSize:13,color:C.text,lineHeight:1.6,marginBottom:20}}>{s.description}</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"18px 24px",marginBottom:18}}>
-              <div>
-                <div style={{fontSize:9,fontWeight:700,color:C.textS,textTransform:"uppercase",letterSpacing:"1px",marginBottom:8}}>Best used when</div>
-                <ul style={{margin:0,padding:0,listStyle:"none"}}>{s.bestUsedWhen.map((x,j)=><li key={j} style={{fontSize:12,color:C.text,lineHeight:1.55,paddingLeft:12,position:"relative",marginBottom:3}}><span style={{position:"absolute",left:0,color:C.textS}}>·</span>{x}</li>)}</ul>
+      <div style={{display:"flex",flexDirection:"column",gap:14,marginBottom:48}}>
+        {SF_PLAYBOOKS.sizes.map((s,i)=><details key={i} style={{background:C.white,borderRadius:8,border:`1px solid ${C.surfaceD}`,overflow:"hidden"}}>
+          <summary style={{cursor:"pointer",padding:"18px 24px",listStyle:"none",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{display:"flex",alignItems:"baseline",gap:16}}>
+              <div style={{fontSize:28,fontWeight:300,fontFamily:"'Cormorant Garamond',serif",color:C.text,lineHeight:1}}>{s.sqm}<span style={{fontSize:13,color:C.textS}}> m²</span></div>
+              <div style={{fontSize:11,color:C.oak,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase"}}>{s.name}</div>
+            </div>
+            <div style={{fontSize:14,color:C.textS}}>+</div>
+          </summary>
+          <div style={{padding:"0 24px 24px"}}>
+            <div style={{borderTop:`1px solid ${C.surfaceD}`,paddingTop:18}}>
+              <div style={{fontSize:13,color:C.text,lineHeight:1.6,marginBottom:20}}>{s.description}</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"18px 24px",marginBottom:18}}>
+                <div>
+                  <div style={{fontSize:9,fontWeight:700,color:C.textS,textTransform:"uppercase",letterSpacing:"1px",marginBottom:8}}>Best used when</div>
+                  <ul style={{margin:0,padding:0,listStyle:"none"}}>{s.bestUsedWhen.map((x,j)=><li key={j} style={{fontSize:12,color:C.text,lineHeight:1.55,paddingLeft:12,position:"relative",marginBottom:3}}><span style={{position:"absolute",left:0,color:C.textS}}>·</span>{x}</li>)}</ul>
+                </div>
+                <div>
+                  <div style={{fontSize:9,fontWeight:700,color:C.textS,textTransform:"uppercase",letterSpacing:"1px",marginBottom:8}}>Key logic</div>
+                  <ul style={{margin:0,padding:0,listStyle:"none"}}>{s.keyLogic.map((x,j)=><li key={j} style={{fontSize:12,color:C.text,lineHeight:1.55,paddingLeft:12,position:"relative",marginBottom:3}}><span style={{position:"absolute",left:0,color:C.textS}}>·</span>{x}</li>)}</ul>
+                </div>
               </div>
-              <div>
-                <div style={{fontSize:9,fontWeight:700,color:C.textS,textTransform:"uppercase",letterSpacing:"1px",marginBottom:8}}>Key logic</div>
-                <ul style={{margin:0,padding:0,listStyle:"none"}}>{s.keyLogic.map((x,j)=><li key={j} style={{fontSize:12,color:C.text,lineHeight:1.55,paddingLeft:12,position:"relative",marginBottom:3}}><span style={{position:"absolute",left:0,color:C.textS}}>·</span>{x}</li>)}</ul>
+              <div style={{marginBottom:18}}>
+                <div style={{fontSize:9,fontWeight:700,color:C.nogo,textTransform:"uppercase",letterSpacing:"1px",marginBottom:8}}>Avoid</div>
+                <ul style={{margin:0,padding:0,listStyle:"none"}}>{s.avoid.map((x,j)=><li key={j} style={{fontSize:12,color:C.text,lineHeight:1.55,paddingLeft:12,position:"relative",marginBottom:3}}><span style={{position:"absolute",left:0,color:C.textS}}>·</span>{x}</li>)}</ul>
+              </div>
+              <div style={{padding:"12px 16px",background:C.surface,borderLeft:`3px solid ${C.oak}`,borderRadius:4}}>
+                <div style={{fontSize:9,fontWeight:700,color:C.oak,textTransform:"uppercase",letterSpacing:"1px",marginBottom:6}}>Commercial role</div>
+                <div style={{fontSize:12,color:C.text,lineHeight:1.6,fontStyle:"italic"}}>{s.commercialRole}</div>
               </div>
             </div>
-            <div style={{marginBottom:18}}>
-              <div style={{fontSize:9,fontWeight:700,color:C.nogo,textTransform:"uppercase",letterSpacing:"1px",marginBottom:8}}>Avoid</div>
-              <ul style={{margin:0,padding:0,listStyle:"none"}}>{s.avoid.map((x,j)=><li key={j} style={{fontSize:12,color:C.text,lineHeight:1.55,paddingLeft:12,position:"relative",marginBottom:3}}><span style={{position:"absolute",left:0,color:C.textS}}>·</span>{x}</li>)}</ul>
-            </div>
-            <div style={{padding:"12px 16px",background:C.surface,borderLeft:`3px solid ${C.oak}`,borderRadius:4}}>
-              <div style={{fontSize:9,fontWeight:700,color:C.oak,textTransform:"uppercase",letterSpacing:"1px",marginBottom:6}}>Commercial role</div>
-              <div style={{fontSize:12,color:C.text,lineHeight:1.6,fontStyle:"italic"}}>{s.commercialRole}</div>
-            </div>
           </div>
-        </div>)}
+        </details>)}
       </div>
 
       {/* EXCEPTIONS */}
