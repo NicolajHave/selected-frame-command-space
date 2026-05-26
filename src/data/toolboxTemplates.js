@@ -95,4 +95,127 @@ Med venlig hilsen,`,
       },
     },
   },
+  {
+    id: "one-month-prior-installation-alignment",
+    title: "One-Month Prior Installation Alignment",
+    description:
+      "Email template for final practical alignment with the partner approximately one month before Selected Frame delivery and installation.",
+    category: "partner-emails",
+    languages: {
+      en: {
+        subject: "Selected Frame — Final Installation Alignment: [Store / City]",
+        body: `Dear [Partner Name],
+
+We are now approaching the delivery and installation of the SELECTED Frame setup in [Store / City].
+
+As we are now approximately one month prior to installation, we would like to make a final alignment to ensure that everything is ready on site and that we have all practical details confirmed.
+
+Please find attached the final floorplan for reference.
+
+1. Key Project Dates
+
+Mounting / installation date: [Date]
+Estimated delivery time: [Time]
+Estimated installation duration: [Duration / see attached installation plan]
+Merchandising date: [Date]
+Opening date: [Date]
+
+Please confirm that the above dates are aligned with your internal planning.
+
+2. Delivery & Installation Details
+
+The installation will include:
+
+• Delivery of SELECTED Frame furniture and fixtures
+• Assembly and installation of the shopfit elements
+• Installation of rails, racks and related fixtures
+• Final merchandising and styling according to SELECTED guidelines
+
+Number of installers on site: [Number of people]
+Additional SELECTED / partner team members on site: [Names / roles if relevant]
+
+Please ensure that access is granted upon arrival and that the installation area is available from the agreed time.
+
+3. Site Readiness Requirements
+
+To ensure a smooth installation, we kindly ask you to confirm that the following will be completed prior to our arrival:
+
+• The space is fully cleared of existing fixtures, stock and materials
+• Walls are finished and painted according to the agreed colour specification
+• Flooring is completed and protected if required
+• Electrical work is completed according to the approved plan
+• Power outlets are installed, tested and ready for use
+• Internet access is available for digital screens, if applicable
+• Any required permissions, access approvals or mall/store regulations have been handled internally
+
+If any of the above is not finalised, or if there is anything we need to be aware of, please inform us as soon as possible.
+
+4. Access & Logistics
+
+Please confirm the following practical details:
+
+• Delivery address: [Address]
+• Preferred unloading point: [Loading zone / shop entrance / goods reception]
+• Earliest possible unloading time: [Time]
+• Any specific access requirements or time restrictions
+• Whether a pallet lifter or unloading equipment is available on site
+• Elevator access and maximum load capacity, if applicable
+• Parking arrangements for the installation team
+• Security clearance or check-in procedure, if required
+
+5. Digital Screens
+
+If digital screens are included in the setup, please confirm:
+
+• Power supply is available at the agreed screen position
+• WiFi or LAN access is available
+• Network access can be provided during installation
+• Any local IT restrictions or approval processes are clarified in advance
+
+Our screen content is managed centrally by SELECTED HQ. Once connected, no daily manual operation should be required.
+
+6. Conditions & On-site Responsibilities
+
+To avoid any misunderstandings, please note the following conditions:
+
+• The installation area must be ready and accessible at the agreed time
+• Any delays caused by unfinished site preparation may affect the installation timeline
+• Any additional on-site work not included in the agreed scope must be aligned separately
+• Local requirements, restrictions or changes must be communicated before installation
+
+Please also confirm whether:
+
+• Professional cleaning is scheduled after installation
+• Waste disposal is handled locally, or whether our team should remove packaging
+• There are any local rules regarding noise, working hours or after-hours installation
+
+7. Sign-off
+
+Please confirm who will be responsible for signing off the completed installation on site:
+
+Name: [Name]
+Role: [Role]
+Phone: [Phone]
+Email: [Email]
+
+8. Guidelines & Training Material
+
+For reference, please find the relevant links below:
+
+VM Guiding Principles: [Insert link]
+Sales Training Material: [Insert link]
+
+These materials should be shared with the relevant local store team before opening to ensure a strong and consistent launch.
+
+If there are any deviations, uncertainties or open questions, it is important that we address them in advance.
+
+Please confirm the above details at your earliest convenience, so we can move forward with a fully aligned installation plan.
+
+We look forward to a successful installation and opening.
+
+Best regards,
+Nicolaj`,
+      },
+    },
+  },
 ];
