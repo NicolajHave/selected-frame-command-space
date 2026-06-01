@@ -83,9 +83,26 @@ function TemplateCard({ template }) {
   const [lang, setLang] = useState(available[0]?.code || "en");
   const variant = template.languages[lang];
   const categoryLabel = CATEGORIES.find((c) => c.id === template.category)?.label || template.category;
+  const attachments = template.attachments || [];
 
   const fullText = `${variant.subject}\n\n${variant.body}`;
   const mailto = `mailto:?subject=${encodeURIComponent(variant.subject)}&body=${encodeURIComponent(variant.body)}`;
+
+  // mailto: cannot carry attachments (RFC limitation). When attachments exist we
+  // trigger their download in the same click so the user can drag them into the
+  // composer that Open-in-email opens.
+  const handleOpenInEmail = (e) => {
+    if (attachments.length === 0) return;
+    attachments.forEach((a) => {
+      const link = document.createElement("a");
+      link.href = a.url;
+      link.download = a.filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    });
+    // Let the anchor's default action (window.location = mailto:) run.
+  };
 
   return (
     <div style={{ background: C.white, border: `1px solid ${C.surfaceD}`, borderRadius: 10, overflow: "hidden" }}>
@@ -106,17 +123,19 @@ function TemplateCard({ template }) {
                 <button
                   key={l.code}
                   onClick={() => setLang(l.code)}
+                  title={l.label}
                   style={{
                     fontSize: 11,
                     fontWeight: 600,
-                    padding: "6px 12px",
+                    padding: "6px 10px",
                     border: "none",
                     cursor: "pointer",
                     background: lang === l.code ? C.black : C.white,
                     color: lang === l.code ? C.white : C.textS,
+                    letterSpacing: ".5px",
                   }}
                 >
-                  {l.label}
+                  {l.short || l.code.toUpperCase()}
                 </button>
               ))}
             </div>
@@ -157,14 +176,53 @@ function TemplateCard({ template }) {
           </div>
         </div>
 
+        {attachments.length > 0 && (
+          <div style={{ marginTop: 18 }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: C.textS, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 8 }}>
+              Attachment{attachments.length > 1 ? "s" : ""}
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {attachments.map((a) => (
+                <a
+                  key={a.url}
+                  href={a.url}
+                  download={a.filename}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    fontSize: 12,
+                    color: C.text,
+                    background: C.white,
+                    border: `1px solid ${C.surfaceD}`,
+                    borderRadius: 6,
+                    padding: "8px 12px",
+                    textDecoration: "none",
+                  }}
+                >
+                  <span style={{ fontSize: 10, fontWeight: 700, color: C.oak, letterSpacing: ".5px" }}>PDF</span>
+                  <span style={{ fontWeight: 500 }}>{a.label}</span>
+                  <span style={{ fontSize: 11, color: C.textS }}>Download</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div style={{ display: "flex", gap: 10, marginTop: 18, alignItems: "center", flexWrap: "wrap" }}>
           <CopyButton label="Copy full email" getText={() => fullText} variant="solid" />
           <a
             href={mailto}
+            onClick={handleOpenInEmail}
             style={{ fontSize: 12, fontWeight: 500, padding: "7px 14px", borderRadius: 6, border: `1px solid ${C.surfaceD}`, background: C.white, color: C.text, textDecoration: "none" }}
           >
             Open in email
           </a>
+          {attachments.length > 0 && (
+            <div style={{ fontSize: 11, color: C.textS, fontStyle: "italic" }}>
+              Attachment{attachments.length > 1 ? "s" : ""} will download — drag into your email after it opens.
+            </div>
+          )}
         </div>
       </div>
     </div>
