@@ -22,13 +22,32 @@ export function isConfigured() {
 export function getSupabase() {
   if (!isConfigured()) throw new Error('SUPABASE_NOT_CONFIGURED');
   if (!client) {
-    const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const url = sanitiseSupabaseUrl(
+      process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,
+    );
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     client = createClient(url, key, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
   }
   return client;
+}
+
+/**
+ * Defensively normalise SUPABASE_URL. Supabase shows the URL with no trailing
+ * slash and no path; if a copy-paste accidentally includes either (a trailing
+ * `/`, or `/rest/v1`), the underlying client constructs malformed URLs and the
+ * gateway responds with "Invalid path specified in request URL" for every
+ * query. Strip both before passing the URL to createClient.
+ */
+export function sanitiseSupabaseUrl(raw) {
+  if (!raw) return raw;
+  let u = String(raw).trim();
+  // Drop a copy-pasted `/rest/v1` suffix.
+  u = u.replace(/\/rest\/v1\/?$/, '');
+  // Drop any trailing slash.
+  u = u.replace(/\/+$/, '');
+  return u;
 }
 
 /**
