@@ -3,6 +3,8 @@ import { SECTIONS as SF_SECTIONS, INTRO as SF_INTRO, DNA as SF_DNA, NON_NEGOTIAB
 import DraftStudioPage from "./draft-studio/DraftStudioPage";
 import ToolboxPage from "./toolbox/ToolboxPage";
 import ProjectIntakePage from "./project-intake/ProjectIntakePage";
+import ExternalFoldersPage from "./external-project-folders/ExternalFoldersPage";
+import { ExternalFolderCard, RecentlyOpenedFolders } from "./external-project-folders/ui";
 import { NEWS } from "../data/news";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
@@ -106,7 +108,50 @@ const OverviewPage=({projects,setPage,setDetail})=>{const active=projects.filter
   </div></div>};
 
 // ─── PROJECTS ─────────────────────────────────────────────
-const ProjectsPage=({projects,detail,setDetail})=>{
+// ─── EXTERNAL FOLDER (project-detail integration) ─────────────────────────
+// Lazy fetch of the project's external folder so we don't block the detail
+// view when the password gate hasn't been unlocked. 401/503 are silent.
+const ProjectDetailExternalFolder=({project,setPage,setExternalFolderTarget})=>{
+  const [folder,setFolder]=useState(null);
+  const [loaded,setLoaded]=useState(false);
+  const [locked,setLocked]=useState(false);
+  const [dbConfigured,setDbConfigured]=useState(true);
+  const refresh=useCallback(async()=>{
+    if(!project?.gid){setLoaded(true);return;}
+    try{
+      const r=await fetch(`/api/external-folders/by-project/${project.gid}`);
+      if(r.status===401){setLocked(true);setLoaded(true);return;}
+      if(r.status===503){setDbConfigured(false);setLoaded(true);return;}
+      const d=await r.json();
+      if(d.dbConfigured===false)setDbConfigured(false);
+      setFolder(d.folder||null);
+    }catch(e){}finally{setLoaded(true);}
+  },[project?.gid]);
+  useEffect(()=>{refresh();},[refresh]);
+  if(!loaded)return null;
+  if(locked){
+    return <div style={{background:C.white,border:`1px solid ${C.surfaceD}`,borderRadius:10,padding:22,marginTop:20}}>
+      <div style={{fontSize:9,fontWeight:700,color:C.oak,letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:8}}>External Project Folder</div>
+      <div style={{fontSize:13,color:C.textS,lineHeight:1.6}}>Restricted area. Open External Folders from the sidebar to unlock with the shared password.</div>
+      <button onClick={()=>setPage("external-folders")} style={{marginTop:12,padding:"10px 18px",background:C.black,color:C.white,border:"none",borderRadius:6,cursor:"pointer",fontSize:13,fontWeight:500}}>Unlock</button>
+    </div>;
+  }
+  return <div style={{marginTop:20}}><ExternalFolderCard folder={folder} dbConfigured={dbConfigured} asanaProjectId={project.gid} projectMeta={{name:project.name,type:project.type,region:project.region,dueOn:project.dueOn,completed:project.completed,completedAt:project.completedAt}} onCreated={(f)=>setFolder(f)} onOpen={(f)=>{setExternalFolderTarget(f.id);setPage("external-folders");}}/></div>;
+};
+
+const ProjectsRecentlyOpened=({setPage,setExternalFolderTarget})=>{
+  const [folders,setFolders]=useState([]);
+  useEffect(()=>{
+    fetch("/api/external-folders/recent")
+      .then(r=>r.ok?r.json():{folders:[]})
+      .then(d=>setFolders(d.folders||[]))
+      .catch(()=>setFolders([]));
+  },[]);
+  if(!folders.length)return null;
+  return <RecentlyOpenedFolders folders={folders} onOpen={(f)=>{setExternalFolderTarget(f.id);setPage("external-folders");}}/>;
+};
+
+const ProjectsPage=({projects,detail,setDetail,setPage,setExternalFolderTarget})=>{
   const [view,setView]=useState("active"); // "active" | "archived"
   const [filter,setFilter]=useState({region:"all",sex:"all",search:""});
 
@@ -137,10 +182,11 @@ const ProjectsPage=({projects,detail,setDetail})=>{
   const REGIONS=["NORTH","DACH","SOUTH","BENELUX & ROW"];
   const SEXES=["MENS","WOMENS"];
 
-  if(detail){const ph=PHASES.find(x=>x.num===detail.phaseNum);return<div><button onClick={()=>setDetail(null)} style={{background:"none",border:"none",color:C.oak,fontSize:13,cursor:"pointer",padding:0,marginBottom:20,fontWeight:500}}>← Back</button><div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:24}}><div><div style={{background:C.white,borderRadius:8,padding:32,border:`1px solid ${C.surfaceD}`,marginBottom:20}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:20}}><div><h2 style={{fontSize:26,fontWeight:400,color:C.text,fontFamily:"'Cormorant Garamond',serif",margin:"0 0 6px"}}>{detail.name}</h2><div style={{fontSize:12,color:C.textS}}>{detail.type}</div></div><Badge variant={detail.completed?"success":"phase0"}>{detail.completed?"Completed":"Active"}</Badge></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:20,fontSize:13}}>{[["Phase",detail.completed?"Completed":`Ph. ${detail.phaseNum} – ${ph?.name||"?"}`],["Type",detail.type],["Sex",detail.sex||"—"],["Region",detail.region||"—"],["Due",fmtDate(detail.dueOn)],["Created",fmtDate(detail.created)]].map(([l,v])=><div key={l}><div style={{color:C.textS,fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>{l}</div><div style={{color:C.text,fontWeight:500}}>{v}</div></div>)}</div></div>{!detail.completed&&ph&&<div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}><div style={{fontSize:14,fontWeight:600,marginBottom:16}}>Phase Progression</div><div style={{display:"flex",gap:3}}>{PHASES.map(x=><div key={x.num} style={{flex:1,height:8,borderRadius:4,background:x.num<=detail.phaseNum?x.color:C.surfaceD}}/>)}</div></div>}</div><div>{!detail.completed&&ph&&<div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`,marginBottom:20}}><div style={{fontSize:14,fontWeight:600,marginBottom:12}}>Current Phase</div><div style={{background:ph.color+"18",borderRadius:8,padding:16,borderLeft:`4px solid ${ph.color}`}}><div style={{fontSize:15,fontWeight:600}}>{ph.name}</div><div style={{fontSize:12,color:C.textS,marginTop:6}}>{ph.desc}</div></div></div>}<a href={detail.url} target="_blank" rel="noopener noreferrer" style={{display:"block",textAlign:"center",background:C.black,color:C.white,padding:12,borderRadius:8,fontSize:13,fontWeight:500,textDecoration:"none"}}>Open in Asana →</a></div></div></div>}
+  if(detail){const ph=PHASES.find(x=>x.num===detail.phaseNum);return<div><button onClick={()=>setDetail(null)} style={{background:"none",border:"none",color:C.oak,fontSize:13,cursor:"pointer",padding:0,marginBottom:20,fontWeight:500}}>← Back</button><div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:24}}><div><div style={{background:C.white,borderRadius:8,padding:32,border:`1px solid ${C.surfaceD}`,marginBottom:20}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:20}}><div><h2 style={{fontSize:26,fontWeight:400,color:C.text,fontFamily:"'Cormorant Garamond',serif",margin:"0 0 6px"}}>{detail.name}</h2><div style={{fontSize:12,color:C.textS}}>{detail.type}</div></div><Badge variant={detail.completed?"success":"phase0"}>{detail.completed?"Completed":"Active"}</Badge></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:20,fontSize:13}}>{[["Phase",detail.completed?"Completed":`Ph. ${detail.phaseNum} – ${ph?.name||"?"}`],["Type",detail.type],["Sex",detail.sex||"—"],["Region",detail.region||"—"],["Due",fmtDate(detail.dueOn)],["Created",fmtDate(detail.created)]].map(([l,v])=><div key={l}><div style={{color:C.textS,fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>{l}</div><div style={{color:C.text,fontWeight:500}}>{v}</div></div>)}</div></div>{!detail.completed&&ph&&<div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}><div style={{fontSize:14,fontWeight:600,marginBottom:16}}>Phase Progression</div><div style={{display:"flex",gap:3}}>{PHASES.map(x=><div key={x.num} style={{flex:1,height:8,borderRadius:4,background:x.num<=detail.phaseNum?x.color:C.surfaceD}}/>)}</div></div>}</div><div>{!detail.completed&&ph&&<div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`,marginBottom:20}}><div style={{fontSize:14,fontWeight:600,marginBottom:12}}>Current Phase</div><div style={{background:ph.color+"18",borderRadius:8,padding:16,borderLeft:`4px solid ${ph.color}`}}><div style={{fontSize:15,fontWeight:600}}>{ph.name}</div><div style={{fontSize:12,color:C.textS,marginTop:6}}>{ph.desc}</div></div></div>}<a href={detail.url} target="_blank" rel="noopener noreferrer" style={{display:"block",textAlign:"center",background:C.black,color:C.white,padding:12,borderRadius:8,fontSize:13,fontWeight:500,textDecoration:"none"}}>Open in Asana →</a><ProjectDetailExternalFolder project={detail} setPage={setPage} setExternalFolderTarget={setExternalFolderTarget}/></div></div></div>}
 
   return<div>
     <Title sub={`${projects.length} projects total`}>Projects</Title>
+    <ProjectsRecentlyOpened setPage={setPage} setExternalFolderTarget={setExternalFolderTarget}/>
 
     {/* KPI counters */}
     <div style={{display:"flex",gap:16,marginBottom:24,flexWrap:"wrap"}}>
@@ -811,7 +857,19 @@ const FlowPage=({projects=[],setPage})=>{
     </div>
   </div>;
 };
-const InstalledPage=({projects})=>{const c=projects.filter(p=>p.completed);return<div><Title sub="Completed">Installed Base</Title><div style={{display:"flex",gap:16,marginBottom:24}}><KPI label="Total" value={c.length}/></div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>{c.map(p=><div key={p.gid} style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`,borderTop:`4px solid ${C.accent}`}}><div style={{fontSize:16,fontWeight:400,fontFamily:"'Cormorant Garamond',serif",marginBottom:8}}>{p.name}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:12}}>{[["Type",p.type],["Completed",fmtDate(p.completedAt)]].map(([l,v])=><div key={l}><div style={{color:C.textS,fontSize:10,fontWeight:600,textTransform:"uppercase"}}>{l}</div><div style={{fontWeight:500}}>{v}</div></div>)}</div><a href={p.url} target="_blank" rel="noopener noreferrer" style={{display:"inline-block",marginTop:12,fontSize:11,color:C.oak,textDecoration:"none",fontWeight:500}}>Details →</a></div>)}</div></div>};
+const InstalledExternalFolderLink=({asanaProjectId,setPage,setExternalFolderTarget})=>{
+  const [folder,setFolder]=useState(null);
+  useEffect(()=>{
+    if(!asanaProjectId)return;
+    fetch(`/api/external-folders/by-project/${asanaProjectId}`)
+      .then(r=>r.ok?r.json():{folder:null})
+      .then(d=>setFolder(d.folder||null))
+      .catch(()=>{});
+  },[asanaProjectId]);
+  if(!folder)return null;
+  return <button onClick={()=>{setExternalFolderTarget(folder.id);setPage("external-folders");}} style={{marginLeft:12,fontSize:11,color:C.oak,background:"none",border:"none",cursor:"pointer",fontWeight:500,padding:0}}>Open External Project Folder →</button>;
+};
+const InstalledPage=({projects,setPage,setExternalFolderTarget})=>{const c=projects.filter(p=>p.completed);return<div><Title sub="Completed">Installed Base</Title><div style={{display:"flex",gap:16,marginBottom:24}}><KPI label="Total" value={c.length}/></div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>{c.map(p=><div key={p.gid} style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`,borderTop:`4px solid ${C.accent}`}}><div style={{fontSize:16,fontWeight:400,fontFamily:"'Cormorant Garamond',serif",marginBottom:8}}>{p.name}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:12}}>{[["Type",p.type],["Completed",fmtDate(p.completedAt)]].map(([l,v])=><div key={l}><div style={{color:C.textS,fontSize:10,fontWeight:600,textTransform:"uppercase"}}>{l}</div><div style={{fontWeight:500}}>{v}</div></div>)}</div><div style={{marginTop:12,display:"flex",flexWrap:"wrap",alignItems:"center"}}><a href={p.url} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:C.oak,textDecoration:"none",fontWeight:500}}>Details →</a><InstalledExternalFolderLink asanaProjectId={p.gid} setPage={setPage} setExternalFolderTarget={setExternalFolderTarget}/></div></div>)}</div></div>};
 const ReviewPill=()=><span style={{fontSize:9,fontWeight:700,color:C.review,background:"#FDF3E0",padding:"2px 6px",borderRadius:3,letterSpacing:".5px",marginLeft:8,verticalAlign:"middle",border:`1px solid ${C.review}33`}}>REVIEW</span>;
 
 const SectionHeader=({eyebrow,title,intro,id})=><div id={id} style={{paddingTop:24,marginBottom:24,scrollMarginTop:24}}>
@@ -1122,22 +1180,23 @@ const AdminPage=({projects})=>{
   </div>;
 };
 
-export default function Home(){const [page,setPage]=useState("overview");const [detail,setDetail]=useState(null);const [hover,setHover]=useState(null);const [projects,setProjects]=useState(FALLBACK_PROJECTS);
+export default function Home(){const [page,setPage]=useState("overview");const [detail,setDetail]=useState(null);const [hover,setHover]=useState(null);const [projects,setProjects]=useState(FALLBACK_PROJECTS);const [externalFolderTarget,setExternalFolderTarget]=useState(null);
   useEffect(()=>{const f=async()=>{try{const r=await fetch("/api/projects");if(r.ok){const d=await r.json();if(d.projects?.length>0)setProjects(d.projects)}}catch(e){}};f();const i=setInterval(f,15*60*1000);return()=>clearInterval(i)},[]);
-  const nav=[{id:"overview",label:"Overview",icon:"◈"},{id:"projects",label:"Projects",icon:"▦"},{id:"intake",label:"Project Intake",icon:"✛"},{id:"roi",label:"ROI Engine",icon:"◇"},{id:"quotation",label:"Quotation",icon:"📋"},{id:"draft",label:"Draft Studio",icon:"✎"},{id:"toolbox",label:"Toolbox",icon:"⊟"},{id:"flow",label:"Project Flow",icon:"⟳"},{id:"installed",label:"Installed Base",icon:"⊞"},{id:"standards",label:"Standards",icon:"☰"},{id:"admin",label:"Admin",icon:"⚙"}];
+  const nav=[{id:"overview",label:"Overview",icon:"◈"},{id:"projects",label:"Projects",icon:"▦"},{id:"external-folders",label:"External Folders",icon:"⊕"},{id:"intake",label:"Project Intake",icon:"✛"},{id:"roi",label:"ROI Engine",icon:"◇"},{id:"quotation",label:"Quotation",icon:"📋"},{id:"draft",label:"Draft Studio",icon:"✎"},{id:"toolbox",label:"Toolbox",icon:"⊟"},{id:"flow",label:"Project Flow",icon:"⟳"},{id:"installed",label:"Installed Base",icon:"⊞"},{id:"standards",label:"Standards",icon:"☰"},{id:"admin",label:"Admin",icon:"⚙"}];
   return<div style={{display:"flex",minHeight:"100vh",background:C.surface}}>
     <div style={{width:220,background:C.black,color:C.white,flexShrink:0,display:"flex",flexDirection:"column",padding:"28px 0",position:"sticky",top:0,height:"100vh"}}><div style={{padding:"0 24px",marginBottom:36}}><img src={LOGO_WHITE} alt="" style={{height:28,marginBottom:8}}/><div style={{fontSize:9,color:C.steel,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:4}}>Command Space</div></div><div style={{flex:1}}>{nav.map(it=><div key={it.id} style={{padding:"10px 24px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontSize:13,fontWeight:page===it.id?600:400,background:page===it.id?C.steelD+"33":hover===it.id?"rgba(255,255,255,.04)":"transparent",color:page===it.id?C.white:C.steelL,borderLeft:page===it.id?`3px solid ${C.oak}`:"3px solid transparent"}} onClick={()=>{setPage(it.id);setDetail(null)}} onMouseEnter={()=>setHover(it.id)} onMouseLeave={()=>setHover(null)}><span style={{fontSize:16,width:20,textAlign:"center",opacity:.7}}>{it.icon}</span>{it.label}</div>)}</div><div style={{padding:"16px 24px",borderTop:`1px solid ${C.steelD}33`}}><div style={{fontSize:10,color:C.steel}}>v2.9.1</div><div style={{fontSize:10,color:C.steel,marginTop:2}}>[ A frame for the business we share ]</div></div></div>
     <div style={{flex:1,overflow:"auto"}}><div style={{padding:"14px 40px",background:C.white,borderBottom:`1px solid ${C.surfaceD}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{fontSize:13,color:C.textS}}>{nav.find(n=>n.id===page)?.label}</div><div style={{fontSize:12,color:C.textS}}>{new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div></div>
       <div style={{padding:"32px 40px",maxWidth:1200}}>
         {page==="overview"&&<OverviewPage projects={projects} setPage={setPage} setDetail={setDetail}/>}
-        {page==="projects"&&<ProjectsPage projects={projects} detail={detail} setDetail={setDetail}/>}
+        {page==="projects"&&<ProjectsPage projects={projects} detail={detail} setDetail={setDetail} setPage={setPage} setExternalFolderTarget={setExternalFolderTarget}/>}
+        {page==="external-folders"&&<ExternalFoldersPage initialFolderId={externalFolderTarget} onClearInitial={()=>setExternalFolderTarget(null)}/>}
         {page==="intake"&&<ProjectIntakePage/>}
         {page==="quotation"&&<QuotationPage/>}
         {page==="draft"&&<DraftStudioPage/>}
         {page==="toolbox"&&<ToolboxPage/>}
         {page==="roi"&&<ROIPage projects={projects}/>}
         {page==="flow"&&<FlowPage projects={projects} setPage={setPage}/>}
-        {page==="installed"&&<InstalledPage projects={projects}/>}
+        {page==="installed"&&<InstalledPage projects={projects} setPage={setPage} setExternalFolderTarget={setExternalFolderTarget}/>}
         {page==="standards"&&<StandardsPage/>}
         {page==="admin"&&<AdminPage projects={projects}/>}
       </div></div></div>}
