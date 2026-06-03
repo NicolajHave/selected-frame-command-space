@@ -1,13 +1,17 @@
-// Server-side utilities for External Project Folders. Pure data layer —
-// route handlers wrap these with auth and HTTP concerns.
+// Server-side utilities for External Project Folders.
+// Pure data layer on top of Supabase. Route handlers wrap these with auth
+// and HTTP concerns.
 
 import crypto from 'node:crypto';
-import { query, ensureSchema, isConfigured } from './db';
+import { getSupabase, isConfigured } from './db';
 import { computeRetention } from './retention';
 
 export { isConfigured };
 
-/** Convert a Postgres row → camelCase object the UI consumes. */
+const FOLDERS = 'external_project_folders';
+const FILES = 'external_project_files';
+const RECENT = 'recently_opened_folders';
+
 function rowToFolder(r) {
   if (!r) return null;
   return {
@@ -37,7 +41,7 @@ function rowToFile(r) {
     fileName: r.file_name,
     originalName: r.original_name,
     fileType: r.file_type,
-    fileSize: Number(r.file_size),
+    fileSize: r.file_size != null ? Number(r.file_size) : 0,
     blobUrl: r.blob_url,
     blobPath: r.blob_path,
     uploadedAt: r.uploaded_at,
@@ -50,51 +54,71 @@ function makeSlug() {
   return crypto.randomBytes(6).toString('base64url');
 }
 
+function unwrap({ data, error }, ctx) {
+  if (error) {
+    // Postgres "relation does not exist" → make the bootstrap requirement
+    // obvious instead of leaking the raw message.
+    if (error.code === '42P01') {
+      throw new Error(
+        `Supabase tables are missing. Run supabase/schema.sql in the SQL Editor. (${ctx})`,
+      );
+    }
+    throw new Error(`${ctx}: ${error.message}`);
+  }
+  return data;
+}
+
 export async function getExternalFolderByAsanaProjectId(asanaProjectId) {
-  await ensureSchema();
-  const { rows } = await query`
-    SELECT * FROM external_project_folders WHERE asana_project_id = ${asanaProjectId} LIMIT 1
-  `;
-  return rowToFolder(rows[0]);
+  const sb = getSupabase();
+  const data = unwrap(
+    await sb.from(FOLDERS).select('*').eq('asana_project_id', asanaProjectId).maybeSingle(),
+    'getExternalFolderByAsanaProjectId',
+  );
+  return rowToFolder(data);
 }
 
 export async function getExternalFolderById(id) {
-  await ensureSchema();
-  const { rows } = await query`
-    SELECT * FROM external_project_folders WHERE id = ${id} OR folder_url_slug = ${id} LIMIT 1
-  `;
-  return rowToFolder(rows[0]);
+  const sb = getSupabase();
+  // Accept either the row id or the URL slug.
+  const data = unwrap(
+    await sb.from(FOLDERS).select('*').or(`id.eq.${id},folder_url_slug.eq.${id}`).maybeSingle(),
+    'getExternalFolderById',
+  );
+  return rowToFolder(data);
 }
 
 export async function listExternalFolders({ status, region, search } = {}) {
-  await ensureSchema();
-  // Build a dynamic filter via tagged-template chaining is awkward with
-  // @vercel/postgres; we filter in JS after fetching. Result set is small
-  // (one row per project) so this is fine for V1.
-  const { rows } = await query`SELECT * FROM external_project_folders ORDER BY due_date ASC NULLS LAST, project_name ASC`;
-  let out = rows.map(rowToFolder);
-  if (status) out = out.filter((f) => f.status === status);
-  if (region) out = out.filter((f) => f.region === region);
-  if (search) {
-    const s = search.toLowerCase();
-    out = out.filter((f) => f.projectName.toLowerCase().includes(s));
-  }
-  return out;
+  const sb = getSupabase();
+  let q = sb.from(FOLDERS).select('*').order('due_date', { ascending: true, nullsFirst: false }).order('project_name', { ascending: true });
+  if (status) q = q.eq('status', status);
+  if (region) q = q.eq('region', region);
+  if (search) q = q.ilike('project_name', `%${search}%`);
+  const data = unwrap(await q, 'listExternalFolders');
+  return data.map(rowToFolder);
 }
 
 export async function listRecentlyOpened(limit = 8) {
-  await ensureSchema();
-  const { rows } = await query`
-    SELECT f.*, r.opened_at AS recent_opened_at
-    FROM recently_opened_folders r
-    JOIN external_project_folders f ON f.id = r.folder_id
-    WHERE r.opened_at = (
-      SELECT MAX(opened_at) FROM recently_opened_folders WHERE folder_id = r.folder_id
-    )
-    ORDER BY r.opened_at DESC
-    LIMIT ${limit}
-  `;
-  return rows.map((r) => ({ ...rowToFolder(r), lastOpenedAt: r.recent_opened_at }));
+  const sb = getSupabase();
+  // We pull the most recent rows from recently_opened_folders, join folder
+  // data, then dedupe by folder in JS keeping the newest opened_at.
+  const recent = unwrap(
+    await sb
+      .from(RECENT)
+      .select('opened_at, folder_id, asana_project_id, folder:external_project_folders!inner(*)')
+      .order('opened_at', { ascending: false })
+      .limit(limit * 3),
+    'listRecentlyOpened',
+  );
+
+  const seen = new Set();
+  const out = [];
+  for (const r of recent) {
+    if (seen.has(r.folder_id)) continue;
+    seen.add(r.folder_id);
+    out.push({ ...rowToFolder(r.folder), lastOpenedAt: r.opened_at });
+    if (out.length >= limit) break;
+  }
+  return out;
 }
 
 /**
@@ -121,16 +145,24 @@ export async function createExternalFolder({
   const status = completed ? 'completed' : 'active';
   const retention = computeRetention({ status, completedAt });
 
-  await query`
-    INSERT INTO external_project_folders (
-      id, asana_project_id, project_name, project_type, region, due_date,
-      status, completed_at, retention_start_date, delete_at, blob_prefix, folder_url_slug
-    ) VALUES (
-      ${id}, ${asanaProjectId}, ${projectName}, ${projectType || null}, ${region || null},
-      ${dueDate || null}, ${status}, ${completedAt}, ${retention.retentionStartDate},
-      ${retention.deleteAt}, ${blobPrefix}, ${slug}
-    )
-  `;
+  const sb = getSupabase();
+  unwrap(
+    await sb.from(FOLDERS).insert({
+      id,
+      asana_project_id: asanaProjectId,
+      project_name: projectName,
+      project_type: projectType || null,
+      region: region || null,
+      due_date: dueDate || null,
+      status,
+      completed_at: completedAt || null,
+      retention_start_date: retention.retentionStartDate,
+      delete_at: retention.deleteAt,
+      blob_prefix: blobPrefix,
+      folder_url_slug: slug,
+    }),
+    'createExternalFolder',
+  );
   return getExternalFolderById(id);
 }
 
@@ -141,30 +173,38 @@ export async function syncProjectStatus({ asanaProjectId, completed, completedAt
   const newStatus = completed ? 'completed' : 'active';
   if (folder.status === newStatus) return folder;
   const retention = computeRetention({ status: newStatus, completedAt });
-  await query`
-    UPDATE external_project_folders
-    SET status = ${newStatus},
-        completed_at = ${completedAt || null},
-        retention_start_date = ${retention.retentionStartDate},
-        delete_at = ${retention.deleteAt}
-    WHERE id = ${folder.id}
-  `;
+  const sb = getSupabase();
+  unwrap(
+    await sb
+      .from(FOLDERS)
+      .update({
+        status: newStatus,
+        completed_at: completedAt || null,
+        retention_start_date: retention.retentionStartDate,
+        delete_at: retention.deleteAt,
+      })
+      .eq('id', folder.id),
+    'syncProjectStatus',
+  );
   return getExternalFolderById(folder.id);
 }
 
 export async function updateLastOpened(folderId) {
-  await ensureSchema();
+  const sb = getSupabase();
   const now = new Date().toISOString();
-  await query`
-    UPDATE external_project_folders SET last_opened_at = ${now} WHERE id = ${folderId}
-  `;
-  const id = crypto.randomUUID();
+  unwrap(await sb.from(FOLDERS).update({ last_opened_at: now }).eq('id', folderId), 'updateLastOpened');
+
   const folder = await getExternalFolderById(folderId);
   if (folder) {
-    await query`
-      INSERT INTO recently_opened_folders (id, folder_id, asana_project_id, opened_at)
-      VALUES (${id}, ${folder.id}, ${folder.asanaProjectId}, ${now})
-    `;
+    unwrap(
+      await sb.from(RECENT).insert({
+        id: crypto.randomUUID(),
+        folder_id: folder.id,
+        asana_project_id: folder.asanaProjectId,
+        opened_at: now,
+      }),
+      'recordRecentlyOpened',
+    );
   }
 }
 
@@ -179,46 +219,64 @@ export async function recordExternalFolderFile({
   uploadedByName = null,
   category = null,
 }) {
-  await ensureSchema();
+  const sb = getSupabase();
   const id = crypto.randomUUID();
-  await query`
-    INSERT INTO external_project_files (
-      id, folder_id, file_name, original_name, file_type, file_size,
-      blob_url, blob_path, uploaded_by_name, category
-    ) VALUES (
-      ${id}, ${folderId}, ${fileName}, ${originalName}, ${fileType}, ${fileSize},
-      ${blobUrl}, ${blobPath}, ${uploadedByName}, ${category}
-    )
-  `;
-  const { rows } = await query`SELECT * FROM external_project_files WHERE id = ${id}`;
-  return rowToFile(rows[0]);
+  unwrap(
+    await sb.from(FILES).insert({
+      id,
+      folder_id: folderId,
+      file_name: fileName,
+      original_name: originalName,
+      file_type: fileType,
+      file_size: fileSize,
+      blob_url: blobUrl,
+      blob_path: blobPath,
+      uploaded_by_name: uploadedByName,
+      category,
+    }),
+    'recordExternalFolderFile',
+  );
+  const data = unwrap(
+    await sb.from(FILES).select('*').eq('id', id).single(),
+    'recordExternalFolderFile/read',
+  );
+  return rowToFile(data);
 }
 
 export async function listExternalFolderFiles(folderId) {
-  await ensureSchema();
-  const { rows } = await query`
-    SELECT * FROM external_project_files WHERE folder_id = ${folderId} ORDER BY uploaded_at DESC
-  `;
-  return rows.map(rowToFile);
+  const sb = getSupabase();
+  const data = unwrap(
+    await sb
+      .from(FILES)
+      .select('*')
+      .eq('folder_id', folderId)
+      .order('uploaded_at', { ascending: false }),
+    'listExternalFolderFiles',
+  );
+  return data.map(rowToFile);
 }
 
 export async function deleteExternalFolderFile(fileId) {
-  await ensureSchema();
-  const { rows } = await query`SELECT * FROM external_project_files WHERE id = ${fileId}`;
-  const file = rows[0];
-  if (!file) return null;
-  await query`DELETE FROM external_project_files WHERE id = ${fileId}`;
-  return rowToFile(file);
+  const sb = getSupabase();
+  const data = unwrap(
+    await sb.from(FILES).select('*').eq('id', fileId).maybeSingle(),
+    'deleteExternalFolderFile/read',
+  );
+  if (!data) return null;
+  unwrap(await sb.from(FILES).delete().eq('id', fileId), 'deleteExternalFolderFile');
+  return rowToFile(data);
 }
 
 export async function countFilesByFolder(folderIds) {
   if (!folderIds.length) return {};
-  await ensureSchema();
-  // We do this in a single round trip rather than per-folder.
-  const { rows } = await query`
-    SELECT folder_id, COUNT(*)::int AS n FROM external_project_files GROUP BY folder_id
-  `;
+  const sb = getSupabase();
+  // PostgREST doesn't expose GROUP BY directly; we fetch only the folder_id
+  // column (cheap) and count in JS. Adequate for V1's data volume.
+  const data = unwrap(
+    await sb.from(FILES).select('folder_id').in('folder_id', folderIds),
+    'countFilesByFolder',
+  );
   const out = {};
-  for (const r of rows) out[r.folder_id] = Number(r.n);
+  for (const r of data) out[r.folder_id] = (out[r.folder_id] || 0) + 1;
   return out;
 }

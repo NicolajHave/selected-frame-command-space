@@ -3,16 +3,17 @@
 // Vercel cron POSTs Authorization: Bearer <CRON_SECRET>. We accept GET too so
 // the route can be hand-tested with curl. Logic:
 //
-//   1. For every completed folder, recompute days-left from deleteAt.
+//   1. For every completed folder, recompute days-left from delete_at.
 //   2. If <= 30 days and reminder_30_sent_at is null → send + mark sent.
-//   3. If <= 7 days  and reminder_7_sent_at  is null → send + mark sent.
-//   4. If deleteAt <= now and status is still completed → set
-//      pending_deletion, hard-delete blob objects, then set status=deleted
-//      (we keep the row so the UI can show "deleted according to policy").
+//   3. If <= 7  days and reminder_7_sent_at  is null → send + mark sent.
+//   4. If delete_at <= now and status is still completed → set
+//      pending_deletion, hard-delete blob objects + file rows, then set
+//      status=deleted (we keep the folder row so the UI can show
+//      "Deleted by retention policy").
 
 import { NextResponse } from 'next/server';
 import { del } from '@vercel/blob';
-import { query, isConfigured, ensureSchema } from '../../../../lib/external-folders/db';
+import { getSupabase, isConfigured } from '../../../../lib/external-folders/db';
 import { sendRetentionReminder } from '../../../../lib/external-folders/email';
 
 export const runtime = 'nodejs';
@@ -20,24 +21,27 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 const DAY = 24 * 60 * 60 * 1000;
+const FOLDERS = 'external_project_folders';
+const FILES = 'external_project_files';
 
 function authorized(request) {
   const expected = process.env.CRON_SECRET;
-  if (!expected) return true; // Allow local runs when no secret is set.
+  if (!expected) return true; // allow local runs when no secret is set
   const got = request.headers.get('authorization') || '';
   return got === `Bearer ${expected}`;
 }
 
 async function run() {
-  await ensureSchema();
+  const sb = getSupabase();
   const now = Date.now();
   const summary = { checked: 0, reminder30: 0, reminder7: 0, deleted: 0 };
 
-  const { rows } = await query`
-    SELECT id, project_name, status, delete_at, reminder_30_sent_at, reminder_7_sent_at, blob_prefix
-    FROM external_project_folders
-    WHERE status IN ('completed', 'pending_deletion')
-  `;
+  const { data: rows, error } = await sb
+    .from(FOLDERS)
+    .select('id, project_name, status, delete_at, reminder_30_sent_at, reminder_7_sent_at, blob_prefix')
+    .in('status', ['completed', 'pending_deletion']);
+
+  if (error) throw new Error(error.message);
 
   const reminderTo = process.env.RETENTION_REMINDER_EMAIL;
 
@@ -48,34 +52,35 @@ async function run() {
     const daysLeft = Math.ceil((deleteAtMs - now) / DAY);
 
     if (deleteAtMs <= now) {
-      // Mark pending_deletion if not already, attempt blob cleanup, then deleted.
       if (r.status !== 'pending_deletion') {
-        await query`UPDATE external_project_folders SET status = 'pending_deletion' WHERE id = ${r.id}`;
+        await sb.from(FOLDERS).update({ status: 'pending_deletion' }).eq('id', r.id);
       }
-      const { rows: files } = await query`SELECT id, blob_url FROM external_project_files WHERE folder_id = ${r.id}`;
-      for (const f of files) {
+      const { data: files } = await sb.from(FILES).select('id, blob_url').eq('folder_id', r.id);
+      for (const f of files || []) {
         try { await del(f.blob_url); } catch { /* best effort */ }
       }
-      await query`DELETE FROM external_project_files WHERE folder_id = ${r.id}`;
-      await query`UPDATE external_project_folders SET status = 'deleted' WHERE id = ${r.id}`;
+      await sb.from(FILES).delete().eq('folder_id', r.id);
+      await sb.from(FOLDERS).update({ status: 'deleted' }).eq('id', r.id);
       summary.deleted++;
       continue;
     }
 
     if (daysLeft <= 30 && !r.reminder_30_sent_at) {
-      const folder = {
-        id: r.id, projectName: r.project_name, deleteAt: r.delete_at,
-      };
-      await sendRetentionReminder({ folder, daysLeft, to: reminderTo });
-      await query`UPDATE external_project_folders SET reminder_30_sent_at = NOW() WHERE id = ${r.id}`;
+      await sendRetentionReminder({
+        folder: { id: r.id, projectName: r.project_name, deleteAt: r.delete_at },
+        daysLeft,
+        to: reminderTo,
+      });
+      await sb.from(FOLDERS).update({ reminder_30_sent_at: new Date().toISOString() }).eq('id', r.id);
       summary.reminder30++;
     }
     if (daysLeft <= 7 && !r.reminder_7_sent_at) {
-      const folder = {
-        id: r.id, projectName: r.project_name, deleteAt: r.delete_at,
-      };
-      await sendRetentionReminder({ folder, daysLeft, to: reminderTo });
-      await query`UPDATE external_project_folders SET reminder_7_sent_at = NOW() WHERE id = ${r.id}`;
+      await sendRetentionReminder({
+        folder: { id: r.id, projectName: r.project_name, deleteAt: r.delete_at },
+        daysLeft,
+        to: reminderTo,
+      });
+      await sb.from(FOLDERS).update({ reminder_7_sent_at: new Date().toISOString() }).eq('id', r.id);
       summary.reminder7++;
     }
   }
@@ -85,7 +90,7 @@ async function run() {
 
 export async function GET(request) {
   if (!authorized(request)) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
-  if (!isConfigured()) return NextResponse.json({ skipped: true, reason: 'DB not configured' });
+  if (!isConfigured()) return NextResponse.json({ skipped: true, reason: 'Supabase not configured' });
   try {
     const summary = await run();
     return NextResponse.json({ ok: true, ...summary });

@@ -51,26 +51,31 @@ LED Logo has no image in the source catalog; rendered as "No image" placeholder 
 
 ## External Project Folders — setup
 
-Per-project workspaces backed by Vercel Blob (files) and Postgres (metadata).
-The feature degrades gracefully if not configured — the rest of the app
-keeps working, and the page shows a setup banner.
+Per-project workspaces backed by Vercel Blob (files) and Supabase Pro
+(metadata). The feature degrades gracefully if not configured — the rest of
+the app keeps working, and the page shows a setup banner.
 
 ### 1. Vercel Blob
 Already in use for Draft Studio. If a Blob store isn't connected yet, go to
 Vercel → Storage → Connect Blob; this sets `BLOB_READ_WRITE_TOKEN` automatically.
 
-### 2. Postgres
-Connect Vercel Postgres (or any Postgres) to the project. Vercel sets
-`POSTGRES_URL` automatically; `DATABASE_URL` is also accepted.
+### 2. Supabase
+On the Supabase project:
 
-Tables are created on first request (idempotent `CREATE TABLE IF NOT EXISTS`),
-so no manual migration step is needed.
+1. **SQL Editor → New query** → paste the contents of `supabase/schema.sql`
+   and Run. This creates the three tables and indexes. Safe to re-run.
+2. **Project Settings → API** → copy the **Project URL** into `SUPABASE_URL`
+   and the **service\_role** key into `SUPABASE_SERVICE_ROLE_KEY`.
+
+The service-role key never leaves the server — Supabase is accessed only
+from API routes via `getSupabase()` in `src/lib/external-folders/db.js`.
 
 ### 3. Environment variables
 Copy `.env.example` and fill in:
 
 - `BLOB_READ_WRITE_TOKEN` — set by Vercel when Blob is connected
-- `POSTGRES_URL` / `DATABASE_URL` — set by Vercel when Postgres is connected
+- `SUPABASE_URL` — Supabase project URL
+- `SUPABASE_SERVICE_ROLE_KEY` — Supabase service-role key (server only)
 - `EXTERNAL_FOLDER_PASSWORD` — shared internal password (V1 default: `1234`)
 - `RETENTION_DAYS` — defaults to `750`
 - `CRON_SECRET` — protects the retention cron endpoint
