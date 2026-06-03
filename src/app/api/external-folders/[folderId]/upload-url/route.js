@@ -25,8 +25,10 @@ export async function POST(request, { params }) {
         if (!pathname.startsWith(folder.blobPrefix)) {
           throw new Error(`Invalid upload path. Must start with ${folder.blobPrefix}`);
         }
+        // No allowedContentTypes — the folder is already password-gated and
+        // we accept arbitrary partner material (DWG/DXF often arrive as
+        // application/octet-stream or with no content type at all).
         return {
-          allowedContentTypes: ['*/*'],
           maximumSizeInBytes: 200 * 1024 * 1024,
           addRandomSuffix: true,
           tokenPayload: JSON.stringify({ folderId: folder.id }),
