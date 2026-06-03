@@ -49,6 +49,50 @@ LED Logo has no image in the source catalog; rendered as "No image" placeholder 
 - Old text-only fixture table
 - All REVIEW pills
 
+## External Project Folders — setup
+
+Per-project workspaces backed by Vercel Blob (files) and Supabase Pro
+(metadata). The feature degrades gracefully if not configured — the rest of
+the app keeps working, and the page shows a setup banner.
+
+### 1. Vercel Blob
+Already in use for Draft Studio. If a Blob store isn't connected yet, go to
+Vercel → Storage → Connect Blob; this sets `BLOB_READ_WRITE_TOKEN` automatically.
+
+### 2. Supabase
+On the Supabase project:
+
+1. **SQL Editor → New query** → paste the contents of `supabase/schema.sql`
+   and Run. This creates the three tables and indexes. Safe to re-run.
+2. **Project Settings → API** → copy the **Project URL** into `SUPABASE_URL`
+   and the **service\_role** key into `SUPABASE_SERVICE_ROLE_KEY`.
+
+The service-role key never leaves the server — Supabase is accessed only
+from API routes via `getSupabase()` in `src/lib/external-folders/db.js`.
+
+### 3. Environment variables
+Copy `.env.example` and fill in:
+
+- `BLOB_READ_WRITE_TOKEN` — set by Vercel when Blob is connected
+- `SUPABASE_URL` — Supabase project URL
+- `SUPABASE_SERVICE_ROLE_KEY` — Supabase service-role key (server only)
+- `EXTERNAL_FOLDER_PASSWORD` — shared internal password (V1 default: `1234`)
+- `RETENTION_DAYS` — defaults to `750`
+- `CRON_SECRET` — protects the retention cron endpoint
+- `RETENTION_REMINDER_EMAIL` — optional; address to receive 30/7-day reminders
+
+### 4. Retention cron
+`vercel.json` registers a daily cron at 03:00 UTC pointing at
+`/api/cron/external-folder-retention`. It checks completed folders, marks
+30/7-day reminders as sent, and deletes the blob objects + metadata when
+`deleteAt` is reached. Project records themselves remain visible after deletion.
+
+### 5. Email (optional)
+`src/lib/external-folders/email.js` is a stub. To send real reminders, replace
+the body with a provider call (Resend, SendGrid, M365 etc.) and add the
+provider's credentials as env vars. The cron writes `reminder_30_sent_at` /
+`reminder_7_sent_at` after each call so reminders won't be sent twice.
+
 ## How to deploy
 
 1. Unzip locally
