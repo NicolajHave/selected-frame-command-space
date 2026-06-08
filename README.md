@@ -93,6 +93,37 @@ the body with a provider call (Resend, SendGrid, M365 etc.) and add the
 provider's credentials as env vars. The cron writes `reminder_30_sent_at` /
 `reminder_7_sent_at` after each call so reminders won't be sent twice.
 
+## Project Intake — native filecard engine (V1)
+
+Replaces the embedded Microsoft Form with a single-page native intake form
+(`src/app/project-intake/`). Field config and the payload/summary builders live
+in `src/lib/project-intake/payload.js` so they're easy to edit and are shared
+between the client and the submit route.
+
+### Submission flow
+`POST /api/project-intake/submit` validates the payload, builds a readable
+filecard summary, and fans out to whatever is configured. **Nothing is
+required for V1** — the submission is always logged server-side and the
+summary is returned to the user's confirmation screen.
+
+Optional integrations (env-driven, all best-effort):
+- `PROJECT_INTAKE_EMAIL_TO` — destination for the email summary. The provider
+  call itself is a stub (`notifyEmail`); pick Resend/SendGrid/M365 and
+  implement the send when ready.
+- `POWER_AUTOMATE_PROJECT_INTAKE_WEBHOOK` — if set, the route POSTs
+  `{ payload, summary }` to the Flow. The webhook URL stays server-side.
+- `ASANA_PROJECT_INTAKE_PROJECT_ID` + `ASANA_PAT` — payload is structured for
+  future Asana task creation; not sent in V1.
+
+### Attachments
+Intake attachments upload directly to Vercel Blob under
+`project-intake/<sessionId>/<group>/` via `/api/project-intake/upload-url`.
+File metadata travels inside the submission payload (no DB row in V1).
+
+### Soft Shop rule
+If "New sales m² area" is below 30, the form shows a Soft Shop notice, and the
+same note is embedded in the confirmation screen and the filecard summary.
+
 ## How to deploy
 
 1. Unzip locally
