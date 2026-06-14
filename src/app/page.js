@@ -4,6 +4,8 @@ import DraftStudioPage from "./draft-studio/DraftStudioPage";
 import ToolboxPage from "./toolbox/ToolboxPage";
 import ProjectIntakePage from "./project-intake/ProjectIntakePage";
 import ExternalFoldersPage from "./external-project-folders/ExternalFoldersPage";
+import OpeningReportsPage from "./opening-reports/OpeningReportsPage";
+import ShowroomOpsPage from "./showroom-ops/ShowroomOpsPage";
 import { ExternalFolderCard, RecentlyOpenedFolders } from "./external-project-folders/ui";
 import { NEWS } from "../data/news";
 import React, { useState, useEffect, useCallback, useRef } from "react";
@@ -1193,7 +1195,11 @@ export default function Home(){const [page,setPage]=useState("overview");const [
       {id:"roi",label:"ROI Engine",icon:"◇"},
       {id:"draft",label:"Draft Studio",icon:"✎"},
       {id:"quotation",label:"Quotation",icon:"📋"},
+      {id:"opening-report",label:"Opening Report",icon:"✓"},
       {id:"toolbox",label:"Toolbox",icon:"⊟"},
+    ]},
+    {label:"Showroom Ops",items:[
+      {id:"showroom-ops",label:"Showroom Ops",icon:"❖"},
     ]},
     {items:[{id:"standards",label:"Standards",icon:"☰"}]},
     {bottom:true,items:[
@@ -1225,11 +1231,13 @@ export default function Home(){const [page,setPage]=useState("overview");const [
         {page==="external-folders"&&<ExternalFoldersPage initialFolderId={externalFolderTarget} onClearInitial={()=>setExternalFolderTarget(null)}/>}
         {page==="intake"&&<ProjectIntakePage/>}
         {page==="quotation"&&<QuotationPage/>}
+        {page==="opening-report"&&<OpeningReportsPage/>}
         {page==="draft"&&<DraftStudioPage/>}
         {page==="toolbox"&&<ToolboxPage/>}
         {page==="roi"&&<ROIPage projects={projects}/>}
         {page==="flow"&&<FlowPage projects={projects} setPage={setPage}/>}
         {page==="installed"&&<InstalledPage projects={projects} setPage={setPage} setExternalFolderTarget={setExternalFolderTarget}/>}
+        {page==="showroom-ops"&&<ShowroomOpsPage/>}
         {page==="standards"&&<StandardsPage/>}
         {page==="admin"&&<AdminPage projects={projects}/>}
       </div></div></div>}
