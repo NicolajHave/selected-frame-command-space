@@ -36,13 +36,29 @@ const INITIAL = {
   projectName: "", yourName: "", desiredOpeningDate: "", marketRegion: "",
   partnerName: "", projectNature: "", designedFor: "", streetAddress: "", postalCode: "", cityState: "", country: "", deliveryAddress: "",
   mainContact: "", role: "", email: "", phone: "", secondaryContact: "", internalStakeholders: "",
-  lastYearRetailSales: "", estimatedAnnualRetailSales: "", currentSalesArea: "", newSalesArea: "",
+  lastYearRetailSales: "", estimatedAnnualRetailSales: "",
   commercialObjectives: [], otherObjective: "", partnerContribution: false, partnerContributionDetails: "",
   existingSpace: "", additionalSpace: "", ceilingHeight: "", columns: "", columnUsage: "", columnUsageNotes: "",
   fittingRoom: "", fittingRoomState: "", fittingRoomNotes: "", flooring: "", areaRemarks: "",
   selectedHangerUsable: "", hangerPartlyNotes: "",
   deliveryTimeWindow: "", unloadingArea: "", maxHeightClearance: "", vehicleAccess: "", logisticsNotes: "",
   mountingPartner: "", installerDetails: "", workingHours: "", wasteDisposal: "", siteResponsible: "", installationNotes: "",
+};
+
+// Form key → section number. Used by submit() to scroll to the first section
+// that contains an unfilled required field.
+const FIELD_SECTION = {
+  projectName: 1, yourName: 1, desiredOpeningDate: 1, marketRegion: 1,
+  partnerName: 2, projectNature: 2, designedFor: 2,
+  streetAddress: 2, postalCode: 2, cityState: 2, country: 2,
+  mainContact: 3, email: 3, phone: 3,
+  otherObjective: 4, partnerContributionDetails: 4,
+  existingSpace: 5, additionalSpace: 5,
+  columns: 5, columnUsage: 5,
+  fittingRoom: 5, fittingRoomState: 5,
+  selectedHangerUsable: 6, hangerPartlyNotes: 6,
+  unloadingArea: 8, vehicleAccess: 8,
+  mountingPartner: 9, workingHours: 9, wasteDisposal: 9, siteResponsible: 9,
 };
 
 // Required fields → human label, for validation messages and the review block.
@@ -61,8 +77,6 @@ const REQUIRED = {
   mainContact: "Main Contact Person",
   email: "E-mail",
   phone: "Phone Number",
-  currentSalesArea: "Current sales m² area",
-  newSalesArea: "New sales m² area",
   existingSpace: "Existing Selected space (m²)",
   additionalSpace: "Additional space requested (m²)",
   columns: "Columns",
@@ -118,7 +132,13 @@ export default function ProjectIntakePage() {
   const submit = async () => {
     if (missing.length) {
       setShowErrors(true);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      // Scroll to the first section that has a missing field. Falls back to
+      // the top of the page if a field has no section mapping.
+      const sectionNumbers = missing.map((m) => FIELD_SECTION[m.key]).filter((n) => typeof n === "number");
+      const firstSection = sectionNumbers.length ? Math.min(...sectionNumbers) : null;
+      const target = firstSection ? document.getElementById(`intake-section-${firstSection}`) : null;
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      else window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
     setSubmitting(true); setSubmitError(null);
@@ -224,7 +244,7 @@ export default function ProjectIntakePage() {
           <TextField label="Phone Number" required value={form.phone} onChange={set("phone")} error={err("phone")} helper="Preferably mobile, including country code." />
         </Row>
         <TextField label="Secondary Contact" value={form.secondaryContact} onChange={set("secondaryContact")} helper="If there is an additional person involved, e.g. logistics or operations, include them here." />
-        <TextField label="Internal Selected Stakeholders" textarea value={form.internalStakeholders} onChange={set("internalStakeholders")} helper="If other SELECTED team members should be referenced, add their names here." />
+        <TextField label="Internal Selected Stakeholders" textarea value={form.internalStakeholders} onChange={set("internalStakeholders")} helper="If other Selected team members should be referenced, add their names here." />
       </IntakeSection>
 
       {/* 4 — Commercial Case */}
@@ -232,10 +252,6 @@ export default function ProjectIntakePage() {
         <Row>
           <TextField label="Actual Last Full Year Retail Sales" type="number" suffix="EUR" value={form.lastYearRetailSales} onChange={set("lastYearRetailSales")} helper="Latest full-year retail sales for SELECTED in this location. If this is a new shop or showroom request, type 0 or leave blank." />
           <TextField label="Estimated Annual Retail Sales after opening" type="number" suffix="EUR" value={form.estimatedAnnualRetailSales} onChange={set("estimatedAnnualRetailSales")} helper="Best estimate once the setup is fully operational." />
-        </Row>
-        <Row>
-          <TextField label="Current sales m² area used for Selected" required type="number" suffix="m²" value={form.currentSalesArea} onChange={set("currentSalesArea")} error={err("currentSalesArea")} helper="Current square metres allocated to SELECTED. If no SIS is in place today, type 0." />
-          <TextField label="New sales m² area used for Selected after opening" required type="number" suffix="m²" value={form.newSalesArea} onChange={set("newSalesArea")} error={err("newSalesArea")} />
         </Row>
         {flags.isSoftShopLikely && <SoftShopNotice />}
         <CheckboxGroup label="Commercial Objective" values={form.commercialObjectives} onChange={set("commercialObjectives")} options={OBJECTIVES} />
@@ -279,9 +295,9 @@ export default function ProjectIntakePage() {
 
       {/* 6 — Hanger System */}
       <IntakeSection number={6} title="Hanger System">
-        <RadioGroup label="Can SELECTED-branded hanger system be used in the space?" required value={form.selectedHangerUsable} onChange={set("selectedHangerUsable")} options={["Yes", "No", "Partly"]} error={err("selectedHangerUsable")} inline />
+        <RadioGroup label="Can Selected-branded hanger system be used in the space?" required value={form.selectedHangerUsable} onChange={set("selectedHangerUsable")} options={["Yes", "No", "Partly"]} error={err("selectedHangerUsable")} inline />
         <ConditionalField when={form.selectedHangerUsable === "Partly"}>
-          <TextField label="Please explain where SELECTED hangers can/cannot be used" required textarea value={form.hangerPartlyNotes} onChange={set("hangerPartlyNotes")} error={err("hangerPartlyNotes")} placeholder="Add relevant restrictions or category-specific limitations." />
+          <TextField label="Please explain where Selected hangers can/cannot be used" required textarea value={form.hangerPartlyNotes} onChange={set("hangerPartlyNotes")} error={err("hangerPartlyNotes")} placeholder="Add relevant restrictions or category-specific limitations." />
         </ConditionalField>
       </IntakeSection>
 
@@ -318,6 +334,11 @@ export default function ProjectIntakePage() {
       {/* 9 — Installation & Execution */}
       <IntakeSection number={9} title="Installation & Execution">
         <RadioGroup label="Mounting Partner / Installer" required value={form.mountingPartner} onChange={set("mountingPartner")} options={MOUNTING} error={err("mountingPartner")} inline />
+        {flags.partnerInstallsWaivesWarranty && (
+          <InfoBox tone="warn" title="Installation warranty waived">
+            When the partner (or any non-Selected installer) handles mounting, the Selected installation warranty does not apply. Selected will provide mounting guides and technical support, but cannot take responsibility for the final setup.
+          </InfoBox>
+        )}
         <ConditionalField when={form.mountingPartner === "Other"}>
           <TextField label="Installer details" value={form.installerDetails} onChange={set("installerDetails")} />
         </ConditionalField>
@@ -342,12 +363,18 @@ export default function ProjectIntakePage() {
 }
 
 function ReviewBlock({ form, flags, missing, attachmentMeta }) {
+  // Total new sales area is derived from Area & Setup (Existing + Additional),
+  // so the Commercial Case section doesn't need to repeat the numbers.
+  const ex = parseFloat(form.existingSpace);
+  const ad = parseFloat(form.additionalSpace);
+  const haveAny = !Number.isNaN(ex) || !Number.isNaN(ad);
+  const totalNewArea = haveAny ? (Number.isNaN(ex) ? 0 : ex) + (Number.isNaN(ad) ? 0 : ad) : null;
   const summaryRows = [
     ["Project", form.projectName || "—"],
     ["Partner", form.partnerName || "—"],
     ["Nature", form.projectNature || "—"],
     ["Region", form.marketRegion || "—"],
-    ["New sales area", form.newSalesArea !== "" ? `${form.newSalesArea} m²` : "—"],
+    ["New sales area", totalNewArea !== null ? `${totalNewArea} m²` : "—"],
     ["Desired opening", form.desiredOpeningDate || "—"],
   ];
   return (
