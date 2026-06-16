@@ -120,3 +120,24 @@ ALTER TABLE showroom_ops.materials        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE showroom_ops.seasons          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE showroom_ops.season_showrooms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE showroom_ops.season_lines     ENABLE ROW LEVEL SECURITY;
+
+-- Schema grants for a custom Supabase schema. Without these, PostgREST
+-- responds with "permission denied for schema showroom_ops" even when the
+-- schema is exposed under Project Settings → API → Exposed schemas. RLS is
+-- enabled above, so the anon key still cannot read or write any rows.
+GRANT USAGE ON SCHEMA showroom_ops
+  TO postgres, anon, authenticated, service_role;
+
+GRANT ALL ON ALL TABLES    IN SCHEMA showroom_ops
+  TO postgres, anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA showroom_ops
+  TO postgres, anon, authenticated, service_role;
+GRANT ALL ON ALL ROUTINES  IN SCHEMA showroom_ops
+  TO postgres, anon, authenticated, service_role;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA showroom_ops
+  GRANT ALL ON TABLES    TO postgres, anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA showroom_ops
+  GRANT ALL ON SEQUENCES TO postgres, anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA showroom_ops
+  GRANT ALL ON ROUTINES  TO postgres, anon, authenticated, service_role;

@@ -133,8 +133,8 @@ export default function ProjectIntakePage() {
         const j = await r.json().catch(() => ({}));
         throw new Error(j.error || `Submit failed (${r.status})`);
       }
-      const { summary } = await r.json();
-      setSubmitted({ payload, summary: summary || buildFilecardSummary(payload) });
+      const { summary, integrations } = await r.json();
+      setSubmitted({ payload, summary: summary || buildFilecardSummary(payload), integrations });
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
       setSubmitError(e.message || "Something went wrong");
@@ -384,6 +384,8 @@ function ReviewBlock({ form, flags, missing, attachmentMeta }) {
 }
 
 function SuccessScreen({ submitted, onReset }) {
+  const ig = submitted.integrations || {};
+  const hasLinks = ig.pdf?.ok || ig.asana?.ok || ig.folder?.ok;
   return (
     <div style={{ maxWidth: 760 }}>
       <Title sub="Start a new Selected Frame / Shop-In-Shop project.">Project Intake</Title>
@@ -391,12 +393,43 @@ function SuccessScreen({ submitted, onReset }) {
         <div style={{ fontSize: 11, fontWeight: 700, color: C.go, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: 10 }}>Submitted</div>
         <div style={{ fontSize: 20, fontWeight: 400, fontFamily: "'Cormorant Garamond',serif", color: C.text, marginBottom: 8 }}>Thank you. The project intake has been submitted to Brand Spaces.</div>
         <div style={{ fontSize: 13, color: C.textS, lineHeight: 1.65 }}>
-          You will receive a confirmation with the submitted details and next steps.
+          A filecard PDF has been generated and the project has been created in Asana. It appears in Current within ~15 minutes.
         </div>
         <div style={{ fontSize: 12, color: C.textS, fontStyle: "italic", lineHeight: 1.6, marginTop: 14, paddingTop: 14, borderTop: `1px solid ${C.surfaceD}` }}>
           In a later version, this confirmation will include site readiness guidance and required preparation before installation.
         </div>
       </div>
+
+      {hasLinks && (
+        <div style={{ background: C.white, border: `1px solid ${C.surfaceD}`, borderRadius: 10, padding: 24, marginBottom: 18 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.textS, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 12 }}>What was created</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {ig.pdf?.ok && (
+              <a href={ig.pdf.url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: C.surface, borderRadius: 8, textDecoration: "none", color: C.text }}>
+                <span style={{ fontSize: 13, fontWeight: 500 }}>Filecard PDF</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: C.oak }}>Open PDF →</span>
+              </a>
+            )}
+            {ig.asana?.ok && (
+              <a href={ig.asana.url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: C.surface, borderRadius: 8, textDecoration: "none", color: C.text }}>
+                <span style={{ fontSize: 13, fontWeight: 500 }}>Asana task created</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: C.oak }}>Open in Asana →</span>
+              </a>
+            )}
+            {ig.folder?.ok && (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: C.surface, borderRadius: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 500, color: C.text }}>External Project Folder</span>
+                <span style={{ fontSize: 12, color: C.textS }}>{ig.filesCopied ? `${ig.filesCopied} file${ig.filesCopied === 1 ? "" : "s"} + PDF copied in` : "Created · PDF copied in"}</span>
+              </div>
+            )}
+          </div>
+          {(ig.asana && !ig.asana.ok) && (
+            <div style={{ marginTop: 12, fontSize: 11, color: C.textS, fontStyle: "italic" }}>
+              Asana task not created ({ig.asana.reason}). The filecard summary below is still saved.
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ background: C.white, border: `1px solid ${C.surfaceD}`, borderRadius: 10, padding: 24, marginBottom: 18 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: C.textS, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 12 }}>Filecard summary</div>

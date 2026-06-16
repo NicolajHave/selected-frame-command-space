@@ -112,96 +112,125 @@ export function buildPayload(form, attachments) {
 }
 
 /**
+ * Structured filecard sections — single source of truth for both the
+ * plain-text summary and the PDF. Each section is { title, rows } where rows
+ * is an array of [label, value] with empties already filtered out, OR
+ * { title, text } for a free paragraph (the Soft Shop note).
+ */
+export function buildFilecardSections(payload) {
+  const p = payload;
+  const sections = [];
+  const sec = (title, rows) => {
+    const filtered = rows
+      .filter(([, v]) => {
+        if (v === null || v === undefined || v === "") return false;
+        if (Array.isArray(v) && v.length === 0) return false;
+        return true;
+      })
+      .map(([label, v]) => [label, Array.isArray(v) ? v.join(", ") : String(v)]);
+    sections.push({ title, rows: filtered });
+  };
+
+  sec("Project Basics", [
+    ["Project name", p.projectBasics.projectName],
+    ["Submitted by", p.projectBasics.yourName],
+    ["Desired opening date", p.projectBasics.desiredOpeningDate],
+    ["Market / Region", p.projectBasics.marketRegion],
+  ]);
+
+  sec("Partner & Location", [
+    ["Partner name", p.partnerLocation.partnerName],
+    ["Project nature", p.partnerLocation.projectNature],
+    ["Designed for", p.partnerLocation.designedFor],
+    ["Address", [p.partnerLocation.streetAddress, p.partnerLocation.postalCode, p.partnerLocation.cityState, p.partnerLocation.country].filter(Boolean).join(", ")],
+    ["Delivery address", p.partnerLocation.deliveryAddress],
+  ]);
+
+  sec("Contact", [
+    ["Main contact", p.contact.mainContact],
+    ["Role", p.contact.role],
+    ["Email", p.contact.email],
+    ["Phone", p.contact.phone],
+    ["Secondary contact", p.contact.secondaryContact],
+    ["Internal Selected stakeholders", p.contact.internalStakeholders],
+  ]);
+
+  sec("Commercial Case", [
+    ["Last full-year retail sales (EUR)", p.commercialCase.lastYearRetailSales],
+    ["Estimated annual retail sales (EUR)", p.commercialCase.estimatedAnnualRetailSales],
+    ["Current sales area (m²)", p.commercialCase.currentSalesArea],
+    ["New sales area (m²)", p.commercialCase.newSalesArea],
+    ["Commercial objectives", p.commercialCase.commercialObjectives],
+    ["Other objective", p.commercialCase.otherObjective],
+    ["Partner contribution applies", p.commercialCase.partnerContribution ? "Yes" : ""],
+    ["Partner contribution details", p.commercialCase.partnerContributionDetails],
+  ]);
+
+  sec("Area & Setup", [
+    ["Existing Selected space (m²)", p.areaSetup.existingSpace],
+    ["Additional space requested (m²)", p.areaSetup.additionalSpace],
+    ["Ceiling height (m)", p.areaSetup.ceilingHeight],
+    ["Columns", p.areaSetup.columns],
+    ["Column usage", p.areaSetup.columnUsage],
+    ["Column usage notes", p.areaSetup.columnUsageNotes],
+    ["Fitting room", p.areaSetup.fittingRoom],
+    ["Fitting room state", p.areaSetup.fittingRoomState],
+    ["Fitting room notes", p.areaSetup.fittingRoomNotes],
+    ["Flooring / surface", p.areaSetup.flooring],
+    ["Area remarks", p.areaSetup.areaRemarks],
+  ]);
+
+  sec("Hanger System", [
+    ["Selected hanger system usable", p.hangerSystem.selectedHangerUsable],
+    ["Notes", p.hangerSystem.hangerPartlyNotes],
+  ]);
+
+  const attachmentRows = [];
+  for (const [group, meta] of Object.entries(p.attachments || {})) {
+    const count = meta?.files?.length || 0;
+    attachmentRows.push([group, `${meta?.status || "Missing"}${count ? ` (${count} file${count === 1 ? "" : "s"})` : ""}`]);
+  }
+  sec("Attachments", attachmentRows);
+
+  sec("Logistics & Access", [
+    ["Delivery time window", p.logisticsAccess.deliveryTimeWindow],
+    ["Unloading area", p.logisticsAccess.unloadingArea],
+    ["Max height clearance", p.logisticsAccess.maxHeightClearance],
+    ["Vehicle access", p.logisticsAccess.vehicleAccess],
+    ["Logistics notes", p.logisticsAccess.logisticsNotes],
+  ]);
+
+  sec("Installation & Execution", [
+    ["Mounting partner / installer", p.installationExecution.mountingPartner],
+    ["Installer details", p.installationExecution.installerDetails],
+    ["Allowed working hours", p.installationExecution.workingHours],
+    ["Waste / material disposal", p.installationExecution.wasteDisposal],
+    ["Site responsible during installation", p.installationExecution.siteResponsible],
+    ["Installation notes", p.installationExecution.installationNotes],
+  ]);
+
+  if (p.derivedFlags.isSoftShopLikely) {
+    sections.push({ title: "Soft Shop note", text: SOFT_SHOP_NOTE });
+  }
+
+  return sections;
+}
+
+/**
  * Human-readable filecard summary, grouped by section. Used on the
- * confirmation screen, in the email body and server logs.
+ * confirmation screen, in the email body and server logs. Rendered from
+ * buildFilecardSections so the PDF and the text never disagree.
  */
 export function buildFilecardSummary(payload) {
   const p = payload;
-  const lines = [];
-  const section = (title) => lines.push("", `## ${title}`);
-  const kv = (label, value) => {
-    if (value === null || value === undefined || value === "") return;
-    const v = Array.isArray(value) ? value.join(", ") : value;
-    if (v === "" || (Array.isArray(value) && value.length === 0)) return;
-    lines.push(`${label}: ${v}`);
-  };
-
-  lines.push(`# Selected Frame — Project Intake Filecard`);
-  lines.push(`Submitted: ${new Date(p.submittedAt).toLocaleString("en-GB")}`);
-
-  section("Project Basics");
-  kv("Project name", p.projectBasics.projectName);
-  kv("Submitted by", p.projectBasics.yourName);
-  kv("Desired opening date", p.projectBasics.desiredOpeningDate);
-  kv("Market / Region", p.projectBasics.marketRegion);
-
-  section("Partner & Location");
-  kv("Partner name", p.partnerLocation.partnerName);
-  kv("Project nature", p.partnerLocation.projectNature);
-  kv("Designed for", p.partnerLocation.designedFor);
-  kv("Address", [p.partnerLocation.streetAddress, p.partnerLocation.postalCode, p.partnerLocation.cityState, p.partnerLocation.country].filter(Boolean).join(", "));
-  kv("Delivery address", p.partnerLocation.deliveryAddress);
-
-  section("Contact");
-  kv("Main contact", p.contact.mainContact);
-  kv("Role", p.contact.role);
-  kv("Email", p.contact.email);
-  kv("Phone", p.contact.phone);
-  kv("Secondary contact", p.contact.secondaryContact);
-  kv("Internal Selected stakeholders", p.contact.internalStakeholders);
-
-  section("Commercial Case");
-  kv("Last full-year retail sales (EUR)", p.commercialCase.lastYearRetailSales);
-  kv("Estimated annual retail sales (EUR)", p.commercialCase.estimatedAnnualRetailSales);
-  kv("Current sales area (m²)", p.commercialCase.currentSalesArea);
-  kv("New sales area (m²)", p.commercialCase.newSalesArea);
-  kv("Commercial objectives", p.commercialCase.commercialObjectives);
-  kv("Other objective", p.commercialCase.otherObjective);
-  kv("Partner contribution applies", p.commercialCase.partnerContribution ? "Yes" : "");
-  kv("Partner contribution details", p.commercialCase.partnerContributionDetails);
-
-  section("Area & Setup");
-  kv("Existing Selected space (m²)", p.areaSetup.existingSpace);
-  kv("Additional space requested (m²)", p.areaSetup.additionalSpace);
-  kv("Ceiling height (m)", p.areaSetup.ceilingHeight);
-  kv("Columns", p.areaSetup.columns);
-  kv("Column usage", p.areaSetup.columnUsage);
-  kv("Column usage notes", p.areaSetup.columnUsageNotes);
-  kv("Fitting room", p.areaSetup.fittingRoom);
-  kv("Fitting room state", p.areaSetup.fittingRoomState);
-  kv("Fitting room notes", p.areaSetup.fittingRoomNotes);
-  kv("Flooring / surface", p.areaSetup.flooring);
-  kv("Area remarks", p.areaSetup.areaRemarks);
-
-  section("Hanger System");
-  kv("Selected hanger system usable", p.hangerSystem.selectedHangerUsable);
-  kv("Notes", p.hangerSystem.hangerPartlyNotes);
-
-  section("Attachments");
-  for (const [group, meta] of Object.entries(p.attachments || {})) {
-    const count = meta?.files?.length || 0;
-    kv(group, `${meta?.status || "Missing"}${count ? ` (${count} file${count === 1 ? "" : "s"})` : ""}`);
+  const lines = [
+    `# Selected Frame — Project Intake Filecard`,
+    `Submitted: ${new Date(p.submittedAt).toLocaleString("en-GB")}`,
+  ];
+  for (const s of buildFilecardSections(payload)) {
+    lines.push("", `## ${s.title}`);
+    if (s.text) lines.push(s.text);
+    else for (const [label, value] of s.rows) lines.push(`${label}: ${value}`);
   }
-
-  section("Logistics & Access");
-  kv("Delivery time window", p.logisticsAccess.deliveryTimeWindow);
-  kv("Unloading area", p.logisticsAccess.unloadingArea);
-  kv("Max height clearance", p.logisticsAccess.maxHeightClearance);
-  kv("Vehicle access", p.logisticsAccess.vehicleAccess);
-  kv("Logistics notes", p.logisticsAccess.logisticsNotes);
-
-  section("Installation & Execution");
-  kv("Mounting partner / installer", p.installationExecution.mountingPartner);
-  kv("Installer details", p.installationExecution.installerDetails);
-  kv("Allowed working hours", p.installationExecution.workingHours);
-  kv("Waste / material disposal", p.installationExecution.wasteDisposal);
-  kv("Site responsible during installation", p.installationExecution.siteResponsible);
-  kv("Installation notes", p.installationExecution.installationNotes);
-
-  if (p.derivedFlags.isSoftShopLikely) {
-    section("Soft Shop note");
-    lines.push(SOFT_SHOP_NOTE);
-  }
-
   return lines.join("\n");
 }
