@@ -9,6 +9,9 @@ export const SOFT_SHOP_THRESHOLD_SQM = 30;
 export const SOFT_SHOP_NOTE =
   "Based on the entered sales area, this project is expected to be handled as a Soft Shop Solution. As a starting point, shopfitting is not included and must be handled locally by the market/partner. If shopfitting support is requested, the cost must be covered by the market/partner.";
 
+export const PARTNER_INSTALL_WARRANTY_NOTE =
+  "Note: when the partner (or any non-Selected installer) handles mounting, the Selected installation warranty does not apply. Selected will provide mounting guides and technical support, but cannot take responsibility for the final setup.";
+
 function num(v) {
   if (v === "" || v === null || v === undefined) return null;
   const n = Number(v);
@@ -20,10 +23,21 @@ function num(v) {
  * truth so the UI and the stored payload never disagree.
  */
 export function deriveFlags(form) {
-  const newArea = num(form.newSalesArea);
+  // Total new sales area = Existing Selected space + Additional space requested,
+  // both captured in Area & Setup. Soft Shop detection uses that sum so the
+  // rep doesn't have to enter the area twice.
+  const ex = num(form.existingSpace);
+  const ad = num(form.additionalSpace);
+  const newArea = (ex === null && ad === null) ? null : (ex || 0) + (ad || 0);
   const isSoftShopLikely = newArea !== null && newArea < SOFT_SHOP_THRESHOLD_SQM;
+  // Selected only guarantees the installation when Selected does it. When the
+  // partner (or any "Other" installer) handles mounting, we provide guides
+  // but the installation warranty is waived.
+  const partnerInstallsWaivesWarranty =
+    form.mountingPartner === "Partner" || form.mountingPartner === "Other";
   return {
     isSoftShopLikely,
+    partnerInstallsWaivesWarranty,
     partnerContributionApplies: Boolean(form.partnerContribution),
     columnsRequireFollowUp:
       form.columns === "Yes" &&
@@ -47,6 +61,7 @@ export function buildPayload(form, attachments) {
     },
     partnerLocation: {
       partnerName: form.partnerName || "",
+      customerNo: form.customerNo || "",
       projectNature: form.projectNature || "",
       designedFor: form.designedFor || "",
       streetAddress: form.streetAddress || "",
@@ -66,8 +81,6 @@ export function buildPayload(form, attachments) {
     commercialCase: {
       lastYearRetailSales: num(form.lastYearRetailSales),
       estimatedAnnualRetailSales: num(form.estimatedAnnualRetailSales),
-      currentSalesArea: num(form.currentSalesArea),
-      newSalesArea: num(form.newSalesArea),
       commercialObjectives: form.commercialObjectives || [],
       otherObjective: form.otherObjective || "",
       partnerContribution: Boolean(form.partnerContribution),
@@ -140,6 +153,7 @@ export function buildFilecardSections(payload) {
 
   sec("Partner & Location", [
     ["Partner name", p.partnerLocation.partnerName],
+    ["Customer no.", p.partnerLocation.customerNo],
     ["Project nature", p.partnerLocation.projectNature],
     ["Designed for", p.partnerLocation.designedFor],
     ["Address", [p.partnerLocation.streetAddress, p.partnerLocation.postalCode, p.partnerLocation.cityState, p.partnerLocation.country].filter(Boolean).join(", ")],
@@ -158,8 +172,6 @@ export function buildFilecardSections(payload) {
   sec("Commercial Case", [
     ["Last full-year retail sales (EUR)", p.commercialCase.lastYearRetailSales],
     ["Estimated annual retail sales (EUR)", p.commercialCase.estimatedAnnualRetailSales],
-    ["Current sales area (m²)", p.commercialCase.currentSalesArea],
-    ["New sales area (m²)", p.commercialCase.newSalesArea],
     ["Commercial objectives", p.commercialCase.commercialObjectives],
     ["Other objective", p.commercialCase.otherObjective],
     ["Partner contribution applies", p.commercialCase.partnerContribution ? "Yes" : ""],
@@ -211,6 +223,9 @@ export function buildFilecardSections(payload) {
 
   if (p.derivedFlags.isSoftShopLikely) {
     sections.push({ title: "Soft Shop note", text: SOFT_SHOP_NOTE });
+  }
+  if (p.derivedFlags.partnerInstallsWaivesWarranty) {
+    sections.push({ title: "Installation warranty note", text: PARTNER_INSTALL_WARRANTY_NOTE });
   }
 
   return sections;

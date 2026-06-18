@@ -39,7 +39,7 @@ function ErrorText({ children }) {
 
 export function IntakeSection({ number, title, children }) {
   return (
-    <section style={{ background: C.white, border: `1px solid ${C.surfaceD}`, borderRadius: 10, padding: 26, marginBottom: 18 }}>
+    <section id={`intake-section-${number}`} style={{ background: C.white, border: `1px solid ${C.surfaceD}`, borderRadius: 10, padding: 26, marginBottom: 18, scrollMarginTop: 84 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 20, paddingBottom: 14, borderBottom: `1px solid ${C.surfaceD}` }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: C.oak, fontFamily: "'DM Mono',monospace" }}>{String(number).padStart(2, "0")}</span>
         <h3 style={{ fontSize: 18, fontWeight: 400, color: C.text, fontFamily: "'Cormorant Garamond',serif", margin: 0 }}>{title}</h3>
