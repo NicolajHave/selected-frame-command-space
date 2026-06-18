@@ -61,6 +61,7 @@ export function buildPayload(form, attachments) {
     },
     partnerLocation: {
       partnerName: form.partnerName || "",
+      customerNo: form.customerNo || "",
       projectNature: form.projectNature || "",
       designedFor: form.designedFor || "",
       streetAddress: form.streetAddress || "",
@@ -152,6 +153,7 @@ export function buildFilecardSections(payload) {
 
   sec("Partner & Location", [
     ["Partner name", p.partnerLocation.partnerName],
+    ["Customer no.", p.partnerLocation.customerNo],
     ["Project nature", p.partnerLocation.projectNature],
     ["Designed for", p.partnerLocation.designedFor],
     ["Address", [p.partnerLocation.streetAddress, p.partnerLocation.postalCode, p.partnerLocation.cityState, p.partnerLocation.country].filter(Boolean).join(", ")],

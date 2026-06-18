@@ -34,7 +34,7 @@ const ATTACHMENT_GROUPS = [
 
 const INITIAL = {
   projectName: "", yourName: "", desiredOpeningDate: "", marketRegion: "",
-  partnerName: "", projectNature: "", designedFor: "", streetAddress: "", postalCode: "", cityState: "", country: "", deliveryAddress: "",
+  partnerName: "", customerNo: "", projectNature: "", designedFor: "", streetAddress: "", postalCode: "", cityState: "", country: "", deliveryAddress: "",
   mainContact: "", role: "", email: "", phone: "", secondaryContact: "", internalStakeholders: "",
   lastYearRetailSales: "", estimatedAnnualRetailSales: "",
   commercialObjectives: [], otherObjective: "", partnerContribution: false, partnerContributionDetails: "",
@@ -49,7 +49,7 @@ const INITIAL = {
 // that contains an unfilled required field.
 const FIELD_SECTION = {
   projectName: 1, yourName: 1, desiredOpeningDate: 1, marketRegion: 1,
-  partnerName: 2, projectNature: 2, designedFor: 2,
+  partnerName: 2, customerNo: 2, projectNature: 2, designedFor: 2,
   streetAddress: 2, postalCode: 2, cityState: 2, country: 2,
   mainContact: 3, email: 3, phone: 3,
   otherObjective: 4, partnerContributionDetails: 4,
@@ -68,6 +68,7 @@ const REQUIRED = {
   desiredOpeningDate: "Desired Shop Opening Date",
   marketRegion: "Market / Region",
   partnerName: "Partner Name",
+  customerNo: "Customer No.",
   projectNature: "Project Nature",
   designedFor: "Who the space is designed for",
   streetAddress: "Street Address",
@@ -220,6 +221,7 @@ export default function ProjectIntakePage() {
       {/* 2 — Partner & Location */}
       <IntakeSection number={2} title="Partner & Location">
         <TextField label="Partner Name" required value={form.partnerName} onChange={set("partnerName")} error={err("partnerName")} helper="Name of the partner, store or showroom." />
+        <TextField label="Customer No." required value={form.customerNo} onChange={set("customerNo")} error={err("customerNo")} helper="The partner's customer / account number." />
         <SelectField label="Project Nature" required value={form.projectNature} onChange={set("projectNature")} options={PROJECT_NATURES} error={err("projectNature")} />
         <RadioGroup label="Who is the space designed for?" required value={form.designedFor} onChange={set("designedFor")} options={DESIGNED_FOR} error={err("designedFor")} inline />
         <Row>
@@ -250,7 +252,7 @@ export default function ProjectIntakePage() {
       {/* 4 — Commercial Case */}
       <IntakeSection number={4} title="Commercial Case">
         <Row>
-          <TextField label="Actual Last Full Year Retail Sales" type="number" suffix="EUR" value={form.lastYearRetailSales} onChange={set("lastYearRetailSales")} helper="Latest full-year retail sales for SELECTED in this location. If this is a new shop or showroom request, type 0 or leave blank." />
+          <TextField label="Actual Last Full Year Retail Sales" type="number" suffix="EUR" value={form.lastYearRetailSales} onChange={set("lastYearRetailSales")} helper="Latest full-year retail sales for Selected in this location. If this is a new shop or showroom request, type 0 or leave blank." />
           <TextField label="Estimated Annual Retail Sales after opening" type="number" suffix="EUR" value={form.estimatedAnnualRetailSales} onChange={set("estimatedAnnualRetailSales")} helper="Best estimate once the setup is fully operational." />
         </Row>
         {flags.isSoftShopLikely && <SoftShopNotice />}
@@ -267,7 +269,7 @@ export default function ProjectIntakePage() {
       {/* 5 — Area & Setup */}
       <IntakeSection number={5} title="Area & Setup">
         <Row>
-          <TextField label="Existing Selected space (m²)" required type="number" suffix="m²" value={form.existingSpace} onChange={set("existingSpace")} error={err("existingSpace")} helper="Current square metres allocated to SELECTED. If no SIS is in place today, type 0." />
+          <TextField label="Existing Selected space (m²)" required type="number" suffix="m²" value={form.existingSpace} onChange={set("existingSpace")} error={err("existingSpace")} helper="Current square metres allocated to Selected. If no SIS is in place today, type 0." />
           <TextField label="Additional space requested (m²)" required type="number" suffix="m²" value={form.additionalSpace} onChange={set("additionalSpace")} error={err("additionalSpace")} helper="New square metres requested within this SIS. If square metres are the same, type 0." />
         </Row>
         <TextField label="Ceiling Height" type="number" suffix="m" value={form.ceilingHeight} onChange={set("ceilingHeight")} helper="Measure from finished floor to ceiling." />
