@@ -228,7 +228,7 @@ Cordiali saluti,`,
         subject: "Selected Frame — Final Installation Alignment: [Store / City]",
         body: `Dear [Partner Name],
 
-We are now approaching the delivery and installation of the SELECTED Frame setup in [Store / City].
+We are now approaching the delivery and installation of the Selected Frame setup in [Store / City].
 
 As we are now approximately one month prior to installation, we would like to make a final alignment to ensure that everything is ready on site and that we have all practical details confirmed.
 
@@ -248,13 +248,13 @@ Please confirm that the above dates are aligned with your internal planning.
 
 The installation will include:
 
-• Delivery of SELECTED Frame furniture and fixtures
+• Delivery of Selected Frame furniture and fixtures
 • Assembly and installation of the shopfit elements
 • Installation of rails, racks and related fixtures
-• Final merchandising and styling according to SELECTED guidelines
+• Final merchandising and styling according to Selected guidelines
 
 Number of installers on site: [Number of people]
-Additional SELECTED / partner team members on site: [Names / roles if relevant]
+Additional Selected / partner team members on site: [Names / roles if relevant]
 
 Please ensure that access is granted upon arrival and that the installation area is available from the agreed time.
 
@@ -294,7 +294,7 @@ If digital screens are included in the setup, please confirm:
 • Network access can be provided during installation
 • Any local IT restrictions or approval processes are clarified in advance
 
-Our screen content is managed centrally by SELECTED HQ. Once connected, no daily manual operation should be required.
+Our screen content is managed centrally by Selected HQ. Once connected, no daily manual operation should be required.
 
 6. Conditions & On-site Responsibilities
 
@@ -342,7 +342,7 @@ Nicolaj`,
         subject: "Selected Frame — Endelig installationsafstemning: [Butik / By]",
         body: `Kære [Partnernavn],
 
-Vi nærmer os nu levering og installation af SELECTED Frame-setuppet i [Butik / By].
+Vi nærmer os nu levering og installation af Selected Frame-setuppet i [Butik / By].
 
 Da vi er cirka en måned før installation, vil vi gerne lave en endelig afstemning for at sikre, at alt er klart på stedet, og at vi har styr på alle praktiske detaljer.
 
@@ -362,13 +362,13 @@ Bekræft venligst, at ovenstående datoer passer med jeres interne planlægning.
 
 Installationen omfatter:
 
-• Levering af SELECTED Frame-møbler og inventar
+• Levering af Selected Frame-møbler og inventar
 • Samling og montering af shopfit-elementer
 • Montering af stænger, racks og tilhørende inventar
-• Endelig merchandising og styling efter SELECTED's retningslinjer
+• Endelig merchandising og styling efter Selected's retningslinjer
 
 Antal montører på stedet: [Antal personer]
-Yderligere SELECTED-/partnerteam på stedet: [Navne/roller hvis relevant]
+Yderligere Selected-/partnerteam på stedet: [Navne/roller hvis relevant]
 
 Sørg venligst for, at der er adgang ved ankomst, og at installationsområdet er tilgængeligt fra det aftalte tidspunkt.
 
@@ -408,7 +408,7 @@ Hvis digitale skærme indgår i setuppet, bekræft venligst:
 • Netværksadgang kan stilles til rådighed under installation
 • Eventuelle lokale IT-restriktioner eller godkendelsesprocesser er afklaret på forhånd
 
-Vores skærmindhold styres centralt af SELECTED HQ. Når skærmen er tilsluttet, kræves der ikke daglig manuel betjening.
+Vores skærmindhold styres centralt af Selected HQ. Når skærmen er tilsluttet, kræves der ikke daglig manuel betjening.
 
 6. Vilkår & ansvar på stedet
 
@@ -456,7 +456,7 @@ Nicolaj`,
         subject: "Selected Frame — Finale Installationsabstimmung: [Filiale / Stadt]",
         body: `Sehr geehrte/r [Partnername],
 
-wir nähern uns nun der Lieferung und Installation des SELECTED Frame-Setups in [Filiale / Stadt].
+wir nähern uns nun der Lieferung und Installation des Selected Frame-Setups in [Filiale / Stadt].
 
 Da wir uns ungefähr einen Monat vor der Installation befinden, möchten wir eine letzte Abstimmung vornehmen, um sicherzustellen, dass vor Ort alles bereit ist und alle praktischen Details bestätigt sind.
 
@@ -476,13 +476,13 @@ Bitte bestätigen Sie, dass die oben genannten Termine mit Ihrer internen Planun
 
 Die Installation umfasst:
 
-• Lieferung der SELECTED Frame-Möbel und -Einrichtung
+• Lieferung der Selected Frame-Möbel und -Einrichtung
 • Montage und Aufbau der Shopfit-Elemente
 • Installation von Stangen, Racks und zugehörigem Inventar
-• Finale Merchandising-Umsetzung gemäß den SELECTED-Richtlinien
+• Finale Merchandising-Umsetzung gemäß den Selected-Richtlinien
 
 Anzahl der Monteure vor Ort: [Anzahl Personen]
-Weitere SELECTED-/Partner-Teammitglieder vor Ort: [Namen / Rollen, falls relevant]
+Weitere Selected-/Partner-Teammitglieder vor Ort: [Namen / Rollen, falls relevant]
 
 Bitte stellen Sie sicher, dass bei Ankunft Zugang gewährt wird und der Installationsbereich ab der vereinbarten Zeit verfügbar ist.
 
@@ -522,7 +522,7 @@ Falls digitale Bildschirme Teil des Setups sind, bitte bestätigen:
 • Netzwerkzugang kann während der Installation bereitgestellt werden
 • Lokale IT-Beschränkungen oder Freigabeprozesse sind im Vorfeld geklärt
 
-Unsere Bildschirminhalte werden zentral von SELECTED HQ gesteuert. Nach der Einrichtung ist im Tagesbetrieb keine manuelle Bedienung erforderlich.
+Unsere Bildschirminhalte werden zentral von Selected HQ gesteuert. Nach der Einrichtung ist im Tagesbetrieb keine manuelle Bedienung erforderlich.
 
 6. Rahmenbedingungen & Verantwortung vor Ort
 
@@ -570,7 +570,7 @@ Nicolaj`,
         subject: "Selected Frame — Alignement final installation : [Magasin / Ville]",
         body: `Bonjour [Nom du partenaire],
 
-Nous approchons de la livraison et de l'installation du setup SELECTED Frame chez [Magasin / Ville].
+Nous approchons de la livraison et de l'installation du setup Selected Frame chez [Magasin / Ville].
 
 À environ un mois de l'installation, nous souhaitons faire un dernier point pour nous assurer que tout est prêt sur site et que tous les aspects pratiques sont confirmés.
 
@@ -590,13 +590,13 @@ Merci de confirmer que ces dates sont en phase avec votre planning interne.
 
 L'installation comprendra :
 
-• Livraison du mobilier et des fixtures SELECTED Frame
+• Livraison du mobilier et des fixtures Selected Frame
 • Montage et installation des éléments shopfit
 • Pose des barres, racks et fixtures associées
-• Merchandising final et mise en scène selon les guidelines SELECTED
+• Merchandising final et mise en scène selon les guidelines Selected
 
 Nombre d'installateurs sur site : [Nombre de personnes]
-Membres SELECTED / partenaires supplémentaires sur site : [Noms / rôles si pertinent]
+Membres Selected / partenaires supplémentaires sur site : [Noms / rôles si pertinent]
 
 Merci de garantir l'accès à l'arrivée et la disponibilité de la zone d'installation à partir de l'heure convenue.
 
@@ -636,7 +636,7 @@ Si des écrans numériques sont inclus, merci de confirmer :
 • Un accès réseau peut être fourni pendant l'installation
 • Les restrictions IT locales ou processus de validation sont clarifiés à l'avance
 
-Notre contenu écran est géré centralement par SELECTED HQ. Une fois connecté, aucune opération manuelle quotidienne ne devrait être requise.
+Notre contenu écran est géré centralement par Selected HQ. Une fois connecté, aucune opération manuelle quotidienne ne devrait être requise.
 
 6. Conditions & responsabilités sur site
 
@@ -684,7 +684,7 @@ Nicolaj`,
         subject: "Selected Frame — Alineación final de instalación: [Tienda / Ciudad]",
         body: `Estimado/a [Nombre del partner],
 
-Nos acercamos a la entrega e instalación del setup SELECTED Frame en [Tienda / Ciudad].
+Nos acercamos a la entrega e instalación del setup Selected Frame en [Tienda / Ciudad].
 
 A aproximadamente un mes de la instalación, nos gustaría hacer una última alineación para asegurarnos de que todo está listo en sitio y que tenemos confirmados todos los detalles prácticos.
 
@@ -704,13 +704,13 @@ Por favor, confirma que las fechas anteriores están alineadas con vuestra plani
 
 La instalación incluirá:
 
-• Entrega del mobiliario y fixtures SELECTED Frame
+• Entrega del mobiliario y fixtures Selected Frame
 • Montaje e instalación de los elementos shopfit
 • Instalación de barras, racks y fixtures relacionadas
-• Merchandising y styling final según las guidelines SELECTED
+• Merchandising y styling final según las guidelines Selected
 
 Número de instaladores en sitio: [Número de personas]
-Miembros adicionales SELECTED / partner en sitio: [Nombres / roles si aplica]
+Miembros adicionales Selected / partner en sitio: [Nombres / roles si aplica]
 
 Por favor, asegura el acceso a la llegada y que el área de instalación esté disponible desde la hora acordada.
 
@@ -750,7 +750,7 @@ Si hay pantallas digitales incluidas, confirma por favor:
 • Acceso de red durante la instalación
 • Restricciones IT locales o procesos de aprobación clarificados con antelación
 
-El contenido de pantalla se gestiona de forma centralizada por SELECTED HQ. Una vez conectada, no debería requerir operación manual diaria.
+El contenido de pantalla se gestiona de forma centralizada por Selected HQ. Una vez conectada, no debería requerir operación manual diaria.
 
 6. Condiciones y responsabilidades en sitio
 
@@ -798,7 +798,7 @@ Nicolaj`,
         subject: "Selected Frame — Allineamento finale installazione: [Negozio / Città]",
         body: `Gentile [Nome del partner],
 
-Ci stiamo avvicinando alla consegna e all'installazione del setup SELECTED Frame presso [Negozio / Città].
+Ci stiamo avvicinando alla consegna e all'installazione del setup Selected Frame presso [Negozio / Città].
 
 Essendo a circa un mese dall'installazione, vorremmo fare un allineamento finale per assicurarci che tutto sia pronto in loco e che tutti i dettagli pratici siano confermati.
 
@@ -818,13 +818,13 @@ Conferma per favore che le date sopra siano allineate con la vostra pianificazio
 
 L'installazione comprenderà:
 
-• Consegna degli arredi e delle fixture SELECTED Frame
+• Consegna degli arredi e delle fixture Selected Frame
 • Montaggio e installazione degli elementi shopfit
 • Installazione di barre, racks e fixture correlate
-• Merchandising e styling finale secondo le guidelines SELECTED
+• Merchandising e styling finale secondo le guidelines Selected
 
 Numero di installatori in loco: [Numero di persone]
-Ulteriori membri SELECTED / partner in loco: [Nomi / ruoli se rilevanti]
+Ulteriori membri Selected / partner in loco: [Nomi / ruoli se rilevanti]
 
 Assicurati che l'accesso sia garantito all'arrivo e che l'area di installazione sia disponibile dall'orario concordato.
 
@@ -864,7 +864,7 @@ Se sono inclusi schermi digitali nel setup, conferma per favore:
 • Accesso di rete fornibile durante l'installazione
 • Restrizioni IT locali o processi di approvazione chiariti in anticipo
 
-I nostri contenuti per gli schermi sono gestiti centralmente da SELECTED HQ. Una volta connesso, non è richiesta operatività manuale quotidiana.
+I nostri contenuti per gli schermi sono gestiti centralmente da Selected HQ. Una volta connesso, non è richiesta operatività manuale quotidiana.
 
 6. Condizioni e responsabilità in loco
 
