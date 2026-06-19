@@ -264,6 +264,7 @@ To ensure a smooth installation, we kindly ask you to confirm that the following
 
 • The space is fully cleared of existing fixtures, stock and materials
 • Walls are finished and painted according to the agreed colour specification
+   – NCS S 1005-G30Y — GLOSS10
 • Flooring is completed and protected if required
 • Electrical work is completed according to the approved plan
 • Power outlets are installed, tested and ready for use
@@ -378,6 +379,7 @@ For at sikre en glidende installation beder vi om bekræftelse på, at følgende
 
 • Området er fuldt ryddet for eksisterende inventar, varer og materialer
 • Vægge er færdige og malet i den aftalte farve
+   – NCS S 1005-G30Y — GLOSS10
 • Gulv er færdigt og om nødvendigt afdækket
 • El-arbejde er udført efter den godkendte plan
 • Stikkontakter er installeret, testet og klar til brug
@@ -492,6 +494,7 @@ Für einen reibungslosen Ablauf bitten wir Sie, vor unserer Ankunft Folgendes zu
 
 • Die Fläche ist vollständig von bestehenden Möbeln, Ware und Material geräumt
 • Wände sind fertiggestellt und in der vereinbarten Farbe gestrichen
+   – NCS S 1005-G30Y — GLOSS10
 • Boden ist fertiggestellt und ggf. abgedeckt/geschützt
 • Elektroarbeiten sind nach dem freigegebenen Plan ausgeführt
 • Steckdosen sind installiert, geprüft und einsatzbereit
@@ -606,6 +609,7 @@ Pour assurer une installation fluide, merci de confirmer que les points suivants
 
 • L'espace est totalement libéré du mobilier, du stock et des matériaux existants
 • Les murs sont finis et peints selon la spécification de couleur convenue
+   – NCS S 1005-G30Y — GLOSS10
 • Le sol est posé et protégé si nécessaire
 • Les travaux électriques sont réalisés conformément au plan approuvé
 • Les prises sont installées, testées et prêtes à l'emploi
@@ -720,6 +724,7 @@ Para una instalación fluida, te pedimos confirmar que lo siguiente estará fina
 
 • El espacio está totalmente despejado de mobiliario, stock y materiales existentes
 • Las paredes están acabadas y pintadas según la especificación de color acordada
+   – NCS S 1005-G30Y — GLOSS10
 • El suelo está terminado y protegido si fuera necesario
 • El trabajo eléctrico está realizado según el plan aprobado
 • Las tomas de corriente están instaladas, probadas y listas para usar
@@ -834,6 +839,7 @@ Per garantire un'installazione fluida, ti chiediamo di confermare che i seguenti
 
 • Lo spazio è completamente libero da arredi, merce e materiali esistenti
 • Le pareti sono finite e tinteggiate secondo la specifica colore concordata
+   – NCS S 1005-G30Y — GLOSS10
 • Il pavimento è completato e, se necessario, protetto
 • I lavori elettrici sono realizzati secondo il piano approvato
 • Le prese sono installate, testate e pronte all'uso
