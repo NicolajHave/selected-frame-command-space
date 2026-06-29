@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   C, CATEGORIES, STATUS_LABELS, fmtDate, formatBytes,
   ExternalFolderGate, ExternalFolderUpload, ExternalFolderFileList,
@@ -100,6 +100,8 @@ function FolderDetailView({ folder: initialFolder, onBack, onChanged }) {
         </div>
       </div>
 
+      <FolderNotes folder={folder} onSaved={(f) => setFolder((prev) => ({ ...prev, notes: f.notes }))} />
+
       {folder.status !== "deleted" && (
         <div style={{ background: C.white, border: `1px solid ${C.surfaceD}`, borderRadius: 10, padding: 22, marginBottom: 20 }}>
           <ExternalFolderUpload folder={folder} onUploaded={onUploaded} />
@@ -110,6 +112,95 @@ function FolderDetailView({ folder: initialFolder, onBack, onChanged }) {
         Files {loading ? "· loading…" : `(${files.length})`}
       </div>
       <ExternalFolderFileList files={files} onDelete={onDelete} allowDelete />
+    </div>
+  );
+}
+
+// Per-folder notes, kept as bullet lines. Stored as a single newline-joined
+// text field; each non-empty line is one bullet. Debounced autosave via PATCH.
+function FolderNotes({ folder, onSaved }) {
+  const linesFrom = (notes) => {
+    const arr = (notes || "").split("\n").map((l) => l.replace(/^[•\-\s]+/, "").trimEnd());
+    return arr.length ? arr : [];
+  };
+  const [items, setItems] = useState(() => linesFrom(folder.notes));
+  const [status, setStatus] = useState(null); // dirty | saving | saved | error
+  const timer = useRef(null);
+  const inputsRef = useRef({});
+
+  // Re-sync if the folder changes (e.g. navigating between folders).
+  useEffect(() => { setItems(linesFrom(folder.notes)); }, [folder.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const save = useCallback((nextItems) => {
+    clearTimeout(timer.current);
+    setStatus("dirty");
+    timer.current = setTimeout(async () => {
+      setStatus("saving");
+      try {
+        const notes = nextItems.map((l) => l.trim()).filter(Boolean).join("\n");
+        const r = await fetch(`/api/external-folders/${folder.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ notes }),
+        });
+        if (!r.ok) throw new Error(`Save failed (${r.status})`);
+        const d = await r.json();
+        setStatus("saved");
+        onSaved?.(d.folder);
+        setTimeout(() => setStatus((s) => (s === "saved" ? null : s)), 1500);
+      } catch {
+        setStatus("error");
+      }
+    }, 700);
+  }, [folder.id, onSaved]);
+
+  const update = (next) => { setItems(next); save(next); };
+  const setAt = (i, v) => update(items.map((it, idx) => (idx === i ? v : it)));
+  const removeAt = (i) => update(items.filter((_, idx) => idx !== i));
+  const addItem = () => {
+    const next = [...items, ""];
+    setItems(next);
+    // Focus the new input after render.
+    setTimeout(() => inputsRef.current[next.length - 1]?.focus(), 0);
+  };
+  const onKeyDown = (i, e) => {
+    if (e.key === "Enter") { e.preventDefault(); addItem(); }
+    else if (e.key === "Backspace" && items[i] === "" && items.length > 1) { e.preventDefault(); removeAt(i); }
+  };
+
+  const statusLabel = { dirty: "Editing…", saving: "Saving…", saved: "Saved", error: "Save failed" }[status];
+
+  return (
+    <div style={{ background: C.white, border: `1px solid ${C.surfaceD}`, borderRadius: 10, padding: 22, marginBottom: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ fontSize: 9, fontWeight: 700, color: C.oak, letterSpacing: "1.5px", textTransform: "uppercase" }}>Notes</div>
+        {statusLabel && <div style={{ fontSize: 11, color: status === "error" ? C.nogo : C.textS }}>{statusLabel}</div>}
+      </div>
+
+      {items.length === 0 ? (
+        <div style={{ fontSize: 13, color: C.textS, marginBottom: 12 }}>No notes yet. Add a short note or a few bullet points for this project.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+          {items.map((it, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ color: C.oak, fontSize: 15, lineHeight: 1, width: 10, textAlign: "center" }}>•</span>
+              <input
+                ref={(el) => { inputsRef.current[i] = el; }}
+                value={it}
+                onChange={(e) => setAt(i, e.target.value)}
+                onKeyDown={(e) => onKeyDown(i, e)}
+                placeholder="Write a note…"
+                style={{ flex: 1, fontSize: 13, color: C.text, border: "none", borderBottom: `1px solid ${C.surfaceD}`, padding: "5px 2px", outline: "none", background: "transparent", fontFamily: "inherit" }}
+              />
+              <button onClick={() => removeAt(i)} title="Remove" style={{ fontSize: 13, color: C.steel, background: "none", border: "none", cursor: "pointer", padding: "2px 6px", lineHeight: 1 }}>×</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button onClick={addItem} style={{ fontSize: 12, fontWeight: 500, color: C.oak, background: "none", border: `1px dashed ${C.surfaceD}`, borderRadius: 6, padding: "7px 12px", cursor: "pointer" }}>
+        + Add note
+      </button>
     </div>
   );
 }
