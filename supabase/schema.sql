@@ -18,8 +18,13 @@ CREATE TABLE IF NOT EXISTS external_project_folders (
   reminder_7_sent_at    TIMESTAMPTZ,
   last_opened_at        TIMESTAMPTZ,
   blob_prefix           TEXT NOT NULL,
-  folder_url_slug       TEXT UNIQUE NOT NULL
+  folder_url_slug       TEXT UNIQUE NOT NULL,
+  notes                 TEXT
 );
+
+-- Per-folder free-text notes (bullet form). Added after the initial release;
+-- this ALTER lets existing deployments pick it up on a re-run.
+ALTER TABLE external_project_folders ADD COLUMN IF NOT EXISTS notes TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_external_folders_status
   ON external_project_folders(status);

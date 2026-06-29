@@ -31,6 +31,7 @@ function rowToFolder(r) {
     lastOpenedAt: r.last_opened_at,
     blobPrefix: r.blob_prefix,
     folderUrlSlug: r.folder_url_slug,
+    notes: r.notes || "",
   };
 }
 
@@ -187,6 +188,16 @@ export async function syncProjectStatus({ asanaProjectId, completed, completedAt
     'syncProjectStatus',
   );
   return getExternalFolderById(folder.id);
+}
+
+/** Update the per-folder notes (free text, typically bullet lines). */
+export async function updateExternalFolderNotes(folderId, notes) {
+  const sb = getSupabase();
+  unwrap(
+    await sb.from(FOLDERS).update({ notes: notes || null }).eq('id', folderId),
+    'updateExternalFolderNotes',
+  );
+  return getExternalFolderById(folderId);
 }
 
 export async function updateLastOpened(folderId) {
