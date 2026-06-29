@@ -28,6 +28,16 @@ const FALLBACK_PROJECTS=[{gid:"1",name:"Salling / Kultorvet",type:"SIS",sex:null
 const fmtDate=(d)=>d?new Date(d).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):"—";
 const fmtEur=(n)=>typeof n==="number"&&n>0?`€${n.toLocaleString("de-DE",{minimumFractionDigits:0,maximumFractionDigits:0})}`:"—";
 const fmtEurSigned=(n)=>{if(typeof n!=="number"||n===0)return"—";const abs=Math.abs(n).toLocaleString("de-DE",{minimumFractionDigits:0,maximumFractionDigits:0});return n<0?`−€${abs}`:`€${abs}`};
+// Quotation currencies. `eurRate` = how many units of the currency per 1 EUR;
+// used to convert the fixed EUR add-on price list into the chosen currency.
+// DKK is pegged to EUR (~7.46); GBP floats (indicative) — both editable in the UI.
+const CURRENCIES={
+  EUR:{code:"EUR",symbol:"€",locale:"de-DE",eurRate:1},
+  DKK:{code:"DKK",symbol:"kr ",locale:"da-DK",eurRate:7.46},
+  GBP:{code:"GBP",symbol:"£",locale:"en-GB",eurRate:0.85},
+};
+const fmtMoney=(n,cur)=>typeof n==="number"&&n>0?`${cur.symbol}${n.toLocaleString(cur.locale,{minimumFractionDigits:0,maximumFractionDigits:0})}`:"—";
+const fmtMoneySigned=(n,cur)=>{if(typeof n!=="number"||n===0)return"—";const abs=Math.abs(n).toLocaleString(cur.locale,{minimumFractionDigits:0,maximumFractionDigits:0});return n<0?`−${cur.symbol}${abs}`:`${cur.symbol}${abs}`};
 const todayISO=()=>new Date().toISOString().split("T")[0];
 const addDaysISO=(iso,days)=>{const d=new Date(iso);d.setDate(d.getDate()+days);return d.toISOString().split("T")[0]};
 const IMG=["/images/kh_selected_sis_018_web.jpg","/images/kh_selected_sis_075_web.jpg","/images/kh_selected_sis_023_web.jpg","/images/kh_selected_sis_032_web.jpg","/images/kh_selected_sis_048_web.jpg","/images/kh_selected_sis_029_web.jpg"];
@@ -41,7 +51,7 @@ const Title=({children,sub})=><div style={{marginBottom:24}}><h2 style={{fontSiz
 const PM=({value,onChange})=><div style={{display:"flex",alignItems:"center"}}><button onClick={()=>onChange(Math.max(1,value-1))} style={{width:28,height:28,border:`1px solid ${C.surfaceD}`,borderRadius:"4px 0 0 4px",background:C.surface,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button><input type="text" inputMode="numeric" value={value} onChange={e=>onChange(parseInt(e.target.value)||1)} style={{width:40,height:28,border:`1px solid ${C.surfaceD}`,borderLeft:"none",borderRight:"none",fontSize:13,textAlign:"center",outline:"none"}}/><button onClick={()=>onChange(value+1)} style={{width:28,height:28,border:`1px solid ${C.surfaceD}`,borderRadius:"0 4px 4px 0",background:C.surface,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button></div>;
 
 // Editable Total field (module-level for stable identity - prevents focus loss on every keystroke)
-const ET=({label,field,cats,setCats})=><div style={{padding:"10px 14px",background:C.surface,borderRadius:6}}><div style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>{label}</div><div style={{display:"flex",alignItems:"center",gap:4}}><span style={{fontSize:16,color:C.text}}>€</span><input type="text" inputMode="decimal" value={cats[field]} onChange={e=>setCats(p=>({...p,[field]:e.target.value}))} style={{fontSize:18,fontWeight:300,color:C.text,fontFamily:"'DM Mono',monospace",border:"none",borderBottom:`1px solid ${C.surfaceD}`,background:"transparent",outline:"none",width:100,padding:"2px 0"}}/></div></div>;
+const ET=({label,field,cats,setCats,symbol="€"})=><div style={{padding:"10px 14px",background:C.surface,borderRadius:6}}><div style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>{label}</div><div style={{display:"flex",alignItems:"center",gap:4}}><span style={{fontSize:16,color:C.text}}>{symbol}</span><input type="text" inputMode="decimal" value={cats[field]} onChange={e=>setCats(p=>({...p,[field]:e.target.value}))} style={{fontSize:18,fontWeight:300,color:C.text,fontFamily:"'DM Mono',monospace",border:"none",borderBottom:`1px solid ${C.surfaceD}`,background:"transparent",outline:"none",width:100,padding:"2px 0"}}/></div></div>;
 
 // ─── NEWS ─────────────────────────────────────────────────
 const fmtNewsDate=(d)=>new Date(d).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
@@ -286,7 +296,12 @@ const QuotationPage=()=>{
   const [emailOpen,setEmailOpen]=useState(false);
   const [emailTo,setEmailTo]=useState("");
   const [sendResult,setSendResult]=useState(null); // {ok, message}
+  const [currency,setCurrency]=useState("EUR");
+  const [fxRate,setFxRate]=useState(String(CURRENCIES.EUR.eurRate));
   const fileRef=useRef(null);
+
+  // Switching currency resets the rate to that currency's default (editable).
+  const changeCurrency=(code)=>{setCurrency(code);setFxRate(String(CURRENCIES[code].eurRate));};
 
   const loadPdfJs=useCallback(()=>new Promise((res,rej)=>{if(window.pdfjsLib)return res(window.pdfjsLib);const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';s.onload=()=>{window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';res(window.pdfjsLib)};s.onerror=rej;document.head.appendChild(s)}),[]);
 
@@ -317,9 +332,19 @@ const QuotationPage=()=>{
   const toggleAO=(id)=>setAddOns(p=>{const n={...p};if(n[id])delete n[id];else n[id]={qty:1};return n});
   const setAOQty=(id,q)=>setAddOns(p=>({...p,[id]:{qty:Math.max(1,parseInt(q)||1)}}));
 
+  // Currency-aware formatting: shadow the EUR helpers locally so every call
+  // site inside this component (display, PDF, email) follows the chosen
+  // currency without touching the global EUR formatters used elsewhere.
+  const curBase=CURRENCIES[currency]||CURRENCIES.EUR;
+  const rate=parseFloat(String(fxRate).replace(",","."))||curBase.eurRate;
+  const cur={...curBase,eurRate:rate};
+  const fmtEur=(n)=>fmtMoney(n,cur);
+  const fmtEurSigned=(n)=>fmtMoneySigned(n,cur);
+
   const inv=parseFloat(cats.inventory)||0;const del=parseFloat(cats.selectedDeliveries)||0;const proj=parseFloat(cats.specificProjectCost)||0;
   const supTotal=inv+del+proj;
-  const aoTotal=Object.entries(addOns).reduce((s,[id,{qty}])=>{const a=ADD_ONS.find(x=>x.id===id);return s+(a?a.price*qty:0)},0);
+  // Add-on list prices are defined in EUR → convert to the chosen currency.
+  const aoTotal=Object.entries(addOns).reduce((s,[id,{qty}])=>{const a=ADD_ONS.find(x=>x.id===id);return s+(a?a.price*qty*cur.eurRate:0)},0);
   const parseLooseEur=(s)=>{if(!s)return 0;const v=String(s).replace(/\s+/g,"").replace(",",".");return parseFloat(v)||0};
   const custTotal=customs.reduce((s,i)=>s+parseLooseEur(i.price)*(parseInt(i.qty)||1),0);
   const grand=supTotal+aoTotal+custTotal;
@@ -331,7 +356,7 @@ const QuotationPage=()=>{
   const infos=warnings.filter(w=>w.severity==="info");
 
   const exportPDF=()=>{
-    const aoItems=Object.entries(addOns).map(([id,{qty}])=>{const a=ADD_ONS.find(x=>x.id===id);return a?{name:a.name,qty,total:a.price*qty}:null}).filter(Boolean);
+    const aoItems=Object.entries(addOns).map(([id,{qty}])=>{const a=ADD_ONS.find(x=>x.id===id);return a?{name:a.name,qty,total:a.price*qty*cur.eurRate}:null}).filter(Boolean);
     const custItems=customs.filter(i=>i.name&&parseLooseEur(i.price)!==0).map(i=>({name:i.name,qty:parseInt(i.qty)||1,total:parseLooseEur(i.price)*(parseInt(i.qty)||1)}));
     const qDate=hdr.quotationDate?fmtDate(hdr.quotationDate):fmtDate(todayISO());
     const vDate=fmtDate(validUntil);
@@ -346,6 +371,7 @@ const QuotationPage=()=>{
     <div class="row"><span class="lbl">Valid until</span> ${vDate}</div>
     ${hdr.salesArea?`<div class="row"><span class="lbl">Sales area</span> ${hdr.salesArea} m²</div>`:''}
     ${hdr.gender?`<div class="row"><span class="lbl">Gender</span> ${hdr.gender}</div>`:''}
+    <div class="row"><span class="lbl">Currency</span> ${currency}</div>
   </div>
 </div>
 <button onclick="window.print()" style="background:#1A1A1A;color:#fff;border:none;padding:10px 24px;border-radius:6px;font-size:13px;cursor:pointer;margin-bottom:24px">Print / Save as PDF</button>
@@ -356,7 +382,7 @@ const QuotationPage=()=>{
 <tr><td>Specific Project Cost</td><td class="r">${fmtEur(proj)}</td></tr>
 <tr style="font-weight:600;border-top:2px solid #ECEAE5"><td>Total</td><td class="r">${fmtEur(supTotal)}</td></tr>
 </tbody></table>
-${aoItems.length?`<h2>Add-ons</h2><table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Total</th></tr></thead><tbody>${aoItems.map(a=>`<tr><td>${a.name}</td><td class="r">${a.qty}</td><td class="r">${fmtEur(a.total)}</td></tr>`).join('')}<tr style="font-weight:600;border-top:2px solid #ECEAE5"><td colspan="2">Add-ons Total</td><td class="r">${fmtEur(aoTotal)}</td></tr></tbody></table>`:''}
+${aoItems.length?`<h2>Add-ons</h2><table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Total</th></tr></thead><tbody>${aoItems.map(a=>`<tr><td>${a.name}</td><td class="r">${a.qty}</td><td class="r">${fmtEur(a.total)}</td></tr>`).join('')}<tr style="font-weight:600;border-top:2px solid #ECEAE5"><td colspan="2">Add-ons Total</td><td class="r">${fmtEur(aoTotal)}</td></tr></tbody></table>${currency!=='EUR'?`<div style="font-size:10px;color:#8A8D8F;margin-top:-12px">Add-on prices converted from EUR at 1 EUR = ${rate} ${currency}.</div>`:''}`:''}
 ${custItems.length?`<h2>Additional Items</h2><table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Total</th></tr></thead><tbody>${custItems.map(a=>`<tr><td>${a.name}</td><td class="r">${a.qty}</td><td class="r">${fmtEurSigned(a.total)}</td></tr>`).join('')}<tr style="font-weight:600;border-top:2px solid #ECEAE5"><td colspan="2">Total</td><td class="r">${fmtEurSigned(custTotal)}</td></tr></tbody></table>`:''}
 <div class="tot"><div class="l">Total excl. VAT</div><div class="a">${fmtEur(grand)}</div></div>
 ${sqm>0?`<div class="sq">${fmtEur(Math.round(grand/sqm))} / m²</div>`:''}
@@ -412,6 +438,11 @@ Bestseller A/S`;
         <div style={{marginBottom:12}}><label style={{display:"block",fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>Project Name</label><input value={hdr.project} onChange={e=>setHdr(h=>({...h,project:e.target.value}))} style={{width:"100%",padding:"8px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,outline:"none"}}/></div>
         <div style={{marginBottom:12}}><label style={{display:"block",fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>Sales Area (m²)</label><input value={hdr.salesArea} onChange={e=>setHdr(h=>({...h,salesArea:e.target.value}))} style={{width:"100%",padding:"8px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,outline:"none"}}/></div>
         <div style={{marginBottom:12}}><label style={{display:"block",fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>Gender</label><select value={hdr.gender} onChange={e=>setHdr(h=>({...h,gender:e.target.value}))} style={{width:"100%",padding:"8px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,background:C.white}}><option value="">Choose Gender</option><option>Unisex</option><option>Womens</option><option>Mens</option></select></div>
+        <div style={{display:"grid",gridTemplateColumns:currency==="EUR"?"1fr":"1fr 1fr",gap:8,marginBottom:12}}>
+          <div><label style={{display:"block",fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>Currency</label><select value={currency} onChange={e=>changeCurrency(e.target.value)} style={{width:"100%",padding:"8px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,background:C.white}}>{Object.keys(CURRENCIES).map(c=><option key={c} value={c}>{c}</option>)}</select></div>
+          {currency!=="EUR"&&<div><label style={{display:"block",fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>1 EUR = {currency}</label><input type="text" inputMode="decimal" value={fxRate} onChange={e=>setFxRate(e.target.value)} style={{width:"100%",padding:"8px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,outline:"none"}}/></div>}
+        </div>
+        {currency!=="EUR"&&<div style={{fontSize:11,color:C.textS,marginBottom:12,lineHeight:1.5}}>Amounts you enter/parse are treated as {currency}. The fixed add-on list (priced in EUR) is converted at this rate.</div>}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
           <div><label style={{display:"block",fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>Quotation Date</label><input type="date" value={hdr.quotationDate} onChange={e=>setHdr(h=>({...h,quotationDate:e.target.value}))} style={{width:"100%",padding:"8px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,outline:"none"}}/></div>
           <div><label style={{display:"block",fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>Valid Until</label><input type="text" readOnly value={fmtDate(validUntil)} style={{width:"100%",padding:"8px 12px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,outline:"none",background:C.surface,color:C.textS}}/></div>
@@ -440,7 +471,7 @@ Bestseller A/S`;
     </div>}
 
     {parsed&&<div style={{marginBottom:32}}><Title sub="From supplier quotation – click amounts to edit">Cost Breakdown</Title><div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,marginBottom:8}}><ET label="Inventory" field="inventory" cats={cats} setCats={setCats}/><ET label="Selected Deliveries" field="selectedDeliveries" cats={cats} setCats={setCats}/><ET label="Specific Project Cost" field="specificProjectCost" cats={cats} setCats={setCats}/></div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,marginBottom:8}}><ET label="Inventory" field="inventory" cats={cats} setCats={setCats} symbol={cur.symbol}/><ET label="Selected Deliveries" field="selectedDeliveries" cats={cats} setCats={setCats} symbol={cur.symbol}/><ET label="Specific Project Cost" field="specificProjectCost" cats={cats} setCats={setCats} symbol={cur.symbol}/></div>
       {(parsed.summary?.inventoryBreakdown?.length>1||parsed.summary?.projectCostBreakdown?.length>1)&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,marginBottom:16,fontSize:10,color:C.textS,lineHeight:1.4}}>
         <div>{parsed.summary?.inventoryBreakdown?.length>1?<>Includes: {parsed.summary.inventoryBreakdown.map(x=>`${x.name.toLowerCase()} (${fmtEur(x.value)})`).join(", ")}</>:<>&nbsp;</>}</div>
         <div>&nbsp;</div>
@@ -509,12 +540,12 @@ Bestseller A/S`;
               </div>
               <div style={{textAlign:"right"}}>
                 <div style={{fontSize:14,fontWeight:600,fontFamily:"'DM Mono',monospace"}}>{s.rounded} pcs</div>
-                <div style={{fontSize:10,color:C.textS}}>{s.rounded>0?`${s.rounded/s.pack}× ${s.pack}-pack · ${fmtEur((s.rounded/s.pack)*s.price)}`:"—"}</div>
+                <div style={{fontSize:10,color:C.textS}}>{s.rounded>0?`${s.rounded/s.pack}× ${s.pack}-pack · ${fmtEur((s.rounded/s.pack)*s.price*cur.eurRate)}`:"—"}</div>
               </div>
             </div>)}
             <div style={{display:"flex",justifyContent:"space-between",padding:"10px 14px",background:C.black,borderRadius:6,color:C.white,marginTop:12}}>
               <span style={{fontSize:11,fontWeight:600,color:C.steelL,textTransform:"uppercase"}}>Hanger cost</span>
-              <span style={{fontSize:18,fontWeight:300,fontFamily:"'Cormorant Garamond',serif"}}>{fmtEur((shirt/50)*69+(clips/50)*83+(coat/25)*89)}</span>
+              <span style={{fontSize:18,fontWeight:300,fontFamily:"'Cormorant Garamond',serif"}}>{fmtEur(((shirt/50)*69+(clips/50)*83+(coat/25)*89)*cur.eurRate)}</span>
             </div>
             <button onClick={addToQuote} disabled={rawTotal===0} style={{width:"100%",marginTop:12,padding:"12px",borderRadius:8,border:"none",background:rawTotal===0?C.steelL:(alreadyMatching?C.success:C.oak),color:C.white,fontSize:13,fontWeight:600,cursor:rawTotal===0?"not-allowed":"pointer"}}>{alreadyMatching?"✓ Added to Quote":"Add to Quote →"}</button>
           </div>
@@ -522,8 +553,8 @@ Bestseller A/S`;
       </div>;
     })()}
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginBottom:32}}>
-      <div><Title sub="Select optional elements">2. Add-ons</Title><div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>{ADD_ONS.map(a=>{const sel=addOns[a.id];return<div key={a.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:`1px solid ${C.surfaceD}`}}><input type="checkbox" checked={!!sel} onChange={()=>toggleAO(a.id)} style={{width:16,height:16,accentColor:C.oak}}/><div style={{flex:1}}><div style={{fontSize:13}}>{a.name}</div><div style={{fontSize:11,color:C.textS}}>{a.cat} · {fmtEur(a.price)} / pc</div></div>{sel&&<PM value={sel.qty} onChange={v=>setAOQty(a.id,v)}/>}{sel&&<div style={{fontSize:13,fontWeight:600,minWidth:60,textAlign:"right"}}>{fmtEur(a.price*sel.qty)}</div>}</div>})}</div></div>
-      <div><Title sub="Additional costs">3. Custom Items</Title><div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>{customs.map((it,i)=><div key={i} style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}><input placeholder="Description" value={it.name} onChange={e=>setCustoms(p=>p.map((x,j)=>j===i?{...x,name:e.target.value}:x))} style={{flex:2,padding:"8px 10px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,outline:"none"}}/><input placeholder="€" type="text" inputMode="decimal" value={it.price} onChange={e=>setCustoms(p=>p.map((x,j)=>j===i?{...x,price:e.target.value}:x))} style={{width:80,padding:"8px 10px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,outline:"none"}}/><input placeholder="Qty" type="text" inputMode="numeric" value={it.qty} onChange={e=>setCustoms(p=>p.map((x,j)=>j===i?{...x,qty:e.target.value}:x))} style={{width:48,padding:"8px 10px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,textAlign:"center",outline:"none"}}/><div style={{minWidth:60,textAlign:"right",fontSize:12,fontWeight:600,color:parseLooseEur(it.price)!==0?(parseLooseEur(it.price)<0?C.danger:C.text):C.textS}}>{fmtEurSigned(parseLooseEur(it.price)*(parseInt(it.qty)||1))}</div><button onClick={()=>setCustoms(p=>p.filter((_,j)=>j!==i))} style={{background:"none",border:"none",color:C.danger,cursor:"pointer",fontSize:16}}>×</button></div>)}<button onClick={()=>setCustoms(p=>[...p,{name:"",price:"",qty:"1"}])} style={{width:"100%",padding:"10px",borderRadius:6,border:`1px dashed ${C.surfaceD}`,background:"transparent",cursor:"pointer",fontSize:13,color:C.textS}}>+ Add custom item</button>{custTotal!==0&&<div style={{display:"flex",justifyContent:"space-between",padding:"12px 4px 0",marginTop:12,borderTop:`1px solid ${C.surfaceD}`,fontSize:12}}><span style={{color:C.textS}}>Custom Items subtotal</span><span style={{fontWeight:600,color:custTotal<0?C.danger:C.text}}>{fmtEurSigned(custTotal)}</span></div>}</div>
+      <div><Title sub="Select optional elements">2. Add-ons</Title><div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>{ADD_ONS.map(a=>{const sel=addOns[a.id];return<div key={a.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:`1px solid ${C.surfaceD}`}}><input type="checkbox" checked={!!sel} onChange={()=>toggleAO(a.id)} style={{width:16,height:16,accentColor:C.oak}}/><div style={{flex:1}}><div style={{fontSize:13}}>{a.name}</div><div style={{fontSize:11,color:C.textS}}>{a.cat} · {fmtEur(a.price*cur.eurRate)} / pc</div></div>{sel&&<PM value={sel.qty} onChange={v=>setAOQty(a.id,v)}/>}{sel&&<div style={{fontSize:13,fontWeight:600,minWidth:60,textAlign:"right"}}>{fmtEur(a.price*sel.qty*cur.eurRate)}</div>}</div>})}</div></div>
+      <div><Title sub="Additional costs">3. Custom Items</Title><div style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`}}>{customs.map((it,i)=><div key={i} style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}><input placeholder="Description" value={it.name} onChange={e=>setCustoms(p=>p.map((x,j)=>j===i?{...x,name:e.target.value}:x))} style={{flex:2,padding:"8px 10px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,outline:"none"}}/><input placeholder={cur.symbol.trim()} type="text" inputMode="decimal" value={it.price} onChange={e=>setCustoms(p=>p.map((x,j)=>j===i?{...x,price:e.target.value}:x))} style={{width:80,padding:"8px 10px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,outline:"none"}}/><input placeholder="Qty" type="text" inputMode="numeric" value={it.qty} onChange={e=>setCustoms(p=>p.map((x,j)=>j===i?{...x,qty:e.target.value}:x))} style={{width:48,padding:"8px 10px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,textAlign:"center",outline:"none"}}/><div style={{minWidth:60,textAlign:"right",fontSize:12,fontWeight:600,color:parseLooseEur(it.price)!==0?(parseLooseEur(it.price)<0?C.danger:C.text):C.textS}}>{fmtEurSigned(parseLooseEur(it.price)*(parseInt(it.qty)||1))}</div><button onClick={()=>setCustoms(p=>p.filter((_,j)=>j!==i))} style={{background:"none",border:"none",color:C.danger,cursor:"pointer",fontSize:16}}>×</button></div>)}<button onClick={()=>setCustoms(p=>[...p,{name:"",price:"",qty:"1"}])} style={{width:"100%",padding:"10px",borderRadius:6,border:`1px dashed ${C.surfaceD}`,background:"transparent",cursor:"pointer",fontSize:13,color:C.textS}}>+ Add custom item</button>{custTotal!==0&&<div style={{display:"flex",justifyContent:"space-between",padding:"12px 4px 0",marginTop:12,borderTop:`1px solid ${C.surfaceD}`,fontSize:12}}><span style={{color:C.textS}}>Custom Items subtotal</span><span style={{fontWeight:600,color:custTotal<0?C.danger:C.text}}>{fmtEurSigned(custTotal)}</span></div>}</div>
         <div style={{background:C.black,borderRadius:8,padding:24,marginTop:20,color:C.white}}>
           <div style={{fontSize:11,color:C.steelL,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase",marginBottom:12}}>Quotation Summary</div>
           {supTotal>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.1)"}}><span style={{color:C.steelL}}>Project Cost</span><span>{fmtEur(supTotal)}</span></div>}
