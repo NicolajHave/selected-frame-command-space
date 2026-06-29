@@ -283,6 +283,47 @@ const matchHangerRule=(itemName)=>{
 const roundShirtClips=(n)=>{const rest=n%50;return rest>15?n+(50-rest):n-rest};
 const roundCoat=(n)=>{const rest=n%25;return rest>5?n+(25-rest):n-rest};
 
+// Cost split between HQ / Market / optional third party. Distributes the
+// grand total by percentage. Lives in the right column of the Quotation Builder.
+const CostSplitCard=({grand,split,setSplit,splitOn,setSplitOn,amounts,sum,valid,money})=>{
+  const setAt=(i,patch)=>setSplit(p=>p.map((x,j)=>j===i?{...x,...patch}:x));
+  const removeAt=(i)=>setSplit(p=>p.length<=2?p:p.filter((_,j)=>j!==i));
+  const addParty=()=>setSplit(p=>p.length>=3?p:[...p,{label:p.length===2?"Third party":`Party ${p.length+1}`,pct:"0"}]);
+  const setPcts=(arr)=>setSplit(p=>p.map((x,i)=>({...x,pct:String(arr[i]??x.pct)})));
+  const evenSplit=()=>setSplit(p=>{const n=p.length;const base=Math.floor(100/n);const rem=100-base*n;return p.map((x,i)=>({...x,pct:String(base+(i<rem?1:0))}));});
+  return (
+    <div style={{background:C.white,border:`1px solid ${C.surfaceD}`,borderRadius:8,padding:20,marginTop:16}}>
+      <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",marginBottom:splitOn?14:0}}>
+        <input type="checkbox" checked={splitOn} onChange={e=>setSplitOn(e.target.checked)} style={{width:16,height:16,accentColor:C.oak}}/>
+        <span style={{fontSize:13,fontWeight:600,color:C.text}}>Cost split</span>
+        <span style={{fontSize:11,color:C.textS}}>HQ / Market{split.length>2?" / third party":""} — included in PDF when on</span>
+      </label>
+      {splitOn&&<div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+          {split.length===2&&[["50 / 50",[50,50]],["60 / 40",[60,40]],["70 / 30",[70,30]]].map(([l,arr])=>
+            <button key={l} onClick={()=>setPcts(arr)} style={{fontSize:11,fontWeight:500,padding:"5px 10px",borderRadius:14,border:`1px solid ${C.surfaceD}`,background:C.white,color:C.text,cursor:"pointer"}}>{l}</button>)}
+          <button onClick={evenSplit} style={{fontSize:11,fontWeight:500,padding:"5px 10px",borderRadius:14,border:`1px solid ${C.surfaceD}`,background:C.white,color:C.text,cursor:"pointer"}}>Even</button>
+        </div>
+        {split.map((p,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+          <input value={p.label} onChange={e=>setAt(i,{label:e.target.value})} placeholder="Party" style={{flex:1,minWidth:0,padding:"7px 10px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,outline:"none"}}/>
+          <div style={{display:"flex",alignItems:"center",gap:2}}>
+            <input value={p.pct} onChange={e=>setAt(i,{pct:e.target.value})} type="text" inputMode="decimal" style={{width:48,padding:"7px 6px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,textAlign:"right",outline:"none"}}/>
+            <span style={{fontSize:13,color:C.textS}}>%</span>
+          </div>
+          <div style={{minWidth:78,textAlign:"right",fontSize:13,fontWeight:600,color:C.text}}>{money(amounts[i])}</div>
+          {split.length>2&&<button onClick={()=>removeAt(i)} style={{background:"none",border:"none",color:C.danger,cursor:"pointer",fontSize:16,lineHeight:1}}>×</button>}
+        </div>)}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10,paddingTop:10,borderTop:`1px solid ${C.surfaceD}`}}>
+          {split.length<3
+            ? <button onClick={addParty} style={{fontSize:12,fontWeight:500,color:C.oak,background:"none",border:"none",cursor:"pointer",padding:0}}>+ Add third party</button>
+            : <span/>}
+          <span style={{fontSize:12,fontWeight:600,color:valid?C.go:C.warn}}>Σ {sum.toLocaleString("en-US",{maximumFractionDigits:1})}%{valid?"":" — must total 100%"}</span>
+        </div>
+      </div>}
+    </div>
+  );
+};
+
 const QuotationPage=()=>{
   const [parsed,setParsed]=useState(null);
   const [parsing,setParsing]=useState(false);
@@ -298,6 +339,8 @@ const QuotationPage=()=>{
   const [sendResult,setSendResult]=useState(null); // {ok, message}
   const [currency,setCurrency]=useState("EUR");
   const [fxRate,setFxRate]=useState(String(CURRENCIES.EUR.eurRate));
+  const [splitOn,setSplitOn]=useState(false);
+  const [split,setSplit]=useState([{label:"HQ",pct:"50"},{label:"Market",pct:"50"}]);
   const fileRef=useRef(null);
 
   // Switching currency resets the rate to that currency's default (editable).
@@ -348,6 +391,11 @@ const QuotationPage=()=>{
   const parseLooseEur=(s)=>{if(!s)return 0;const v=String(s).replace(/\s+/g,"").replace(",",".");return parseFloat(v)||0};
   const custTotal=customs.reduce((s,i)=>s+parseLooseEur(i.price)*(parseInt(i.qty)||1),0);
   const grand=supTotal+aoTotal+custTotal;
+  // Cost split: distribute the grand total across parties by percentage.
+  const splitPct=(p)=>parseFloat(String(p.pct).replace(",","."))||0;
+  const splitSum=split.reduce((s,p)=>s+splitPct(p),0);
+  const splitValid=Math.abs(splitSum-100)<0.5;
+  const splitAmounts=(()=>{const a=split.map(p=>Math.round(grand*splitPct(p)/100));if(splitValid&&a.length){a[a.length-1]+=Math.round(grand)-a.reduce((x,y)=>x+y,0);}return a;})();
   const sqm=parseFloat(hdr.salesArea)||0;
   const validUntil=hdr.quotationDate?addDaysISO(hdr.quotationDate,14):"";
 
@@ -386,6 +434,7 @@ ${aoItems.length?`<h2>Add-ons</h2><table><thead><tr><th>Item</th><th class="r">Q
 ${custItems.length?`<h2>Additional Items</h2><table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Total</th></tr></thead><tbody>${custItems.map(a=>`<tr><td>${a.name}</td><td class="r">${a.qty}</td><td class="r">${fmtEurSigned(a.total)}</td></tr>`).join('')}<tr style="font-weight:600;border-top:2px solid #ECEAE5"><td colspan="2">Total</td><td class="r">${fmtEurSigned(custTotal)}</td></tr></tbody></table>`:''}
 <div class="tot"><div class="l">Total excl. VAT</div><div class="a">${fmtEur(grand)}</div></div>
 ${sqm>0?`<div class="sq">${fmtEur(Math.round(grand/sqm))} / m²</div>`:''}
+${splitOn?`<h2>Cost Split</h2><table><thead><tr><th>Party</th><th class="r">Share</th><th class="r">Amount</th></tr></thead><tbody>${split.map((p,i)=>`<tr><td>${p.label||`Party ${i+1}`}</td><td class="r">${splitPct(p).toLocaleString("en-US",{maximumFractionDigits:1})}%</td><td class="r">${fmtEur(splitAmounts[i])}</td></tr>`).join('')}<tr style="font-weight:600;border-top:2px solid #ECEAE5"><td>Total</td><td class="r">${splitSum.toLocaleString("en-US",{maximumFractionDigits:1})}%</td><td class="r">${fmtEur(grand)}</td></tr></tbody></table>${splitValid?'':`<div style="font-size:10px;color:#C75B4A;margin-top:-12px">Note: shares total ${splitSum}%, not 100%.</div>`}`:''}
 <div class="validity"><strong>Validity</strong>This quotation is valid until ${vDate} (14 days from quotation date).</div>
 <div class="ft"><span>Selected Frame · Brand Spaces</span><span>Confidential</span></div>
 </body></html>`);w.document.close()};
@@ -411,7 +460,10 @@ Date: ${fmtDate(hdr.quotationDate)}
 Valid until: ${fmtDate(validUntil)} (14 days from quotation date)
 
 INVESTMENT
-Total excl. VAT: ${fmtEur(grand)}${sqmPriceStr}
+Total excl. VAT: ${fmtEur(grand)}${sqmPriceStr}${splitOn?`
+
+COST SPLIT
+${split.map((p,i)=>`${p.label||`Party ${i+1}`}: ${splitPct(p).toLocaleString("en-US",{maximumFractionDigits:1})}% — ${fmtEur(splitAmounts[i])}`).join("\n")}`:""}
 
 The full breakdown is in the attached PDF.
 
@@ -564,6 +616,7 @@ Bestseller A/S`;
           {sqm>0&&<div style={{fontSize:12,color:C.steelL,marginTop:4,textAlign:"right"}}>{fmtEur(Math.round(grand/sqm))} / m²</div>}
           {grand>0&&hdr.quotationDate&&<div style={{fontSize:11,color:C.steelL,marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,.1)"}}>Valid until {fmtDate(validUntil)}</div>}
         </div>
+        {grand>0&&<CostSplitCard grand={grand} split={split} setSplit={setSplit} splitOn={splitOn} setSplitOn={setSplitOn} amounts={splitAmounts} sum={splitSum} valid={splitValid} money={fmtEur}/>}
         {grand>0&&<div style={{display:"flex",gap:8,marginTop:16}}>
           <button onClick={exportPDF} style={{flex:1,padding:"14px",borderRadius:8,border:"none",background:C.oak,color:C.white,fontSize:14,fontWeight:600,cursor:"pointer"}}>Export Quotation as PDF →</button>
           <button onClick={()=>setEmailOpen(o=>!o)} style={{padding:"14px 20px",borderRadius:8,border:`1px solid ${C.oak}`,background:emailOpen?C.oak+"15":C.white,color:C.oak,fontSize:14,fontWeight:600,cursor:"pointer"}}>Send via Email ✉</button>
