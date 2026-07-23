@@ -236,12 +236,31 @@ export async function POST(request) {
   }
 
   // 7. Best-effort fan-out (V2b wiring).
+  // Flat contract consumed by the Power Automate flow (V2b): copy `files`
+  // into OneDrive under `targetSubfolder`, then send the email via Outlook
+  // with the filecard PDF attached. Field names are stable — the Flow maps
+  // them directly, so treat this as an API contract.
+  const webhookFiles = [];
+  if (pdfUrl) webhookFiles.push({ name: `Filecard - ${projectName}.pdf`, url: pdfUrl });
+  for (const meta of Object.values(payload.attachments || {})) {
+    for (const f of meta?.files || []) {
+      if (f?.url) webhookFiles.push({ name: f.originalName || 'file', url: f.url });
+    }
+  }
   integrations.powerAutomate = await notifyPowerAutomate({
-    payload,
-    summary,
+    projectName,
+    targetSubfolder: projectName,
+    files: webhookFiles,
+    emailTo: process.env.PROJECT_INTAKE_EMAIL_TO || '',
+    emailSubject: `New Selected Frame project intake: ${projectName}`,
+    emailBody: summary,
     pdfUrl,
-    asana: integrations.asana,
-    folder: integrations.folder,
+    asanaUrl: integrations.asana?.url || null,
+    submittedBy: payload.projectBasics.yourName,
+    region: payload.projectBasics.marketRegion,
+    softShop,
+    // Full payload kept for future needs — the Flow can ignore it.
+    payload,
   });
   integrations.email = await notifyEmail(summary, payload);
 
