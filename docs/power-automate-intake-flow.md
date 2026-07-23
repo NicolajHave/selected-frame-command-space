@@ -41,14 +41,24 @@ OneDrive for Business, Outlook.
 2. **Trigger setup** — set *Who can trigger the flow* to **Anyone**.
    Paste the JSON above into **"Use sample payload to generate schema"**.
 3. **Step 2: Apply to each** — add action **Control → Apply to each**,
-   select output **`files`**. Inside the loop:
-   - **HTTP** action (or *OneDrive → Upload file from URL* if available
-     in your tenant): Method **GET**, URI **`items('Apply_to_each')?['url']`**.
-   - **OneDrive for Business → Create file**:
-     - Folder path: `/Selected Frame Projects/` + dynamic **`targetSubfolder`**
-       (Create file auto-creates missing folders)
-     - File name: dynamic **`name`** (from `files` item)
-     - File content: **Body** of the HTTP action.
+   select output **`files`**. Inside the loop, add TWO actions:
+
+   **3a. HTTP action** (downloads the file from its Blob URL):
+   - **Method:** `GET`
+   - **URI:** this must be an EXPRESSION, not typed text (typing it plain
+     gives "Enter a valid URI"). Click the URI field → **fx (Expression)**
+     tab → paste `items('Apply_to_each')?['url']` → Add. It becomes a
+     coloured token.
+   - Leave Headers / Queries / Body empty; Authentication `None`.
+
+   **3b. OneDrive for Business → Create file** (saves it):
+   - **Folder Path:** type `/Selected Frame Projects/` then insert the
+     dynamic value **`targetSubfolder`** right after it. (If the field only
+     shows a folder picker, click the small edit/`T` icon to switch to a
+     custom value.) Create file auto-creates missing folders.
+   - **File Name:** dynamic **`name`** (or expression
+     `items('Apply_to_each')?['name']`).
+   - **File Content:** dynamic **Body** (the output of the HTTP action, 3a).
 4. **Step 3: Get the PDF for the mail** — outside the loop, add one more
    **HTTP GET** with URI = dynamic **`pdfUrl`**.
 5. **Step 4: Outlook → Send an email (V2)**:
