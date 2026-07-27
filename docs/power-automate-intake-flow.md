@@ -56,6 +56,14 @@ OneDrive for Business, Outlook.
      dynamic value **`targetSubfolder`** right after it. (If the field only
      shows a folder picker, click the small edit/`T` icon to switch to a
      custom value.) Create file auto-creates missing folders.
+
+     *To use an existing folder instead:* the connector takes paths relative
+     to your OneDrive root, so translate the SharePoint URL by dropping
+     everything up to and including `/Documents/` and decoding `%20` to
+     spaces. E.g. `.../personal/<you>/Documents/BRAND%20SPACE/01_INCOMING%20FILECARDS`
+     becomes `/BRAND SPACE/01_INCOMING FILECARDS/` — then append the dynamic
+     `targetSubfolder` for a per-project subfolder, or leave it off to drop
+     every file flat into that one folder.
    - **File Name:** dynamic **`name`** (or expression
      `items('Apply_to_each')?['name']`).
    - **File Content:** dynamic **Body** (the output of the HTTP action, 3a).
