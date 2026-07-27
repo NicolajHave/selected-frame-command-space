@@ -314,7 +314,7 @@ export const FIXTURES = {
         { code: "105-06-002",        name: "Floor Rack 700",                dims: "1758 H × 800 W × 500 D",  material: "Stainless Steel",      hangers: 25, image: "/images/elements/floor_rack_700.jpg" },
         { code: "105-06-014",        name: "Floor Rack 1400 H1700",         dims: "1708 H × 1310 W × 500 D", material: "Stainless Steel",      hangers: 50, image: "/images/elements/floor_rack_1400_h1700.jpg" },
         { code: "105-06-014b",       name: "Floor Rack 700 H1700",          dims: "1708 H × 800 W × 500 D",  material: "Stainless Steel",      hangers: 25, image: "/images/elements/floor_rack_700_h1700.jpg" },
-        { code: "105-06-010",        name: "Jeans Rack Single",             dims: "1758 H × 1310 W × 500 D", material: "Stainless Steel, Oak", hangers: 25, image: "/images/elements/jeans_rack_single.jpg" },
+        { code: "105-06-010",        name: "Single Shelf Floor Rack",       dims: "1758 H × 1310 W × 500 D", material: "Stainless Steel, Oak", hangers: 25, image: "/images/elements/jeans_rack_single.jpg" },
         { code: "105-06-011",        name: "Double Shelf Floor Rack",       dims: "1758 H × 1310 W × 500 D", material: "Stainless Steel, Oak", hangers: 10, image: "/images/elements/double_shelf_floor_rack.jpg" },
         { code: "105-06-013",        name: "Triple Shelf Floor Rack",       dims: "1752 H × 1300 W × 500 D", material: "Stainless Steel, Oak", image: "/images/elements/triple_shelf_floor_rack.jpg" },
         { code: "105-06-011-22-C",   name: "Floor Rack Acrylic Sign",       dims: "324.9 H × 148.5 W × 19.6 D", material: "Stainless Steel",   image: "/images/elements/floor_rack_acrylic_sign.jpg" },
