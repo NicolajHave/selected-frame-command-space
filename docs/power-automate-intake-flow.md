@@ -15,6 +15,7 @@ OneDrive for Business, Outlook.
 {
   "projectName": "Magasin, Lyngby",
   "targetSubfolder": "Magasin, Lyngby",
+  "pdfFileName": "Filecard - Magasin, Lyngby.pdf",
   "files": [
     { "name": "Filecard - Magasin, Lyngby.pdf", "url": "https://...blob.../filecard.pdf" },
     { "name": "floorplan.pdf", "url": "https://...blob.../floorplan.pdf" }
@@ -75,8 +76,9 @@ OneDrive for Business, Outlook.
    - To: dynamic **`emailTo`**
    - Subject: dynamic **`emailSubject`**
    - Body: dynamic **`emailBody`** (switch the editor to plain text `</>`)
-   - Attachments: under **Advanced parameters → Show all**. Name =
-     `Filecard.pdf`, Content = **Body of `HTTP 2`**.
+   - Attachments: under **Advanced parameters → Show all**. Name = dynamic
+     **`pdfFileName`** (e.g. `Filecard - Magasin, Lyngby.pdf`),
+     Content = **Body of `HTTP 2`**.
 
    ⚠️ Pick the Body from **HTTP 2**, not from the HTTP inside the loop.
    Referencing the loop's output here makes Power Automate wrap this action

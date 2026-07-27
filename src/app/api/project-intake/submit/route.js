@@ -48,6 +48,21 @@ function slugify(s) {
   );
 }
 
+/**
+ * Make a project or file name safe for OneDrive / SharePoint. Those reject
+ * \ / : * ? " < > | outright — and a project called "Magasin / Lyngby" would
+ * otherwise turn the folder path into an unintended nested folder.
+ */
+function safeName(s, fallback = 'Untitled') {
+  const out = String(s || '')
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\.+$/, '')
+    .slice(0, 120);
+  return out || fallback;
+}
+
 function isIso(v) {
   return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 }
@@ -241,15 +256,18 @@ export async function POST(request) {
   // with the filecard PDF attached. Field names are stable — the Flow maps
   // them directly, so treat this as an API contract.
   const webhookFiles = [];
-  if (pdfUrl) webhookFiles.push({ name: `Filecard - ${projectName}.pdf`, url: pdfUrl });
+  const safeProject = safeName(projectName, 'Project');
+  const pdfFileName = `Filecard - ${safeProject}.pdf`;
+  if (pdfUrl) webhookFiles.push({ name: pdfFileName, url: pdfUrl });
   for (const meta of Object.values(payload.attachments || {})) {
     for (const f of meta?.files || []) {
-      if (f?.url) webhookFiles.push({ name: f.originalName || 'file', url: f.url });
+      if (f?.url) webhookFiles.push({ name: safeName(f.originalName, 'file'), url: f.url });
     }
   }
   integrations.powerAutomate = await notifyPowerAutomate({
     projectName,
-    targetSubfolder: projectName,
+    targetSubfolder: safeProject,
+    pdfFileName,
     files: webhookFiles,
     emailTo: process.env.PROJECT_INTAKE_EMAIL_TO || '',
     emailSubject: `New Selected Frame project intake: ${projectName}`,
