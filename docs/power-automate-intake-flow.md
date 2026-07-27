@@ -67,13 +67,20 @@ OneDrive for Business, Outlook.
    - **File Name:** dynamic **`name`** (or expression
      `items('Apply_to_each')?['name']`).
    - **File Content:** dynamic **Body** (the output of the HTTP action, 3a).
-4. **Step 3: Get the PDF for the mail** — outside the loop, add one more
-   **HTTP GET** with URI = dynamic **`pdfUrl`**.
-5. **Step 4: Outlook → Send an email (V2)**:
+4. **Step 3: Get the PDF for the mail** — **outside / below** the Apply to
+   each loop, add one more **HTTP** action: Method `GET`, URI = dynamic
+   **`pdfUrl`** (this one is a plain dynamic value, not an expression).
+   It will be named `HTTP 2`.
+5. **Step 4: Outlook → Send an email (V2)**, also outside the loop:
    - To: dynamic **`emailTo`**
    - Subject: dynamic **`emailSubject`**
    - Body: dynamic **`emailBody`** (switch the editor to plain text `</>`)
-   - Attachments: Name = `Filecard.pdf`, Content = **Body** of step 3's HTTP.
+   - Attachments: under **Advanced parameters → Show all**. Name =
+     `Filecard.pdf`, Content = **Body of `HTTP 2`**.
+
+   ⚠️ Pick the Body from **HTTP 2**, not from the HTTP inside the loop.
+   Referencing the loop's output here makes Power Automate wrap this action
+   in its own Apply to each — which sends one email per file.
 6. **Save.** Copy the **HTTP POST URL** the trigger now shows.
 7. In Vercel → Project → Settings → Environment Variables, add
    `POWER_AUTOMATE_PROJECT_INTAKE_WEBHOOK` = that URL → redeploy.
