@@ -95,6 +95,19 @@ Submit a test intake in Command Space. Within ~1 minute:
 - The intake mail (from your Outlook) lands at `emailTo` with the PDF attached.
 - Flow run history (Power Automate → My flows → run history) shows green.
 
+## Troubleshooting
+
+**A field (e.g. `pdfFileName`) is missing from the dynamic content picker.**
+The picker is built from the schema generated when you pasted the sample
+payload — it does not update when Command Space adds a field. Either:
+
+- *Quick fix:* type it as an expression instead. In the field, open the
+  **fx (Expression)** tab and enter `triggerBody()?['pdfFileName']`. This
+  reads the raw request body, so it works regardless of the schema.
+- *Proper fix:* open the trigger → **Use sample payload to generate schema**
+  → paste the current JSON from the contract above → Done. Re-check any
+  bindings afterwards, as regenerating can clear them.
+
 ## Notes
 
 - The Flow URL contains its own access signature — treat it like a
