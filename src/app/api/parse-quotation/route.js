@@ -248,8 +248,11 @@ function parseSalesQuoteFormat(lines) {
 
   // Pattern to detect tail of an item: "QTY Unit UnitPrice LinePrice"
   const TAIL_RE = /^(.*?)\s+(\d+)\s+(Pcs|Hour|Pallet|Pack|km)\s+([\d.,]+)\s+([\d.,]+)\s*$/i;
-  // Pattern to detect start of item (item-no at line start)
-  const ITEM_START_RE = /^(\d{3,4}(?:[-_][\dA-Za-z\-_]+)?)\s+(.+)$/;
+  // Pattern to detect start of item (item-no at line start).
+  // The separator class must include / and . — real item numbers look like
+  // "105-06-001-E/01" as well as "105-09-001-B" and "112_99_040". Omitting /
+  // silently dropped those lines from the quote (and from the hanger count).
+  const ITEM_START_RE = /^(\d{3,4}(?:[-_/.][\dA-Za-z\-_/.]+)?)\s+(.+)$/;
 
   // Filter and trim relevant table lines first
   const tableLines = [];
@@ -384,7 +387,9 @@ function buildSummary({ header, categories, grandTotal, grandSqm, warnings, addW
     const diff = Math.abs(summary.totalExclVat - sumOfPillars);
     const tolerance = Math.max(50, summary.totalExclVat * 0.02);
     if (sumOfPillars > 0 && diff > tolerance) {
-      addWarn('warn', `Pillar totals (€${sumOfPillars.toLocaleString('de-DE')}) don't match grand total (€${summary.totalExclVat.toLocaleString('de-DE')}) - difference €${Math.round(diff).toLocaleString('de-DE')}`);
+      // Escalated to 'error': this almost always means line items were missed,
+      // so the quote would go out too low. It must be impossible to miss.
+      addWarn('error', `Parsed items total €${sumOfPillars.toLocaleString('de-DE')} but the PDF says €${summary.totalExclVat.toLocaleString('de-DE')} — €${Math.round(diff).toLocaleString('de-DE')} is unaccounted for. Some line items were not read; check the breakdown against the PDF before sending.`);
     }
   }
 
