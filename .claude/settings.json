@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "g=$(git rev-parse --git-dir 2>/dev/null) || exit 0; f=\"$g/claude-md-nudge\"; now=$(date +%s); last=$(cat \"$f\" 2>/dev/null || echo 1); [ $((now-last)) -lt 10800 ] && exit 0; [ -z \"$(git log --since=@$last --oneline 2>/dev/null)\" ] && exit 0; echo \"$now\" > \"$f\"; printf %s '{\"decision\":\"block\",\"reason\":\"Session checkpoint - review this session and propose CLAUDE.md updates while the context is fresh. Look for durable facts a future session would need: new modules, schema or env-var changes, conventions, or gotchas that cost time. Propose concrete edits and ask before applying them. If nothing durable changed, say so in one line and stop.\"}'",
+            "timeout": 10,
+            "statusMessage": "Checking CLAUDE.md freshness"
+          }
+        ]
+      }
+    ]
+  }
+}
