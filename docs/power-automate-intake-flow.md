@@ -15,6 +15,9 @@ OneDrive for Business, Outlook.
 {
   "projectName": "Magasin, Lyngby",
   "targetSubfolder": "Magasin, Lyngby",
+  "targetYear": "2027",
+  "targetRegion": "NORTHWEST",
+  "targetPath": "2027/NORTHWEST/Magasin, Lyngby",
   "pdfFileName": "Filecard - Magasin, Lyngby.pdf",
   "files": [
     { "name": "Filecard - Magasin, Lyngby.pdf", "url": "https://...blob.../filecard.pdf" },
@@ -94,6 +97,27 @@ Submit a test intake in Command Space. Within ~1 minute:
   filecard PDF + every attachment.
 - The intake mail (from your Outlook) lands at `emailTo` with the PDF attached.
 - Flow run history (Power Automate → My flows → run history) shows green.
+
+## Filing by year and region
+
+`targetPath` arrives ready to use as `<year>/<REGION>/<project>`, e.g.
+`2027/NORTHWEST/Magasin, Lyngby`. The year comes from the desired opening
+date, so a 2027 opening files under 2027 by itself; the region is one of
+BENELUX & ROW / DACH / NORTHWEST / SOUTH. `targetYear` and `targetRegion` are
+also sent separately if you want to compose the path differently in the flow.
+
+In the OneDrive **Create file** action set Folder Path to your Shop in Shop
+root followed by the dynamic `targetPath` — for example
+`/BRAND SPACE/SHOP IN SHOP/` + `targetPath`.
+
+To keep the incoming inbox as well, add a *second* Create file action inside
+the same Apply to each: same File Name and File Content, but Folder Path
+`/BRAND SPACE/01_INCOMING FILECARDS/` + `targetSubfolder`. Each file is then
+written twice, once to the inbox and once to its permanent home.
+
+⚠️ Create file **auto-creates missing folders**, so a mistyped root silently
+builds a whole parallel tree instead of failing. Confirm the exact spelling
+with the folder picker once before trusting it.
 
 ## Troubleshooting
 

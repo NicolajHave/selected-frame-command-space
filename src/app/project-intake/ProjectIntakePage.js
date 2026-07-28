@@ -14,7 +14,9 @@ const Title = ({ children, sub }) => (
   </div>
 );
 
-const REGIONS = ["North", "DACH", "France", "Benelux", "UK & Ireland", "Southern Europe", "Eastern Europe", "Other"];
+// The four sales regions. These double as OneDrive folder names in the
+// <year>/<REGION>/ filing structure, so keep them exactly as spelled here.
+const REGIONS = ["BENELUX & ROW", "DACH", "NORTHWEST", "SOUTH"];
 const PROJECT_NATURES = ["New Shop In Shop Opening (>30 sqm)", "New Soft Shop Opening (<30 sqm)", "Shop Upshining", "Shop Expansion / Relocation", "Showroom Update"];
 const DESIGNED_FOR = ["Womens Presentation", "Mens Presentation", "Unisex Presentation"];
 const OBJECTIVES = ["Increase visibility", "Increase sell-through", "Upgrade brand presentation", "Secure / expand partner space", "Test new location", "Replace existing setup", "Other"];
