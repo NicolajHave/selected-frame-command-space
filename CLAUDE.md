@@ -77,6 +77,31 @@ Task names follow `PARTNER, CITY // TYPE`; `/api/projects` splits on `//` for
 the display name and type. Use `ASANA_TOKEN` — an older stub referenced
 `ASANA_PAT`, which was never set.
 
+## Quotation parser
+
+`src/app/api/parse-quotation/route.js` takes text lines the browser extracted
+with pdf.js and returns three pillars (Inventory / Selected Deliveries /
+Specific Project Cost). It handles two supplier formats — `sales-quote`
+(item-per-line, no category headers) and `calculation` (explicit headers) —
+chosen by `detectFormat()`.
+
+In the sales-quote parser an item is recognised by its **item number at line
+start**. Real numbers look like `105-06-001-E/01`, `112_99_040` and `0421`, so
+the separator class must allow `/` and `.` — omitting `/` silently dropped two
+line items from a real quote (€1,364 understated, and the hanger calculator
+under-counted because those fixtures never reached it).
+
+**Silent drops are the failure mode to watch.** `buildSummary()` compares the
+parsed pillar sum against the PDF's stated grand total and raises an **error**
+on divergence. Never downgrade that check — it is the only thing between a
+mis-parse and a wrong quote reaching a partner.
+
+To debug a parse, replay the real PDF rather than guessing:
+`npm install --no-save pdfjs-dist@3.11.174`, mirror the client extraction in
+`src/app/page.js` (group text items by `transform[5]`, ~2pt tolerance) to build
+the `lines` array, then call the route's `POST` with
+`{ json: async () => ({ lines }) }`.
+
 ## Environment variables
 
 | Var | Used for |
@@ -114,6 +139,17 @@ is a **stable contract** — `projectName`, `targetSubfolder`, `pdfFileName`,
 `files[{name,url}]`, `emailTo`, `emailSubject`, `emailBody`. Renaming a field
 breaks the user's flow, so treat it as an API.
 
+The flow must **not** create the Asana task — `/api/project-intake/submit`
+already does (step 3), and its gid keys the External Folder. Duplicating it in
+the flow yields two tasks per intake. The task URL is handed to the flow as
+`asanaUrl` for linking in the mail.
+
 Note: the flow's dynamic-content picker is frozen at the schema generated when
 the sample payload was pasted, so a newly added field needs
 `triggerBody()?['field']` until the schema is regenerated.
+
+The trigger's HTTP POST URL carries its own access signature in the `sig=`
+query parameter — it is a credential, not just an address. It belongs only in
+the Vercel env var. Anyone holding it can drop files in the OneDrive folder and
+send mail from the connected Outlook account; the only reliable way to
+invalidate one is to recreate the trigger, which mints a new URL.
