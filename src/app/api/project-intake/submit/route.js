@@ -258,6 +258,17 @@ export async function POST(request) {
   const webhookFiles = [];
   const safeProject = safeName(projectName, 'Project');
   const pdfFileName = `Filecard - ${safeProject}.pdf`;
+  // OneDrive filing: <year>/<REGION>/<project>. The year comes from the
+  // desired opening date, so a 2027 opening files under 2027 without anyone
+  // having to remember. Falls back to the current year if the date is absent.
+  const targetYear = String(
+    (isIso(payload.projectBasics.desiredOpeningDate)
+      ? new Date(payload.projectBasics.desiredOpeningDate)
+      : new Date()
+    ).getFullYear(),
+  );
+  const targetRegion = safeName(payload.projectBasics.marketRegion, 'UNSPECIFIED');
+  const targetPath = `${targetYear}/${targetRegion}/${safeProject}`;
   if (pdfUrl) webhookFiles.push({ name: pdfFileName, url: pdfUrl });
   for (const meta of Object.values(payload.attachments || {})) {
     for (const f of meta?.files || []) {
@@ -267,6 +278,9 @@ export async function POST(request) {
   integrations.powerAutomate = await notifyPowerAutomate({
     projectName,
     targetSubfolder: safeProject,
+    targetYear,
+    targetRegion,
+    targetPath,
     pdfFileName,
     files: webhookFiles,
     emailTo: process.env.PROJECT_INTAKE_EMAIL_TO || '',
