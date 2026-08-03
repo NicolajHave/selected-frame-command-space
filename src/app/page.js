@@ -283,6 +283,11 @@ const matchHangerRule=(itemName)=>{
 const roundShirtClips=(n)=>{const rest=n%50;return rest>15?n+(50-rest):n-rest};
 const roundCoat=(n)=>{const rest=n%25;return rest>5?n+(25-rest):n-rest};
 
+// Spare buffer added on top of the fixture-derived need before the type split,
+// so a shop is not left short. Applied to the raw total (not per type) so the
+// 60/25/15 ratio is preserved; pack rounding still applies afterwards.
+const HANGER_BUFFER_PCT=25;
+
 // Cost split between HQ / Market / optional third party. Distributes the
 // grand total by percentage. Lives in the right column of the Quotation Builder.
 const CostSplitCard=({grand,split,setSplit,splitOn,setSplitOn,amounts,sum,valid,money})=>{
@@ -544,9 +549,10 @@ Bestseller A/S`;
       const matched=inv.items.map(it=>{const r=matchHangerRule(it.name);return r?{...it,rule:r,subtotal:(it.qty||0)*r.hangers}:null}).filter(Boolean);
       if(!matched.length)return null;
       const rawTotal=matched.reduce((s,m)=>s+m.subtotal,0);
-      const shirtRaw=Math.round(rawTotal*0.60);
-      const clipsRaw=Math.round(rawTotal*0.25);
-      const coatRaw=Math.round(rawTotal*0.15);
+      const bufferedTotal=Math.round(rawTotal*(1+HANGER_BUFFER_PCT/100));
+      const shirtRaw=Math.round(bufferedTotal*0.60);
+      const clipsRaw=Math.round(bufferedTotal*0.25);
+      const coatRaw=Math.round(bufferedTotal*0.15);
       const shirt=Math.max(0,roundShirtClips(shirtRaw));
       const clips=Math.max(0,roundShirtClips(clipsRaw));
       const coat=Math.max(0,roundCoat(coatRaw));
@@ -579,11 +585,15 @@ Bestseller A/S`;
             )}</div>
             <div style={{display:"flex",justifyContent:"space-between",padding:"10px 14px",background:C.surface,borderRadius:6}}>
               <span style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase"}}>Raw total</span>
-              <span style={{fontSize:18,fontWeight:300,fontFamily:"'Cormorant Garamond',serif"}}>{rawTotal} hangers</span>
+              <span style={{fontSize:15,fontWeight:300,color:C.textS,fontFamily:"'Cormorant Garamond',serif"}}>{rawTotal} hangers</span>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"10px 14px",background:C.oak+"15",borderRadius:6,marginTop:6}}>
+              <span style={{fontSize:11,fontWeight:600,color:C.oak,textTransform:"uppercase"}}>+{HANGER_BUFFER_PCT}% buffer</span>
+              <span style={{fontSize:18,fontWeight:300,fontFamily:"'Cormorant Garamond',serif"}}>{bufferedTotal} hangers</span>
             </div>
           </div>
           <div>
-            <div style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:10}}>Type split (60/25/15)</div>
+            <div style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:10}}>Type split (60/25/15) of {bufferedTotal}</div>
             {[
               {label:"Shirt",pct:60,raw:shirtRaw,rounded:shirt,pack:50,price:69,id:"shirt50"},
               {label:"Clips",pct:25,raw:clipsRaw,rounded:clips,pack:50,price:83,id:"clip50"},
