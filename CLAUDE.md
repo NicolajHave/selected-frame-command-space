@@ -77,6 +77,13 @@ Task names follow `PARTNER, CITY // TYPE`; `/api/projects` splits on `//` for
 the display name and type. Use `ASANA_TOKEN` — an older stub referenced
 `ASANA_PAT`, which was never set.
 
+**Sales regions** are `BENELUX & ROW`, `DACH`, `NORTHWEST`, `SOUTH`. They live
+in three places that must agree: the intake dropdown (`REGIONS` in
+`ProjectIntakePage.js`), the Current filter (`REGIONS` in `page.js`), and the
+REGION custom field in Asana, which that filter matches against. Rename in one
+place only and existing projects silently stop filtering. The strings double as
+OneDrive folder names, so spelling and casing are load-bearing.
+
 ## Quotation parser
 
 `src/app/api/parse-quotation/route.js` takes text lines the browser extracted
@@ -129,15 +136,23 @@ must never fail the user's submission. Report the outcome instead.
 - The user deploys via Vercel on merge and does not run npm locally. Don't add
   a dependency when a CDN script fits the existing pattern (SheetJS and pdf.js
   are both loaded that way).
+- Vercel reads env vars **only at build time**, so setting one changes nothing
+  until a rebuild. To force one, push an empty commit to `main` — that is the
+  safe trigger. Do not reach for the Vercel deploy tool available here: it
+  uploads a file tree as a *new* project rather than rebuilding this one, which
+  would produce a duplicate without the env vars or the git connection.
 - Copy is British English. The brand is written **Selected** — never SELECTED.
 - Write in Danish when the user does.
 
 ## Power Automate (intake → OneDrive + mail)
 
 `docs/power-automate-intake-flow.md` has the full build guide. The webhook body
-is a **stable contract** — `projectName`, `targetSubfolder`, `pdfFileName`,
+is a **stable contract** — `projectName`, `targetSubfolder`, `targetYear`,
+`targetRegion`, `targetPath`, `pdfFileName`,
 `files[{name,url}]`, `emailTo`, `emailSubject`, `emailBody`. Renaming a field
-breaks the user's flow, so treat it as an API.
+breaks the user's flow, so treat it as an API. `targetPath` is
+`<year>/<REGION>/<project>`, with the year taken from the desired opening date,
+so a 2027 opening files under 2027 without anyone having to remember.
 
 The flow must **not** create the Asana task — `/api/project-intake/submit`
 already does (step 3), and its gid keys the External Folder. Duplicating it in
