@@ -9,6 +9,7 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { safeText } from './pdf-text';
 
 const A4 = { w: 595.28, h: 841.89 };
 const M = 48;
@@ -22,23 +23,6 @@ const RULE = rgb(0.925, 0.918, 0.898);
 const SURFACE = rgb(0.961, 0.957, 0.945);
 const WHITE = rgb(1, 1, 1);
 const DANGER = rgb(0.78, 0.357, 0.290);
-
-// The standard fonts encode WinAnsi (CP1252) only. Anything outside it throws
-// at draw time and would take the whole export down — a typographic minus
-// (U+2212) in a negative custom item was enough. Normalise what we can and
-// drop the rest, so an odd character in a project name degrades instead of
-// failing. € and the curly quotes/dashes ARE in CP1252, so they survive.
-const CP1252_EXTRA = '€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ';
-function safeText(s) {
-  return String(s ?? '')
-    .replace(/[−‐‑]/g, '-')
-    .split('')
-    .filter((ch) => {
-      const c = ch.charCodeAt(0);
-      return (c >= 0x20 && c <= 0xff) || CP1252_EXTRA.includes(ch);
-    })
-    .join('');
-}
 
 function fmtMoney(n, cur) {
   if (typeof n !== 'number' || !Number.isFinite(n)) return '—';
