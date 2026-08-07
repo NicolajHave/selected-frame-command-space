@@ -272,6 +272,17 @@ const HANGER_RULES=[
   {label:"Wall unit 700",hangers:25,test:n=>n.includes("wall unit")&&n.includes("700")&&!n.includes("bracket")&&!n.includes("connector")&&!n.includes("wall rack")},
 ];
 
+// Supplier quotes still carry the old fixture names for these racks, while
+// Standards (and everything customer-facing) uses the Shelf Floor Rack naming.
+// DISPLAY ONLY — the hanger rules above match on the raw supplier name, so the
+// parsed item must keep it.
+const STANDARDS_NAME_RULES=[
+  {test:/jeans.*rack.*single/i,name:"Single Shelf Floor Rack"},
+  {test:/jeans.*rack.*double/i,name:"Double Shelf Floor Rack"},
+  {test:/jeans.*rack.*triple/i,name:"Triple Shelf Floor Rack"},
+];
+const displayItemName=(n)=>STANDARDS_NAME_RULES.find(r=>r.test.test(n||""))?.name||n;
+
 const matchHangerRule=(itemName)=>{
   if(!itemName)return null;
   const n=itemName.toLowerCase();
@@ -341,6 +352,21 @@ const QuotationPage=()=>{
   const [warningsCollapsed,setWarningsCollapsed]=useState(false);
   const [emailOpen,setEmailOpen]=useState(false);
   const [includeItems,setIncludeItems]=useState(true); // include parsed supplier lines in the PDF
+  // Attach the quotation to an External Project Folder so Export also files a
+  // PDF copy under 03-quotation. Requires the folder password gate to be open.
+  const [folders,setFolders]=useState([]);
+  const [foldersLocked,setFoldersLocked]=useState(false);
+  const [linkedFolderId,setLinkedFolderId]=useState("");
+  const [filing,setFiling]=useState(false);
+  const [fileResult,setFileResult]=useState(null); // {ok,message}
+  useEffect(()=>{
+    let off=false;
+    fetch("/api/external-folders")
+      .then(r=>{if(r.status===401){if(!off)setFoldersLocked(true);return{folders:[]}}return r.ok?r.json():{folders:[]}})
+      .then(d=>{if(!off)setFolders(d.folders||[])})
+      .catch(()=>{});
+    return()=>{off=true};
+  },[]);
   const [emailTo,setEmailTo]=useState("");
   const [sendResult,setSendResult]=useState(null); // {ok, message}
   const [currency,setCurrency]=useState("EUR");
@@ -409,7 +435,52 @@ const QuotationPage=()=>{
   const warns=warnings.filter(w=>w.severity==="warn");
   const infos=warnings.filter(w=>w.severity==="info");
 
+  // Everything the server-side PDF renderer needs. Item names go through
+  // displayItemName so the filed copy uses the Standards naming too.
+  const buildQuotationPayload=()=>({
+    header:{
+      project:hdr.project||"",
+      salesArea:sqm>0?sqm:null,
+      gender:hdr.gender||"",
+      quotationDate:hdr.quotationDate?fmtDate(hdr.quotationDate):fmtDate(todayISO()),
+      validUntil:fmtDate(validUntil),
+    },
+    currency:{code:currency,symbol:cur.symbol,locale:cur.locale},
+    rows:[
+      {label:"Inventory",value:inv},
+      {label:"Selected Deliveries",value:del},
+      {label:"Specific Project Cost",value:proj},
+    ],
+    addOns:Object.entries(addOns).map(([id,{qty}])=>{const a=ADD_ONS.find(x=>x.id===id);return a?{name:a.name,qty,total:a.price*qty*cur.eurRate}:null}).filter(Boolean),
+    customs:customs.filter(i=>i.name&&parseLooseEur(i.price)!==0).map(i=>({name:i.name,qty:parseInt(i.qty)||1,total:parseLooseEur(i.price)*(parseInt(i.qty)||1)})),
+    supTotal,aoTotal,custTotal,grand,
+    sqmPrice:sqm>0?Math.round(grand/sqm):0,
+    split:splitOn?{on:true,parties:split.map((p,i)=>({label:p.label||`Party ${i+1}`,pct:splitPct(p),amount:splitAmounts[i]})),sum:splitSum,valid:splitValid}:null,
+    itemised:(includeItems&&parsed?.categories?.length)?{
+      include:true,
+      categories:parsed.categories.map(c=>({name:c.name,total:c.total,items:(c.items||[]).map(it=>({qty:it.qty,name:displayItemName(it.name),totalPrice:it.totalPrice}))})),
+    }:null,
+  });
+
+  // Files a server-rendered PDF copy into the linked project folder.
+  const fileToFolder=async()=>{
+    if(!linkedFolderId)return;
+    setFiling(true);setFileResult(null);
+    try{
+      const r=await fetch(`/api/external-folders/${linkedFolderId}/quotation`,{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(buildQuotationPayload()),
+      });
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error(j.error||`Failed (${r.status})`);
+      setFileResult({ok:true,message:`Saved to ${j.folderName} · 03 Quotation`});
+    }catch(e){
+      setFileResult({ok:false,message:e.message||"Could not save to folder"});
+    }finally{setFiling(false)}
+  };
+
   const exportPDF=()=>{
+    if(linkedFolderId)fileToFolder();
     const esc=(s)=>String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
     const aoItems=Object.entries(addOns).map(([id,{qty}])=>{const a=ADD_ONS.find(x=>x.id===id);return a?{name:a.name,qty,total:a.price*qty*cur.eurRate}:null}).filter(Boolean);
     const custItems=customs.filter(i=>i.name&&parseLooseEur(i.price)!==0).map(i=>({name:i.name,qty:parseInt(i.qty)||1,total:parseLooseEur(i.price)*(parseInt(i.qty)||1)}));
@@ -443,7 +514,7 @@ ${custItems.length?`<h2>Additional Items</h2><table><thead><tr><th>Item</th><th 
 ${sqm>0?`<div class="sq">${fmtEur(Math.round(grand/sqm))} / m²</div>`:''}
 ${splitOn?`<div class="csplit"><div class="h">Cost Split</div><table><thead><tr><th>Party</th><th class="r">Share</th><th class="r">Amount</th></tr></thead><tbody>${split.map((p,i)=>`<tr><td>${p.label||`Party ${i+1}`}</td><td class="r">${splitPct(p).toLocaleString("en-US",{maximumFractionDigits:1})}%</td><td class="r">${fmtEur(splitAmounts[i])}</td></tr>`).join('')}<tr style="font-weight:600;border-top:2px solid #ECEAE5"><td>Total</td><td class="r">${splitSum.toLocaleString("en-US",{maximumFractionDigits:1})}%</td><td class="r">${fmtEur(grand)}</td></tr></tbody></table>${splitValid?'':`<div class="note">Note: shares total ${splitSum}%, not 100%.</div>`}</div>`:''}
 <div class="validity"><strong>Validity</strong>This quotation is valid until ${vDate} (14 days from quotation date).</div>
-${includeItems&&parsed&&parsed.categories&&parsed.categories.length?`<div class="itemsec"><div class="ann-h">Itemised Breakdown</div><div class="ann-sub">Line items from the uploaded supplier quotation, included for transparency.</div>${parsed.categories.map(cat=>`<div class="cat"><div class="cath"><span>${esc(cat.name)}</span><span>${fmtEur(cat.total)}</span></div><table><tbody>${(cat.items||[]).map(it=>`<tr><td class="q">${it.qty>0?`${esc(it.qty)}×`:''}</td><td>${esc(it.name)}</td><td class="r">${fmtEur(it.totalPrice)}</td></tr>`).join('')}</tbody></table></div>`).join('')}</div>`:''}
+${includeItems&&parsed&&parsed.categories&&parsed.categories.length?`<div class="itemsec"><div class="ann-h">Itemised Breakdown</div><div class="ann-sub">Line items from the uploaded supplier quotation, included for transparency.</div>${parsed.categories.map(cat=>`<div class="cat"><div class="cath"><span>${esc(cat.name)}</span><span>${fmtEur(cat.total)}</span></div><table><tbody>${(cat.items||[]).map(it=>`<tr><td class="q">${it.qty>0?`${esc(it.qty)}×`:''}</td><td>${esc(displayItemName(it.name))}</td><td class="r">${fmtEur(it.totalPrice)}</td></tr>`).join('')}</tbody></table></div>`).join('')}</div>`:''}
 <div class="ft"><span>Selected Frame · Brand Spaces</span><span>Confidential</span></div>
 </body></html>`);w.document.close()};
 
@@ -538,7 +609,7 @@ Bestseller A/S`;
         <div>{parsed.summary?.projectCostBreakdown?.length>1?<>Includes: {parsed.summary.projectCostBreakdown.map(x=>`${x.name.toLowerCase()} (${fmtEur(x.value)})`).join(", ")}</>:<>&nbsp;</>}</div>
       </div>}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}><div style={{padding:"10px 14px",background:C.black,borderRadius:6,color:C.white}}><div style={{fontSize:11,fontWeight:600,color:C.steelL,textTransform:"uppercase",letterSpacing:".5px"}}>Total</div><div style={{fontSize:20,fontWeight:300,fontFamily:"'Cormorant Garamond',serif"}}>{fmtEur(supTotal)}</div></div>{sqm>0&&<div style={{padding:"10px 14px",background:C.surface,borderRadius:6}}><div style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase"}}>SQM Price</div><div style={{fontSize:20,fontWeight:300,fontFamily:"'Cormorant Garamond',serif"}}>{fmtEur(Math.round(supTotal/sqm))} / m²</div></div>}</div>
-      {parsed.categories?.map(cat=><details key={cat.name} style={{marginBottom:8}}><summary style={{cursor:"pointer",fontSize:13,fontWeight:600,padding:"8px 0",borderBottom:`1px solid ${C.surfaceD}`}}>{cat.name} — {fmtEur(cat.total)} ({cat.items?.length||0} items)</summary><div style={{padding:"8px 0"}}>{cat.items?.map((it,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"3px 0",color:C.textS}}><span>{it.qty>0?`${it.qty}× `:""}{it.name}</span><span style={{fontWeight:500,color:C.text}}>{fmtEur(it.totalPrice)}</span></div>)}</div></details>)}
+      {parsed.categories?.map(cat=><details key={cat.name} style={{marginBottom:8}}><summary style={{cursor:"pointer",fontSize:13,fontWeight:600,padding:"8px 0",borderBottom:`1px solid ${C.surfaceD}`}}>{cat.name} — {fmtEur(cat.total)} ({cat.items?.length||0} items)</summary><div style={{padding:"8px 0"}}>{cat.items?.map((it,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"3px 0",color:C.textS}}><span>{it.qty>0?`${it.qty}× `:""}{displayItemName(it.name)}</span><span style={{fontWeight:500,color:C.text}}>{fmtEur(it.totalPrice)}</span></div>)}</div></details>)}
     </div></div>}
     {(()=>{
       // ── Hanger Calculator ─────────────────────────────────────────
@@ -635,7 +706,25 @@ Bestseller A/S`;
           <span style={{fontSize:13,fontWeight:600,color:C.text}}>Include itemised supplier breakdown in PDF</span>
           <span style={{fontSize:11,color:C.textS,marginLeft:"auto"}}>{parsed.categories.reduce((s,c)=>s+(c.items?.length||0),0)} lines</span>
         </label>}
-        {grand>0&&<div style={{display:"flex",gap:8,marginTop:16}}>
+        {grand>0&&<div style={{marginTop:16,padding:"14px 16px",background:C.white,border:`1px solid ${C.surfaceD}`,borderRadius:8}}>
+          <div style={{fontSize:11,fontWeight:600,color:C.textS,textTransform:"uppercase",letterSpacing:".5px",marginBottom:8}}>Attach to project</div>
+          {foldersLocked?(
+            <div style={{fontSize:12,color:C.textS,lineHeight:1.55}}>External Folders is locked. Open it from the sidebar and enter the shared password to file quotations into a project.</div>
+          ):(
+            <>
+              <select value={linkedFolderId} onChange={e=>{setLinkedFolderId(e.target.value);setFileResult(null)}} style={{width:"100%",padding:"9px 12px",borderRadius:6,border:`1px solid ${linkedFolderId?C.oak:C.surfaceD}`,fontSize:13,background:C.white}}>
+                <option value="">— Don't file (export only) —</option>
+                {folders.map(f=><option key={f.id} value={f.id}>{f.projectName}{f.region?` · ${f.region}`:""}</option>)}
+              </select>
+              <div style={{fontSize:11,color:C.textS,marginTop:6,lineHeight:1.5}}>
+                {linkedFolderId?"Export also saves a PDF copy to this project's folder under 03 Quotation.":"Pick a project to file a PDF copy alongside the export."}
+              </div>
+              {filing&&<div style={{fontSize:11,color:C.oak,marginTop:6}}>Saving to folder…</div>}
+              {fileResult&&<div style={{fontSize:11,marginTop:6,color:fileResult.ok?C.success:C.danger}}>{fileResult.ok?"✓ ":"⚠ "}{fileResult.message}</div>}
+            </>
+          )}
+        </div>}
+        {grand>0&&<div style={{display:"flex",gap:8,marginTop:12}}>
           <button onClick={exportPDF} style={{flex:1,padding:"14px",borderRadius:8,border:"none",background:C.oak,color:C.white,fontSize:14,fontWeight:600,cursor:"pointer"}}>Export Quotation as PDF →</button>
           <button onClick={()=>setEmailOpen(o=>!o)} style={{padding:"14px 20px",borderRadius:8,border:`1px solid ${C.oak}`,background:emailOpen?C.oak+"15":C.white,color:C.oak,fontSize:14,fontWeight:600,cursor:"pointer"}}>Send via Email ✉</button>
         </div>}
