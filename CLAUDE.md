@@ -84,6 +84,23 @@ REGION custom field in Asana, which that filter matches against. Rename in one
 place only and existing projects silently stop filtering. The strings double as
 OneDrive folder names, so spelling and casing are load-bearing.
 
+## PDFs (pdf-lib)
+
+Two server-side generators share one trap: `src/lib/project-intake/filecard-pdf.js`
+and `src/lib/quotation-pdf.js`. The `StandardFonts` encode **WinAnsi / CP1252
+only**, and drawing anything outside that set *throws* — a typographic minus
+(U+2212) pasted into a project name was enough to kill a whole render. Free-text
+fields pick such characters up from Word and Excel routinely, and because the
+integrations are best-effort the failure is silent: the rep just never gets a
+filecard. Route every `drawText` and `widthOfTextAtSize` through
+`safeText()` in `src/lib/pdf-text.js`; never call them directly on
+user-supplied text.
+
+The quotation PDF is rendered server-side (not from the print view) because a
+print window produces no file to upload. `POST /api/external-folders/[folderId]/quotation`
+generates it, stores it under the folder's `03-quotation` category, and is
+gated by the same shared password as the rest of External Folders.
+
 ## Quotation parser
 
 `src/app/api/parse-quotation/route.js` takes text lines the browser extracted
@@ -97,6 +114,12 @@ start**. Real numbers look like `105-06-001-E/01`, `112_99_040` and `0421`, so
 the separator class must allow `/` and `.` — omitting `/` silently dropped two
 line items from a real quote (€1,364 understated, and the hanger calculator
 under-counted because those fixtures never reached it).
+
+Supplier quotes still call the racks `Jeans (Denim) Rack Single/Double`, while
+Standards uses `Single/Double/Triple Shelf Floor Rack`. `displayItemName()` in
+`page.js` maps them **for display only** — the parsed item must keep its raw
+name, because the hanger rules match on `jeans` and silently stop counting if
+the data is renamed.
 
 **Silent drops are the failure mode to watch.** `buildSummary()` compares the
 parsed pillar sum against the PDF's stated grand total and raises an **error**

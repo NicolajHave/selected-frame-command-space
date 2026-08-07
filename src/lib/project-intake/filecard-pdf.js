@@ -10,6 +10,7 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { buildFilecardSections } from './payload';
+import { safeText } from '../pdf-text';
 
 const A4 = { w: 595.28, h: 841.89 };
 const M = 48;                     // page margin
@@ -26,7 +27,7 @@ const RULE = rgb(0.925, 0.918, 0.898);   // #ECEAE5
 // Greedy word-wrap to a max width at a given size.
 function wrap(text, font, size, maxW) {
   const out = [];
-  for (const paragraph of String(text).split('\n')) {
+  for (const paragraph of safeText(text).split('\n')) {
     const words = paragraph.split(/\s+/).filter(Boolean);
     if (!words.length) { out.push(''); continue; }
     let line = '';
@@ -55,6 +56,11 @@ export async function buildFilecardPdf(payload) {
     logo = await doc.embedPng(bytes);
   } catch { /* logo is optional — header falls back to text */ }
 
+  // All user-supplied text passes through safeText: the standard fonts are
+  // WinAnsi-only and a stray character would throw mid-render.
+  const draw = (pg, str, o) => pg.drawText(safeText(str), o);
+  const wOf = (f, str, size) => f.widthOfTextAtSize(safeText(str), size);
+
   const pages = [];
   let page = null;
   let y = 0;
@@ -76,13 +82,13 @@ export async function buildFilecardPdf(payload) {
     page.drawImage(logo, { x: M, y: y - lh, width: lw, height: lh });
     y -= lh + 10;
   }
-  page.drawText('PROJECT INTAKE FILECARD', { x: M, y: y - 14, size: 9, font: bold, color: GREY, characterSpacing: 2 });
+  draw(page, 'PROJECT INTAKE FILECARD', { x: M, y: y - 14, size: 9, font: bold, color: GREY, characterSpacing: 2 });
   y -= 26;
   const title = payload.projectBasics?.projectName || 'Selected Frame Project';
-  page.drawText(title, { x: M, y: y - 22, size: 22, font: bold, color: BLACK });
+  draw(page, title, { x: M, y: y - 22, size: 22, font: bold, color: BLACK });
   y -= 34;
   const submitted = `Submitted ${new Date(payload.submittedAt).toLocaleString('en-GB')}`;
-  page.drawText(submitted, { x: M, y: y - 12, size: 10, font, color: GREY });
+  draw(page, submitted, { x: M, y: y - 12, size: 10, font, color: GREY });
   y -= 26;
   page.drawLine({ start: { x: M, y }, end: { x: A4.w - M, y }, thickness: 2, color: BLACK });
   y -= 24;
@@ -91,7 +97,7 @@ export async function buildFilecardPdf(payload) {
   for (const section of buildFilecardSections(payload)) {
     // Section title with oak rule.
     ensure(40);
-    page.drawText(section.title.toUpperCase(), { x: M, y: y - 11, size: 11, font: bold, color: OAK, characterSpacing: 1 });
+    draw(page, section.title.toUpperCase(), { x: M, y: y - 11, size: 11, font: bold, color: OAK, characterSpacing: 1 });
     y -= 18;
     page.drawLine({ start: { x: M, y }, end: { x: A4.w - M, y }, thickness: 0.75, color: RULE });
     y -= 16;
@@ -100,7 +106,7 @@ export async function buildFilecardPdf(payload) {
       const lines = wrap(section.text, font, 10.5, CONTENT_W);
       for (const ln of lines) {
         ensure(15);
-        page.drawText(ln, { x: M, y: y - 10, size: 10.5, font, color: TEXT });
+        draw(page, ln, { x: M, y: y - 10, size: 10.5, font, color: TEXT });
         y -= 15;
       }
       y -= 10;
@@ -109,7 +115,7 @@ export async function buildFilecardPdf(payload) {
 
     if (!section.rows.length) {
       ensure(15);
-      page.drawText('—', { x: M, y: y - 10, size: 10.5, font, color: GREY });
+      draw(page, '—', { x: M, y: y - 10, size: 10.5, font, color: GREY });
       y -= 18;
       continue;
     }
@@ -122,11 +128,11 @@ export async function buildFilecardPdf(payload) {
       // Label (grey, left column).
       const labelLines = wrap(label, bold, 9, LABEL_W - 10);
       labelLines.forEach((ll, i) => {
-        page.drawText(ll, { x: M, y: rowTop - 9 - i * 12, size: 9, font: bold, color: GREY });
+        draw(page, ll, { x: M, y: rowTop - 9 - i * 12, size: 9, font: bold, color: GREY });
       });
       // Value (right column, wraps).
       valueLines.forEach((vl, i) => {
-        page.drawText(vl, { x: M + LABEL_W, y: rowTop - 9 - i * 14, size: 10.5, font, color: TEXT });
+        draw(page, vl, { x: M + LABEL_W, y: rowTop - 9 - i * 14, size: 10.5, font, color: TEXT });
       });
       y = rowTop - rowH;
     }
@@ -137,11 +143,11 @@ export async function buildFilecardPdf(payload) {
   const total = pages.length;
   pages.forEach((p, i) => {
     p.drawLine({ start: { x: M, y: M - 14 }, end: { x: A4.w - M, y: M - 14 }, thickness: 0.5, color: RULE });
-    p.drawText('Selected Frame · Brand Spaces', { x: M, y: M - 28, size: 8, font, color: GREY });
+    draw(p, 'Selected Frame · Brand Spaces', { x: M, y: M - 28, size: 8, font, color: GREY });
     const conf = 'Confidential';
-    p.drawText(conf, { x: (A4.w - font.widthOfTextAtSize(conf, 8)) / 2, y: M - 28, size: 8, font, color: GREY });
+    draw(p, conf, { x: (A4.w - wOf(font, conf, 8)) / 2, y: M - 28, size: 8, font, color: GREY });
     const pageLabel = `${i + 1} / ${total}`;
-    p.drawText(pageLabel, { x: A4.w - M - font.widthOfTextAtSize(pageLabel, 8), y: M - 28, size: 8, font, color: GREY });
+    draw(p, pageLabel, { x: A4.w - M - wOf(font, pageLabel, 8), y: M - 28, size: 8, font, color: GREY });
   });
 
   return doc.save();
