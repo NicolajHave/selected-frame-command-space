@@ -190,6 +190,20 @@ export async function syncProjectStatus({ asanaProjectId, completed, completedAt
   return getExternalFolderById(folder.id);
 }
 
+/**
+ * Permanently remove a folder and its file rows. The FK cascades take care of
+ * external_project_files and recently_opened_folders; the caller is responsible
+ * for deleting the blobs first, since this drops the rows that point at them.
+ * Returns the deleted folder, or null when it does not exist.
+ */
+export async function deleteExternalFolder(id) {
+  const folder = await getExternalFolderById(id);
+  if (!folder) return null;
+  const sb = getSupabase();
+  unwrap(await sb.from(FOLDERS).delete().eq('id', folder.id), 'deleteExternalFolder');
+  return folder;
+}
+
 /** Update the per-folder notes (free text, typically bullet lines). */
 export async function updateExternalFolderNotes(folderId, notes) {
   const sb = getSupabase();

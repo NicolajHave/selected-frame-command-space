@@ -112,6 +112,72 @@ function FolderDetailView({ folder: initialFolder, onBack, onChanged }) {
         Files {loading ? "· loading…" : `(${files.length})`}
       </div>
       <ExternalFolderFileList files={files} onDelete={onDelete} allowDelete />
+
+      <DeleteFolder folder={folder} fileCount={files.length} onDeleted={onBack} />
+    </div>
+  );
+}
+
+// Permanent folder delete. Requires typing the project name, because this also
+// removes every uploaded file and there is no undo.
+function DeleteFolder({ folder, fileCount, onDeleted }) {
+  const [open, setOpen] = useState(false);
+  const [confirmName, setConfirmName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const matches = confirmName.trim() === (folder.projectName || "").trim();
+
+  const remove = async () => {
+    if (!matches) return;
+    setBusy(true); setError(null);
+    try {
+      const r = await fetch(`/api/external-folders/${folder.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmName: confirmName.trim() }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || `Delete failed (${r.status})`);
+      onDeleted?.();
+    } catch (e) {
+      setError(e.message || "Could not delete folder");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ marginTop: 28, paddingTop: 18, borderTop: `1px solid ${C.surfaceD}` }}>
+      {!open ? (
+        <button onClick={() => setOpen(true)} style={{ fontSize: 12, color: C.nogo, background: "none", border: `1px solid ${C.surfaceD}`, borderRadius: 6, padding: "8px 14px", cursor: "pointer" }}>
+          Delete this folder
+        </button>
+      ) : (
+        <div style={{ background: "#FBF0EE", border: `1px solid ${C.nogo}44`, borderRadius: 8, padding: 18 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.nogo, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 8 }}>Delete folder</div>
+          <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, marginBottom: 12 }}>
+            This permanently removes <strong>{folder.projectName}</strong>
+            {fileCount > 0 ? <> and its {fileCount} file{fileCount === 1 ? "" : "s"}</> : null}. It cannot be undone.
+            Type the project name to confirm.
+          </div>
+          <input
+            value={confirmName}
+            onChange={(e) => setConfirmName(e.target.value)}
+            placeholder={folder.projectName}
+            style={{ width: "100%", maxWidth: 380, padding: "9px 12px", border: `1px solid ${matches ? C.nogo : C.surfaceD}`, borderRadius: 6, fontSize: 13, outline: "none", background: C.white, color: C.text }}
+          />
+          {error && <div style={{ fontSize: 12, color: C.nogo, marginTop: 10 }}>{error}</div>}
+          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+            <button onClick={remove} disabled={!matches || busy}
+              style={{ padding: "9px 16px", background: matches && !busy ? C.nogo : C.steelL, color: C.white, border: "none", borderRadius: 6, cursor: matches && !busy ? "pointer" : "not-allowed", fontSize: 13, fontWeight: 500 }}>
+              {busy ? "Deleting…" : "Delete permanently"}
+            </button>
+            <button onClick={() => { setOpen(false); setConfirmName(""); setError(null); }} disabled={busy}
+              style={{ padding: "9px 16px", background: C.white, color: C.text, border: `1px solid ${C.surfaceD}`, borderRadius: 6, cursor: "pointer", fontSize: 13 }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
