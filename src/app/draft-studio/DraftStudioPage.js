@@ -1,5 +1,5 @@
 "use client";
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
 
 const C = {
@@ -204,6 +204,30 @@ function ResultPanel({ result, onReset }) {
           : ""}
       </div>
 
+      {result.filed && (
+        <div
+          style={{
+            marginBottom: 20,
+            padding: "12px 16px",
+            borderRadius: 8,
+            background: result.filed.error ? "#FBF0EE" : "#EEF4EF",
+            border: `1px solid ${result.filed.error ? C.nogo : C.success}33`,
+            fontSize: 12,
+            color: result.filed.error ? C.nogo : C.text,
+            lineHeight: 1.55,
+          }}
+        >
+          {result.filed.error ? (
+            <>Could not file into the project folder: {result.filed.error}. The download above is unaffected.</>
+          ) : (
+            <>
+              ✓ Filed as <strong>Draft {result.filed.draftNumber}</strong> in{" "}
+              <strong>{result.filed.folderName}</strong> · 02 Floorplans
+            </>
+          )}
+        </div>
+      )}
+
       {result.report?.operations?.length ? (
         <div style={{ marginBottom: 20 }}>
           <div
@@ -316,6 +340,23 @@ export default function DraftStudioPage() {
   const [busyStage, setBusyStage] = useState(null); // "uploading" | "processing"
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
+  // Optional: file the processed draft into a project's External Folder,
+  // renamed "<project> - Draft N". Needs the folder password gate to be open.
+  const [folders, setFolders] = useState([]);
+  const [foldersLocked, setFoldersLocked] = useState(false);
+  const [folderId, setFolderId] = useState("");
+
+  useEffect(() => {
+    let off = false;
+    fetch("/api/external-folders")
+      .then((r) => {
+        if (r.status === 401) { if (!off) setFoldersLocked(true); return { folders: [] }; }
+        return r.ok ? r.json() : { folders: [] };
+      })
+      .then((d) => { if (!off) setFolders(d.folders || []); })
+      .catch(() => {});
+    return () => { off = true; };
+  }, []);
 
   const reset = useCallback(() => {
     if (result?.url) URL.revokeObjectURL(result.url);
@@ -356,6 +397,7 @@ export default function DraftStudioPage() {
           replaceLogos: opts.replaceLogos,
           updateContact: opts.updateContact,
           appendZoning: opts.appendZoning,
+          folderId: folderId || null,
         }),
       });
       if (!res.ok) {
@@ -371,13 +413,19 @@ export default function DraftStudioPage() {
         } catch {}
       }
 
+      let filed = null;
+      const filedHeader = res.headers.get("X-PDF-Studio-Filed");
+      if (filedHeader) {
+        try { filed = JSON.parse(decodeURIComponent(filedHeader)); } catch {}
+      }
+
       const outBlob = await res.blob();
       const url = URL.createObjectURL(outBlob);
-      const filename = (file.name || "document.pdf").replace(
-        /\.pdf$/i,
-        "__selected-frame.pdf",
-      );
-      setResult({ url, filename, size: outBlob.size, report });
+      // When the draft was filed, the server already named it
+      // "<project> - Draft N.pdf" — use the same name for the download.
+      const filename = filed?.fileName
+        || (file.name || "document.pdf").replace(/\.pdf$/i, "__selected-frame.pdf");
+      setResult({ url, filename, size: outBlob.size, report, filed });
     } catch (e) {
       setError(e.message || "Something went wrong");
     } finally {
@@ -455,6 +503,35 @@ export default function DraftStudioPage() {
               {error}
             </div>
           )}
+
+          <div style={{ marginBottom: 18, padding: "14px 16px", background: C.surface, borderRadius: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.textS, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 8 }}>
+              File to project
+            </div>
+            {foldersLocked ? (
+              <div style={{ fontSize: 12, color: C.textS, lineHeight: 1.55 }}>
+                External Folders is locked. Open it from the sidebar and enter the shared password to file drafts into a project.
+              </div>
+            ) : (
+              <>
+                <select
+                  value={folderId}
+                  onChange={(e) => setFolderId(e.target.value)}
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: 6, border: `1px solid ${folderId ? C.oak : C.surfaceD}`, fontSize: 13, background: C.white, color: C.text }}
+                >
+                  <option value="">— Download only —</option>
+                  {folders.map((f) => (
+                    <option key={f.id} value={f.id}>{f.projectName}{f.region ? ` · ${f.region}` : ""}</option>
+                  ))}
+                </select>
+                <div style={{ fontSize: 11, color: C.textS, marginTop: 6, lineHeight: 1.5 }}>
+                  {folderId
+                    ? "Saved to the project folder under 02 Floorplans, renamed “<project> - Draft N”. The number increments on each new draft."
+                    : "Pick a project to save the processed draft into its folder with an automatic draft number."}
+                </div>
+              </>
+            )}
+          </div>
 
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
             <button
