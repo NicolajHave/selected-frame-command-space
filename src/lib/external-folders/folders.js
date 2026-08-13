@@ -191,6 +191,23 @@ export async function syncProjectStatus({ asanaProjectId, completed, completedAt
 }
 
 /**
+ * Next draft number for a folder. Reads the filenames we ourselves wrote
+ * ("<project> - Draft N.pdf") and returns max + 1, so deleting a draft never
+ * causes the next one to reuse a number that has already been shared.
+ */
+export async function nextDraftNumber(folderId) {
+  const files = await listExternalFolderFiles(folderId);
+  let max = 0;
+  for (const f of files) {
+    const m = String(f.originalName || '').match(/-\s*Draft\s*(\d+)\s*(?:\.pdf)?$/i);
+    if (!m) continue;
+    const n = parseInt(m[1], 10);
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  return max + 1;
+}
+
+/**
  * Permanently remove a folder and its file rows. The FK cascades take care of
  * external_project_files and recently_opened_folders; the caller is responsible
  * for deleting the blobs first, since this drops the rows that point at them.
