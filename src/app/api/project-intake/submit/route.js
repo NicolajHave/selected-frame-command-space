@@ -161,6 +161,9 @@ export async function POST(request) {
         name: buildTaskName(payload),
         notes: summary,
         dueOn: payload.projectBasics.desiredOpeningDate,
+        // Total Selected footprint after opening — the same sum the Soft Shop
+        // rule uses. Lands in Asana's SQM field for the FY report.
+        sqm: (payload.areaSetup?.existingSpace || 0) + (payload.areaSetup?.additionalSpace || 0),
       });
       integrations.asana = { ok: true, gid: task.gid, url: task.url };
     } catch (e) {
