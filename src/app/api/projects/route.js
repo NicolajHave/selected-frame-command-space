@@ -58,6 +58,13 @@ export async function GET() {
           salesResp: getCustomField(task, 'SALES RESPONSIBLE'),
           specialElements: getCustomField(task, 'SPECIAL ELEMENTS'),
           projectNumber: getCustomField(task, 'PROJECT NUMBER'),
+          // Square metres for the FY footprint report. Number custom field in
+          // Asana; Project Intake fills it in automatically on creation.
+          sqm: (() => {
+            const v = getCustomField(task, 'SQM');
+            const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(',', '.'));
+            return Number.isFinite(n) ? n : null;
+          })(),
           dueOn: task.due_on, startOn: task.start_on,
           completed: task.completed,
           completedAt: task.completed_at ? task.completed_at.split('T')[0] : null,

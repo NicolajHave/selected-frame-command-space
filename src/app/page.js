@@ -4,6 +4,7 @@ import DraftStudioPage from "./draft-studio/DraftStudioPage";
 import ToolboxPage from "./toolbox/ToolboxPage";
 import ProjectIntakePage from "./project-intake/ProjectIntakePage";
 import ExternalFoldersPage from "./external-project-folders/ExternalFoldersPage";
+import FootprintPage from "./footprint/FootprintPage";
 import OpeningReportsPage from "./opening-reports/OpeningReportsPage";
 import ShowroomOpsPage from "./showroom-ops/ShowroomOpsPage";
 import { ExternalFolderCard, RecentlyOpenedFolders } from "./external-project-folders/ui";
@@ -1381,6 +1382,7 @@ export default function Home(){const [page,setPage]=useState("overview");const [
       {id:"projects",label:"Current",icon:"▦"},
       {id:"flow",label:"Project Flow",icon:"⟳"},
       {id:"installed",label:"Installed Base",icon:"⊞"},
+      {id:"footprint",label:"Footprint",icon:"▤"},
     ]},
     {label:"Tools",items:[
       {id:"roi",label:"ROI Engine",icon:"◇"},
@@ -1428,6 +1430,7 @@ export default function Home(){const [page,setPage]=useState("overview");const [
         {page==="roi"&&<ROIPage projects={projects}/>}
         {page==="flow"&&<FlowPage projects={projects} setPage={setPage}/>}
         {page==="installed"&&<InstalledPage projects={projects} setPage={setPage} setExternalFolderTarget={setExternalFolderTarget}/>}
+        {page==="footprint"&&<FootprintPage projects={projects}/>}
         {page==="showroom-ops"&&<ShowroomOpsPage/>}
         {page==="standards"&&<StandardsPage/>}
         {page==="admin"&&<AdminPage projects={projects}/>}
