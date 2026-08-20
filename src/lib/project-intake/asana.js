@@ -60,44 +60,37 @@ export function buildTaskName(payload) {
   return `${base} // ${type}`;
 }
 
-// Custom-field gids are per workspace, so rather than carry another env var we
-// look the field up by name on the intake project and remember it for the
-// lifetime of the lambda. Returns null when the field does not exist, which
-// keeps task creation working on a workspace that has not added it yet.
-const fieldGidCache = new Map();
-async function customFieldGid(fieldName) {
-  if (fieldGidCache.has(fieldName)) return fieldGidCache.get(fieldName);
-  let gid = null;
-  try {
-    const settings = await asana(
-      `/projects/${intakeProjectGid()}/custom_field_settings?opt_fields=custom_field.gid,custom_field.name&limit=100`,
-    );
-    const hit = (settings || []).find(
-      (s) => (s.custom_field?.name || '').trim().toUpperCase() === fieldName.toUpperCase(),
-    );
-    gid = hit?.custom_field?.gid || null;
-  } catch {
-    gid = null; // Best effort — never block the intake on a lookup.
-  }
-  fieldGidCache.set(fieldName, gid);
-  return gid;
+// The SQM number field on the intake project, feeding the FY footprint report.
+// Overridable via env in case the field is ever recreated.
+const DEFAULT_SQM_FIELD_GID = '1217571452526962';
+function sqmFieldGid() {
+  return process.env.ASANA_SQM_FIELD_ID || DEFAULT_SQM_FIELD_GID;
 }
 
 export async function createIntakeTask({ name, notes, dueOn, sqm }) {
-  // Attach SQM so the FY footprint report has structured data from day one.
-  let customFields;
-  if (typeof sqm === 'number' && Number.isFinite(sqm) && sqm > 0) {
-    const gid = await customFieldGid('SQM');
-    if (gid) customFields = { [gid]: sqm };
-  }
-  const data = await asana('/tasks', 'POST', {
+  const base = {
     name,
     notes,
     projects: [intakeProjectGid()],
     ...(isIsoDate(dueOn) ? { due_on: dueOn } : {}),
-    ...(customFields ? { custom_fields: customFields } : {}),
-  });
-  return { gid: data.gid, url: data.permalink_url };
+  };
+
+  const hasSqm = typeof sqm === 'number' && Number.isFinite(sqm) && sqm > 0;
+  const withField = hasSqm
+    ? { ...base, custom_fields: { [sqmFieldGid()]: sqm } }
+    : base;
+
+  try {
+    const data = await asana('/tasks', 'POST', withField);
+    return { gid: data.gid, url: data.permalink_url, sqmAttached: hasSqm };
+  } catch (e) {
+    // The task is the keystone of the whole intake — it keys the External
+    // Folder and puts the project in Current. Never let a custom-field problem
+    // (renamed, deleted, wrong gid) cost us the task; retry without it.
+    if (!hasSqm) throw e;
+    const data = await asana('/tasks', 'POST', base);
+    return { gid: data.gid, url: data.permalink_url, sqmAttached: false };
+  }
 }
 
 export async function updateTaskNotes(gid, notes) {
