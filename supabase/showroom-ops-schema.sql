@@ -40,6 +40,33 @@ CREATE TABLE IF NOT EXISTS showroom_ops.showrooms (
 
 CREATE INDEX IF NOT EXISTS idx_showrooms_status ON showroom_ops.showrooms(status);
 
+-- The shipping list has both a "Navn" and a "By": the showroom is called
+-- Kaarst while the city reads "Kaarst / Düsseldorf". Added after the first
+-- release, so an idempotent ALTER keeps existing deployments in step.
+ALTER TABLE showroom_ops.showrooms ADD COLUMN IF NOT EXISTS city TEXT;
+
+-- ─── showroom_materials — standing customisations per showroom ────────────────
+-- Some showrooms always need something extra: Helsinki takes a 850x2000 mm
+-- lightposter for both MEN and WOMEN. These belong to the showroom, not to a
+-- season, so whoever ticks the showroom for a season never has to remember
+-- them — they flow into the graphics sheet and the shipping list on their own.
+CREATE TABLE IF NOT EXISTS showroom_ops.showroom_materials (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  showroom_id   UUID NOT NULL REFERENCES showroom_ops.showrooms(id) ON DELETE CASCADE,
+  material_id   UUID REFERENCES showroom_ops.materials(id) ON DELETE SET NULL,
+  name          TEXT NOT NULL,          -- free text when there is no catalog entry
+  gender        TEXT NOT NULL DEFAULT 'BOTH',  -- 'MEN' | 'WOMEN' | 'BOTH'
+  format        TEXT,                   -- e.g. '850 x 2000 mm'
+  quantity      INTEGER NOT NULL DEFAULT 1,
+  remarks       TEXT,
+  active        BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_showroom_materials_showroom
+  ON showroom_ops.showroom_materials(showroom_id);
+
 -- ─── materials — reusable catalog (seed from sheet "MATERIAL CATALOG") ────────
 CREATE TABLE IF NOT EXISTS showroom_ops.materials (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -115,7 +142,8 @@ CREATE INDEX IF NOT EXISTS idx_season_lines_scope  ON showroom_ops.season_lines(
 
 -- Row Level Security: the service-role key is used server-side only; the anon
 -- key must never read or write these rows. Matches the public-schema modules.
-ALTER TABLE showroom_ops.showrooms        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE showroom_ops.showrooms          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE showroom_ops.showroom_materials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE showroom_ops.materials        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE showroom_ops.seasons          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE showroom_ops.season_showrooms ENABLE ROW LEVEL SECURITY;
