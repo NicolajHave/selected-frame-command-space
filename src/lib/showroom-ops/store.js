@@ -95,6 +95,15 @@ function toColumns(patch, map) {
   return out;
 }
 
+
+// PostgREST reports a column or table it does not know about rather than
+// failing the query outright. A schema addition that has not been applied (or
+// a stale PostgREST cache) must degrade, not take the whole page down.
+function isMissingSchema(e) {
+  const m = String(e?.message || '');
+  return /Could not find the .* column|schema cache|does not exist|42P01|PGRST204/i.test(m);
+}
+
 // ─── Showrooms ────────────────────────────────────────────────────────────────
 export async function listShowrooms() {
   const sb = getShowroomSupabase();
@@ -280,10 +289,17 @@ export async function getSeasonDetail(id) {
     await sb.from('season_showrooms').select('*').eq('season_id', id),
     'getSeasonDetail/showrooms',
   );
-  const sprints = await listSeasonSprints(id);
+  // Sprints arrived in a later schema revision; without them the rest of the
+  // season is still perfectly usable.
+  let sprints = [];
+  let sprintsUnavailable = false;
+  try { sprints = await listSeasonSprints(id); }
+  catch (e) { if (isMissingSchema(e)) sprintsUnavailable = true; else throw e; }
+
   return {
     season,
     sprints,
+    sprintsUnavailable,
     lines: lines.map(lineFromRow),
     seasonShowrooms: seasonShowrooms.map(seasonShowroomFromRow),
   };
@@ -348,11 +364,23 @@ export async function setSeasonShowroom(seasonId, showroomId, patch) {
     women_sets: Math.max(1, parseInt(patch.womenSets, 10) || 1),
     extras: patch.extras || null, remarks: patch.remarks || null,
   };
-  const data = unwrap(
-    await sb.from('season_showrooms').upsert(row, { onConflict: 'season_id,showroom_id' }).select('*').single(),
-    'setSeasonShowroom',
-  );
-  return seasonShowroomFromRow(data);
+  try {
+    const data = unwrap(
+      await sb.from('season_showrooms').upsert(row, { onConflict: 'season_id,showroom_id' }).select('*').single(),
+      'setSeasonShowroom',
+    );
+    return seasonShowroomFromRow(data);
+  } catch (e) {
+    if (!isMissingSchema(e)) throw e;
+    // men_sets / women_sets not applied yet — tick without them rather than
+    // blocking the one action the whole season is planned with.
+    const { men_sets, women_sets, ...withoutSets } = row;
+    const data = unwrap(
+      await sb.from('season_showrooms').upsert(withoutSets, { onConflict: 'season_id,showroom_id' }).select('*').single(),
+      'setSeasonShowroom/withoutSets',
+    );
+    return seasonShowroomFromRow(data);
+  }
 }
 export async function removeSeasonShowroom(seasonId, showroomId) {
   const sb = getShowroomSupabase();
