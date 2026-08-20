@@ -46,7 +46,7 @@ const Pill = ({ children, color }) => <span style={{ display: "inline-block", fo
 
 function SubNav({ tab, setTab }) {
   const tabs = [
-    ["dashboard", "Season Dashboard"], ["graphics", "Graphics Queue"],
+    ["dashboard", "Season Dashboard"], ["saleslist", "Sales List"], ["graphics", "Graphics Queue"],
     ["purchasing", "Purchasing Export"], ["shipping", "Shipping List"], ["registry", "Registry Admin"],
   ];
   return (
@@ -387,6 +387,149 @@ function LinesTable({ lines, materials, season, onChanged }) {
   );
 }
 
+// ─── Sales List — tick which showrooms get a package this season ─────────────
+// The working view: pick a season, tick MEN / WOMEN per showroom, and edit
+// showroom details in place. Standing customisations are shown read-only so it
+// is visible what rides along with a tick without anyone maintaining them here.
+function SalesListView({ seasons, selectedId, setSelectedId, showrooms, reloadRegistry }) {
+  const [ticks, setTicks] = useState({});          // showroomId -> {menPackage, womenPackage, extras, remarks}
+  const [customs, setCustoms] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(null);      // showroomId currently saving
+  const [error, setError] = useState(null);
+  const [editing, setEditing] = useState(null);    // showroom being edited
+  const [search, setSearch] = useState("");
+
+  const load = useCallback(async () => {
+    if (!selectedId) { setTicks({}); return; }
+    setLoading(true); setError(null);
+    try {
+      const [dRes, cRes] = await Promise.all([
+        fetch(`/api/showroom-ops/seasons/${selectedId}`),
+        fetch(`/api/showroom-ops/showroom-materials`),
+      ]);
+      if (dRes.ok) {
+        const d = await dRes.json();
+        const m = {};
+        for (const ss of d.seasonShowrooms || []) m[ss.showroomId] = ss;
+        setTicks(m);
+      }
+      if (cRes.ok) setCustoms((await cRes.json()).materials || []);
+    } catch (e) { setError(e.message); } finally { setLoading(false); }
+  }, [selectedId]);
+  useEffect(() => { load(); }, [load]);
+
+  const customsFor = (showroomId, gender) =>
+    customs.filter((m) => m.active && m.showroomId === showroomId && (m.gender === "BOTH" || m.gender === gender));
+
+  const toggle = async (showroom, gender) => {
+    if (!selectedId) return;
+    const cur = ticks[showroom.id] || { menPackage: false, womenPackage: false };
+    const next = {
+      showroomId: showroom.id,
+      menPackage: gender === "MEN" ? !cur.menPackage : !!cur.menPackage,
+      womenPackage: gender === "WOMEN" ? !cur.womenPackage : !!cur.womenPackage,
+      extras: cur.extras || null,
+      remarks: cur.remarks || null,
+    };
+    // Optimistic: the grid must feel like a spreadsheet.
+    setTicks((p) => ({ ...p, [showroom.id]: { ...next } }));
+    setSaving(showroom.id); setError(null);
+    try {
+      const r = await fetch(`/api/showroom-ops/seasons/${selectedId}/showrooms`, {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(next),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `Save failed (${r.status})`);
+    } catch (e) {
+      setError(e.message);
+      setTicks((p) => ({ ...p, [showroom.id]: cur }));  // roll back
+    } finally { setSaving(null); }
+  };
+
+  const visible = showrooms.filter((s) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return [s.name, s.city, s.country, s.customerNoMen, s.customerNoWomen]
+      .some((v) => String(v || "").toLowerCase().includes(q));
+  });
+
+  const menCount = Object.values(ticks).filter((t) => t.menPackage).length;
+  const womenCount = Object.values(ticks).filter((t) => t.womenPackage).length;
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <SeasonSelector seasons={seasons} selectedId={selectedId} onSelect={setSelectedId} />
+          <input placeholder="Search showroom, city, customer no…" value={search} onChange={(e) => setSearch(e.target.value)}
+            style={{ ...inputStyle, width: 260 }} />
+        </div>
+        {selectedId && (
+          <div style={{ fontSize: 12, color: C.textS }}>
+            <strong style={{ color: C.text }}>{menCount}</strong> MEN · <strong style={{ color: C.text }}>{womenCount}</strong> WOMEN packages
+          </div>
+        )}
+      </div>
+
+      {error && <div style={{ marginBottom: 12, padding: "10px 14px", background: "#FBE5E1", borderLeft: `3px solid ${C.nogo}`, borderRadius: 4, fontSize: 12, color: C.nogo }}>{error}</div>}
+
+      {editing && <ShowroomForm showroom={editing} onClose={() => setEditing(null)} onSaved={async () => { setEditing(null); await reloadRegistry(); }} />}
+
+      {!selectedId ? (
+        <Card><div style={{ fontSize: 13, color: C.textS }}>Pick a season, then tick which showrooms receive a MEN or WOMEN package. The ticks drive the graphics sheet and the shipping list.</div></Card>
+      ) : loading ? (
+        <Card><div style={{ padding: 20, textAlign: "center", color: C.textS, fontSize: 13 }}>Loading…</div></Card>
+      ) : (
+        <Card style={{ padding: 0, overflow: "hidden" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: C.surface }}>
+                {["Showroom", "City", "Country", "Cust# MEN", "Cust# WOMEN", "MEN", "WOMEN", "Always included", ""].map((h) => (
+                  <th key={h} style={{ padding: "8px 10px", textAlign: h === "MEN" || h === "WOMEN" ? "center" : "left", fontSize: 10, fontWeight: 700, color: C.textS, textTransform: "uppercase", letterSpacing: ".5px", borderBottom: `1px solid ${C.surfaceD}` }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((s) => {
+                const t = ticks[s.id] || {};
+                const busy = saving === s.id;
+                const cm = customsFor(s.id, "MEN");
+                const cw = customsFor(s.id, "WOMEN");
+                const allCustom = [...new Set([...cm, ...cw].map((m) => `${m.quantity > 1 ? `${m.quantity}× ` : ""}${m.name}${m.format ? ` (${m.format})` : ""}`))];
+                return (
+                  <tr key={s.id} style={{ borderBottom: `1px solid ${C.surfaceD}`, opacity: busy ? 0.55 : 1 }}>
+                    <td style={{ padding: "7px 10px", fontWeight: 500 }}>
+                      {s.name}
+                      {s.status === "VERIFY" && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: C.warn }}>VERIFY</span>}
+                    </td>
+                    <td style={{ padding: "7px 10px", color: C.textS }}>{s.city || "—"}</td>
+                    <td style={{ padding: "7px 10px" }}>{s.country || "—"}</td>
+                    <td style={{ padding: "7px 10px", fontFamily: "'DM Mono',monospace" }}>{s.customerNoMen || "—"}</td>
+                    <td style={{ padding: "7px 10px", fontFamily: "'DM Mono',monospace" }}>{s.customerNoWomen || "—"}</td>
+                    <td style={{ padding: "7px 10px", textAlign: "center" }}>
+                      <input type="checkbox" checked={!!t.menPackage} disabled={busy} onChange={() => toggle(s, "MEN")} style={{ width: 16, height: 16, accentColor: C.oak, cursor: "pointer" }} />
+                    </td>
+                    <td style={{ padding: "7px 10px", textAlign: "center" }}>
+                      <input type="checkbox" checked={!!t.womenPackage} disabled={busy} onChange={() => toggle(s, "WOMEN")} style={{ width: 16, height: 16, accentColor: C.oak, cursor: "pointer" }} />
+                    </td>
+                    <td style={{ padding: "7px 10px", fontSize: 11, color: allCustom.length ? C.oak : C.steelL }}>
+                      {allCustom.length ? allCustom.join(" · ") : "—"}
+                    </td>
+                    <td style={{ padding: "7px 10px", textAlign: "right" }}>
+                      <button onClick={() => setEditing(s)} style={{ ...btnLight, padding: "4px 8px", fontSize: 11 }}>Edit</button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {!visible.length && <tr><td colSpan={9} style={{ padding: 24, textAlign: "center", color: C.textS, fontSize: 13 }}>No showrooms match the search</td></tr>}
+            </tbody>
+          </table>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 // ─── Graphics Queue ──────────────────────────────────────────────────────────
 function GraphicsQueue({ seasons, selectedId, setSelectedId, materials }) {
   const [detail, setDetail] = useState(null);
@@ -529,13 +672,23 @@ function ShippingList({ seasons, selectedId, setSelectedId }) {
 
   const rows = (data?.rows || []).filter((r) => gender === "ALL" || r.gender === gender);
 
+  // Column names and order mirror the FORSENDELSESLISTE sheets the buyer works
+  // in today, so the export drops straight into that workflow.
   const columns = [
-    { header: "Showroom", key: "showroom" }, { header: "Gender", key: "gender" }, { header: "Address", key: "address" },
-    { header: "Zip", key: "zip" }, { header: "Country", key: "country" }, { header: "Customer No", key: "customerNo" },
-    { header: "Delivery Type", key: "deliveryTypeLabel" }, { header: "Extras", key: "extras" }, { header: "Remarks", key: "remarks" },
-    { header: "Special Handling", key: "specialHandling" },
+    { header: "Navn:", key: "showroom" }, { header: "Adr.:", key: "address" },
+    { header: "Postnr.:", key: "zip" }, { header: "By", key: "city" },
+    { header: "Land:", key: "country" }, { header: "Customerno.:", key: "customerNo" },
+    { header: "PACKAGE", key: "packageMark" }, { header: "REMARKS", key: "remarksOut" },
   ];
-  const exportRows = rows.map((r) => ({ ...r, deliveryTypeLabel: DELIVERY_LABEL[r.deliveryType] || r.deliveryType || "" }));
+  const exportRows = rows.map((r) => ({
+    ...r,
+    city: r.city || r.showroom,
+    packageMark: "X",
+    // Extras carry the showroom's standing customisations, so they belong in
+    // the remarks the buyer actually reads.
+    remarksOut: [r.extras, r.remarks, r.specialHandling].filter(Boolean).join(" · "),
+    deliveryTypeLabel: DELIVERY_LABEL[r.deliveryType] || r.deliveryType || "",
+  }));
 
   const doExport = async () => {
     await exportToXlsx({ filename: `${data.season.code}_SHIPPING_${gender}.xlsx`, sheetName: `${data.season.code} ${gender}`, columns, rows: exportRows });
@@ -558,7 +711,7 @@ function ShippingList({ seasons, selectedId, setSelectedId }) {
         : (
           <Card style={{ padding: 0, overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-              <thead><tr style={{ background: C.surface }}>{columns.slice(0, 9).map((c) => <th key={c.key} style={{ padding: "8px 10px", textAlign: "left", fontSize: 10, fontWeight: 700, color: C.textS, textTransform: "uppercase", letterSpacing: ".5px", borderBottom: `1px solid ${C.surfaceD}` }}>{c.header}</th>)}</tr></thead>
+              <thead><tr style={{ background: C.surface }}>{["Showroom","Gender","Address","Zip","Country","Customer no.","Delivery","Always included / extras","Remarks"].map((c) => <th key={c} style={{ padding: "8px 10px", textAlign: "left", fontSize: 10, fontWeight: 700, color: C.textS, textTransform: "uppercase", letterSpacing: ".5px", borderBottom: `1px solid ${C.surfaceD}` }}>{c}</th>)}</tr></thead>
               <tbody>{rows.map((r, i) => {
                 const tone = rowTone(r);
                 return (
@@ -643,7 +796,8 @@ function ShowroomAdmin({ showrooms, reload }) {
 }
 
 const SHOWROOM_FORM_FIELDS = [
-  ["name", "Name *", "text"], ["country", "Country", "text"], ["lines", "Lines (MEN/WOMEN/MEN+WOMEN)", "text"],
+  ["name", "Name *", "text"], ["city", "City (as it reads on the shipping list)", "text"],
+  ["country", "Country", "text"], ["lines", "Lines (MEN/WOMEN/MEN+WOMEN)", "text"],
   ["deliveryType", "Delivery type", "delivery"], ["companyName", "Company name", "text"], ["status", "Status", "status"],
   ["addressMen", "Address (MEN)", "text"], ["zipMen", "Zip (MEN)", "text"],
   ["addressWomen", "Address (WOMEN)", "text"], ["zipWomen", "Zip (WOMEN)", "text"],
@@ -652,6 +806,80 @@ const SHOWROOM_FORM_FIELDS = [
   ["emailWomen", "Email WOMEN", "text"], ["phoneWomen", "Phone WOMEN", "text"],
   ["specialHandling", "Special handling", "text"], ["notes", "Notes", "text"],
 ];
+
+// Standing customisations for one showroom. Maintained once here; they follow
+// the showroom into every season it is ticked for, so nobody has to remember
+// that Helsinki takes a lightposter.
+function ShowroomMaterials({ showroom }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [draft, setDraft] = useState({ name: "", format: "", gender: "BOTH", quantity: "1", remarks: "" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`/api/showroom-ops/showroom-materials?showroomId=${showroom.id}`);
+      if (r.ok) setItems((await r.json()).materials || []);
+    } finally { setLoading(false); }
+  }, [showroom.id]);
+  useEffect(() => { load(); }, [load]);
+
+  const add = async () => {
+    if (!draft.name.trim()) return;
+    setBusy(true); setError(null);
+    try {
+      const r = await fetch("/api/showroom-ops/showroom-materials", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...draft, showroomId: showroom.id, quantity: parseInt(draft.quantity) || 1 }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Failed");
+      setDraft({ name: "", format: "", gender: "BOTH", quantity: "1", remarks: "" });
+      await load();
+    } catch (e) { setError(e.message); } finally { setBusy(false); }
+  };
+
+  const remove = async (m) => {
+    if (!confirm(`Remove "${m.name}" from ${showroom.name}?`)) return;
+    await fetch(`/api/showroom-ops/showroom-materials/${m.id}`, { method: "DELETE" });
+    await load();
+  };
+
+  return (
+    <div style={{ marginTop: 18, paddingTop: 16, borderTop: `1px solid ${C.surfaceD}` }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.oak, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 4 }}>Always included</div>
+      <div style={{ fontSize: 11, color: C.textS, marginBottom: 12, lineHeight: 1.5 }}>
+        Customised material this showroom always needs. It follows every season the showroom is ticked for — no one has to re-enter it.
+      </div>
+      {loading ? <div style={{ fontSize: 12, color: C.textS }}>Loading…</div> : (
+        <>
+          {items.map((m) => (
+            <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", background: C.surface, borderRadius: 6, marginBottom: 6 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, color: C.oak, background: C.oak + "1A", padding: "2px 6px", borderRadius: 3, minWidth: 44, textAlign: "center" }}>{m.gender}</span>
+              <span style={{ flex: 1, fontSize: 12, color: C.text }}>
+                {m.quantity > 1 ? `${m.quantity}× ` : ""}{m.name}{m.format ? <span style={{ color: C.textS }}> · {m.format}</span> : null}
+                {m.remarks ? <span style={{ color: C.textS, fontStyle: "italic" }}> — {m.remarks}</span> : null}
+              </span>
+              <button onClick={() => remove(m)} style={{ background: "none", border: "none", color: C.nogo, cursor: "pointer", fontSize: 15, lineHeight: 1 }}>×</button>
+            </div>
+          ))}
+          {!items.length && <div style={{ fontSize: 12, color: C.textS, marginBottom: 8 }}>Nothing yet.</div>}
+        </>
+      )}
+      <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Lightposter" style={{ ...inputStyle, flex: 2, minWidth: 140 }} />
+        <input value={draft.format} onChange={(e) => setDraft({ ...draft, format: e.target.value })} placeholder="850 x 2000 mm" style={{ ...inputStyle, flex: 1, minWidth: 120 }} />
+        <select value={draft.gender} onChange={(e) => setDraft({ ...draft, gender: e.target.value })} style={{ ...inputStyle, width: 90 }}>
+          {["BOTH", "MEN", "WOMEN"].map((g) => <option key={g}>{g}</option>)}
+        </select>
+        <input value={draft.quantity} onChange={(e) => setDraft({ ...draft, quantity: e.target.value })} type="text" inputMode="numeric" style={{ ...inputStyle, width: 52, textAlign: "center" }} />
+        <button onClick={add} disabled={busy || !draft.name.trim()} style={{ ...btnDark, padding: "8px 14px", opacity: busy || !draft.name.trim() ? 0.5 : 1 }}>Add</button>
+      </div>
+      {error && <div style={{ fontSize: 11, color: C.nogo, marginTop: 8 }}>{error}</div>}
+    </div>
+  );
+}
 
 function ShowroomForm({ showroom, onClose, onSaved }) {
   const [form, setForm] = useState(showroom || { name: "", status: "ACTIVE" });
@@ -684,6 +912,7 @@ function ShowroomForm({ showroom, onClose, onSaved }) {
         ))}
       </div>
       {error && <div style={{ marginTop: 12, fontSize: 12, color: C.nogo }}>{error}</div>}
+      {showroom && <ShowroomMaterials showroom={showroom} />}
       <div style={{ marginTop: 18, display: "flex", gap: 10 }}><button onClick={save} disabled={busy} style={btnDark}>{busy ? "Saving…" : "Save"}</button><button onClick={onClose} style={btnLight}>Cancel</button></div>
     </Modal>
   );
@@ -886,6 +1115,7 @@ export default function ShowroomOpsPage() {
       {!loaded ? <Card><div style={{ padding: 20, textAlign: "center", color: C.textS, fontSize: 13 }}>Loading…</div></Card> : (
         <>
           {tab === "dashboard" && <SeasonDashboard seasons={seasons} reloadSeasons={reloadSeasons} selectedId={selectedSeasonId} setSelectedId={setSelectedSeasonId} materials={materials} />}
+          {tab === "saleslist" && <SalesListView seasons={seasons} selectedId={selectedSeasonId} setSelectedId={setSelectedSeasonId} showrooms={showrooms} reloadRegistry={reloadRegistry} />}
           {tab === "graphics" && <GraphicsQueue seasons={seasons} selectedId={selectedSeasonId} setSelectedId={setSelectedSeasonId} materials={materials} />}
           {tab === "purchasing" && <PurchasingExport seasons={seasons} selectedId={selectedSeasonId} setSelectedId={setSelectedSeasonId} materials={materials} />}
           {tab === "shipping" && <ShippingList seasons={seasons} selectedId={selectedSeasonId} setSelectedId={setSelectedSeasonId} />}

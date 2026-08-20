@@ -9,7 +9,7 @@ export { isConfigured };
 
 // ─── Row mappers ──────────────────────────────────────────────────────────────
 const showroomFromRow = (r) => r && ({
-  id: r.id, name: r.name, country: r.country, lines: r.lines,
+  id: r.id, name: r.name, city: r.city, country: r.country, lines: r.lines,
   deliveryType: r.delivery_type, companyName: r.company_name,
   addressMen: r.address_men, zipMen: r.zip_men,
   addressWomen: r.address_women, zipWomen: r.zip_women,
@@ -50,7 +50,7 @@ const seasonShowroomFromRow = (r) => r && ({
 
 // camelCase → snake_case column maps for partial updates.
 const SHOWROOM_COLS = {
-  name: 'name', country: 'country', lines: 'lines', deliveryType: 'delivery_type',
+  name: 'name', city: 'city', country: 'country', lines: 'lines', deliveryType: 'delivery_type',
   companyName: 'company_name', addressMen: 'address_men', zipMen: 'zip_men',
   addressWomen: 'address_women', zipWomen: 'zip_women',
   customerNoMen: 'customer_no_men', customerNoWomen: 'customer_no_women',
@@ -108,6 +108,49 @@ export async function updateShowroom(id, patch) {
 export async function deleteShowroom(id) {
   const sb = getShowroomSupabase();
   unwrap(await sb.from('showrooms').delete().eq('id', id), 'deleteShowroom');
+}
+
+// ─── Showroom materials — standing customisations per showroom ───────────────
+// These belong to the showroom, not to a season, so nobody has to remember
+// Helsinki's lightposter when ticking it for a new season.
+const showroomMaterialFromRow = (r) => r && ({
+  id: r.id, showroomId: r.showroom_id, materialId: r.material_id,
+  name: r.name, gender: r.gender, format: r.format,
+  quantity: r.quantity, remarks: r.remarks, active: r.active !== false,
+});
+const SHOWROOM_MATERIAL_COLS = {
+  showroomId: 'showroom_id', materialId: 'material_id', name: 'name',
+  gender: 'gender', format: 'format', quantity: 'quantity',
+  remarks: 'remarks', active: 'active',
+};
+
+export async function listShowroomMaterials(showroomId = null) {
+  const sb = getShowroomSupabase();
+  let q = sb.from('showroom_materials').select('*').order('name', { ascending: true });
+  if (showroomId) q = q.eq('showroom_id', showroomId);
+  const data = unwrap(await q, 'listShowroomMaterials');
+  return data.map(showroomMaterialFromRow);
+}
+export async function createShowroomMaterial(patch) {
+  const sb = getShowroomSupabase();
+  const row = unwrap(
+    await sb.from('showroom_materials').insert(toColumns(patch, SHOWROOM_MATERIAL_COLS)).select('*').single(),
+    'createShowroomMaterial',
+  );
+  return showroomMaterialFromRow(row);
+}
+export async function updateShowroomMaterial(id, patch) {
+  const sb = getShowroomSupabase();
+  const update = { ...toColumns(patch, SHOWROOM_MATERIAL_COLS), updated_at: new Date().toISOString() };
+  const row = unwrap(
+    await sb.from('showroom_materials').update(update).eq('id', id).select('*').maybeSingle(),
+    'updateShowroomMaterial',
+  );
+  return showroomMaterialFromRow(row);
+}
+export async function deleteShowroomMaterial(id) {
+  const sb = getShowroomSupabase();
+  unwrap(await sb.from('showroom_materials').delete().eq('id', id), 'deleteShowroomMaterial');
 }
 
 // ─── Materials ────────────────────────────────────────────────────────────────
@@ -316,6 +359,59 @@ export async function deleteLine(id) {
 }
 
 /**
+ * Everything a ticked showroom pulls in for a season, per gender.
+ *
+ * A tick on Helsinki/MEN drags Helsinki's standing MEN (and BOTH) materials
+ * along with it. Graphics need them as items to produce; purchasing needs them
+ * as extras on the shipping row. Derived on demand so a change to a showroom's
+ * customisations is reflected the moment it is saved — nothing is copied into
+ * the season.
+ */
+export async function getSeasonCustomisations(seasonId) {
+  const detail = await getSeasonDetail(seasonId);
+  if (!detail) return null;
+  const [showrooms, materials] = await Promise.all([listShowrooms(), listShowroomMaterials()]);
+  const byId = new Map(showrooms.map((s) => [s.id, s]));
+  const bySr = new Map();
+  for (const m of materials) {
+    if (!m.active) continue;
+    if (!bySr.has(m.showroomId)) bySr.set(m.showroomId, []);
+    bySr.get(m.showroomId).push(m);
+  }
+
+  const wanted = (m, gender) => m.gender === 'BOTH' || m.gender === gender;
+  const rows = [];
+  for (const ss of detail.seasonShowrooms) {
+    const sr = byId.get(ss.showroomId);
+    if (!sr) continue;
+    for (const gender of ['MEN', 'WOMEN']) {
+      const ticked = gender === 'MEN' ? ss.menPackage : ss.womenPackage;
+      if (!ticked) continue;
+      for (const m of bySr.get(sr.id) || []) {
+        if (!wanted(m, gender)) continue;
+        rows.push({
+          showroomId: sr.id,
+          showroom: sr.name,
+          city: sr.city,
+          country: sr.country,
+          gender,
+          name: m.name,
+          format: m.format,
+          quantity: m.quantity || 1,
+          remarks: m.remarks,
+          materialId: m.materialId,
+        });
+      }
+    }
+  }
+  rows.sort((a, b) =>
+    (a.showroom || '').localeCompare(b.showroom || '') ||
+    a.gender.localeCompare(b.gender) ||
+    (a.name || '').localeCompare(b.name || ''));
+  return { season: detail.season, rows };
+}
+
+/**
  * Derived shipping list for a season. Joins season_showrooms with the
  * registry, splitting per gender so each row carries the correct customer
  * number. Never stored — recomputed on demand. This is what replaces the
@@ -324,22 +420,33 @@ export async function deleteLine(id) {
 export async function getShippingList(seasonId) {
   const detail = await getSeasonDetail(seasonId);
   if (!detail) return null;
-  const all = await listShowrooms();
+  const [all, customs] = await Promise.all([listShowrooms(), listShowroomMaterials()]);
   const byId = new Map(all.map((s) => [s.id, s]));
+  // Standing customisations show up as extras on the row, so the buyer sees
+  // Helsinki's lightposter without anyone re-typing it each season.
+  const customFor = (showroomId, gender) =>
+    customs
+      .filter((m) => m.active && m.showroomId === showroomId && (m.gender === 'BOTH' || m.gender === gender))
+      .map((m) => `${m.quantity > 1 ? `${m.quantity}× ` : ''}${m.name}${m.format ? ` (${m.format})` : ''}`);
 
   const rows = [];
   for (const ss of detail.seasonShowrooms) {
     const sr = byId.get(ss.showroomId);
     if (!sr) continue;
     const base = {
-      showroomId: sr.id, showroom: sr.name, country: sr.country,
-      deliveryType: sr.deliveryType, extras: ss.extras, remarks: ss.remarks,
+      showroomId: sr.id, showroom: sr.name, city: sr.city, country: sr.country,
+      deliveryType: sr.deliveryType, remarks: ss.remarks,
       specialHandling: sr.specialHandling, status: sr.status,
+    };
+    const withExtras = (gender) => {
+      const parts = [ss.extras, ...customFor(sr.id, gender)].filter(Boolean);
+      return parts.join(' · ');
     };
     if (ss.menPackage) {
       rows.push({
         ...base, gender: 'MEN', address: sr.addressMen, zip: sr.zipMen,
         customerNo: sr.customerNoMen, contact: sr.contactMen,
+        extras: withExtras('MEN'),
       });
     }
     if (ss.womenPackage) {
@@ -347,6 +454,7 @@ export async function getShippingList(seasonId) {
         ...base, gender: 'WOMEN', address: sr.addressWomen || sr.addressMen,
         zip: sr.zipWomen || sr.zipMen, customerNo: sr.customerNoWomen,
         contact: sr.contactWomen, email: sr.emailWomen, phone: sr.phoneWomen,
+        extras: withExtras('WOMEN'),
       });
     }
   }
