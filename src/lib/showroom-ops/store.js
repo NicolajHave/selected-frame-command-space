@@ -45,7 +45,14 @@ const lineFromRow = (r) => r && ({
 const seasonShowroomFromRow = (r) => r && ({
   seasonId: r.season_id, showroomId: r.showroom_id,
   menPackage: !!r.men_package, womenPackage: !!r.women_package,
+  // How many collection sets this location holds this season (Oslo 1/2/3 = 3).
+  menSets: r.men_sets ?? 1, womenSets: r.women_sets ?? 1,
   extras: r.extras, remarks: r.remarks,
+});
+
+const sprintFromRow = (r) => r && ({
+  id: r.id, seasonId: r.season_id, name: r.name,
+  orderDate: r.order_date, deliveryDate: r.delivery_date, sortOrder: r.sort_order,
 });
 
 // camelCase → snake_case column maps for partial updates.
@@ -219,6 +226,48 @@ export async function deleteSeason(id) {
   unwrap(await sb.from('seasons').delete().eq('id', id), 'deleteSeason');
 }
 
+// ─── season sprints — a season orders in waves ───────────────────────────────
+export async function listSeasonSprints(seasonId) {
+  const sb = getShowroomSupabase();
+  const data = unwrap(
+    await sb.from('season_sprints').select('*').eq('season_id', seasonId)
+      .order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
+    'listSeasonSprints',
+  );
+  return data.map(sprintFromRow);
+}
+export async function createSeasonSprint(seasonId, patch) {
+  const sb = getShowroomSupabase();
+  const existing = await listSeasonSprints(seasonId);
+  const row = unwrap(
+    await sb.from('season_sprints').insert({
+      season_id: seasonId,
+      name: patch.name || `Sprint ${existing.length + 1}`,
+      order_date: patch.orderDate || null,
+      delivery_date: patch.deliveryDate || null,
+      sort_order: existing.length,
+    }).select('*').single(),
+    'createSeasonSprint',
+  );
+  return sprintFromRow(row);
+}
+export async function updateSeasonSprint(id, patch) {
+  const sb = getShowroomSupabase();
+  const update = {};
+  if ('name' in patch) update.name = patch.name || null;
+  if ('orderDate' in patch) update.order_date = patch.orderDate || null;
+  if ('deliveryDate' in patch) update.delivery_date = patch.deliveryDate || null;
+  const row = unwrap(
+    await sb.from('season_sprints').update(update).eq('id', id).select('*').maybeSingle(),
+    'updateSeasonSprint',
+  );
+  return sprintFromRow(row);
+}
+export async function deleteSeasonSprint(id) {
+  const sb = getShowroomSupabase();
+  unwrap(await sb.from('season_sprints').delete().eq('id', id), 'deleteSeasonSprint');
+}
+
 export async function getSeasonDetail(id) {
   const season = await getSeason(id);
   if (!season) return null;
@@ -231,8 +280,10 @@ export async function getSeasonDetail(id) {
     await sb.from('season_showrooms').select('*').eq('season_id', id),
     'getSeasonDetail/showrooms',
   );
+  const sprints = await listSeasonSprints(id);
   return {
     season,
+    sprints,
     lines: lines.map(lineFromRow),
     seasonShowrooms: seasonShowrooms.map(seasonShowroomFromRow),
   };
@@ -293,6 +344,8 @@ export async function setSeasonShowroom(seasonId, showroomId, patch) {
   const row = {
     season_id: seasonId, showroom_id: showroomId,
     men_package: !!patch.menPackage, women_package: !!patch.womenPackage,
+    men_sets: Math.max(1, parseInt(patch.menSets, 10) || 1),
+    women_sets: Math.max(1, parseInt(patch.womenSets, 10) || 1),
     extras: patch.extras || null, remarks: patch.remarks || null,
   };
   const data = unwrap(
@@ -359,6 +412,30 @@ export async function deleteLine(id) {
 }
 
 /**
+ * How many of a LOCAL_SHOWROOMS line to produce, from the showrooms ticked for
+ * the season. Oslo holding three collection sets means a sign that goes to
+ * everyone is needed three times there — that is what men_sets/women_sets carry.
+ *
+ * Only local-showroom material scales this way. Collection-meeting scopes
+ * (Brande, Perfect, Creative…) are one venue, so their quantity stays editorial
+ * and is returned as null for the caller to leave alone.
+ */
+export function derivedLineQuantity(line, seasonShowrooms) {
+  if (!line || line.scope !== 'LOCAL_SHOWROOMS') return null;
+  let total = 0;
+  for (const ss of seasonShowrooms || []) {
+    const men = ss.menPackage ? (ss.menSets ?? 1) : 0;
+    const women = ss.womenPackage ? (ss.womenSets ?? 1) : 0;
+    if (line.gender === 'MEN') total += men;
+    else if (line.gender === 'WOMEN') total += women;
+    // A unisex item still follows the collection sets at a location, so Oslo
+    // with three men's and two women's sets needs three.
+    else total += Math.max(men, women);
+  }
+  return total;
+}
+
+/**
  * Import one gender's sales list into a season.
  *
  * The customer number is the join key: the sales list calls a showroom
@@ -392,9 +469,20 @@ export async function importSalesList(seasonId, { gender, rows, createMissing = 
   const zipField = gender === 'MEN' ? 'zipMen' : 'zipWomen';
   const contactField = gender === 'MEN' ? 'contactMen' : 'contactWomen';
 
-  const result = { matched: [], created: [], unmatched: [], ticked: 0 };
+  const result = { matched: [], created: [], unmatched: [], ticked: 0, sets: {} };
 
+  // "Oslo 1", "Oslo 2", "Oslo 3" are one location holding three collection
+  // sets. Collapse them to a single showroom called "Oslo" and remember how
+  // many rows folded in, so a sign that goes to everyone arrives three times.
+  const cleanName = (n) => String(n || '').replace(/\s*\d+\s*$/, '').trim() || String(n || '').trim();
+  const grouped = new Map();
   for (const row of rows || []) {
+    const key = String(row.customerNo || '').trim() || normName(row.name);
+    if (!grouped.has(key)) grouped.set(key, { ...row, name: cleanName(row.name), sets: 0 });
+    grouped.get(key).sets += 1;
+  }
+
+  for (const row of grouped.values()) {
     const cust = String(row.customerNo || '').trim();
     let showroom = (cust && byCustomer.get(cust)) || byName.get(normName(row.name)) || null;
 
@@ -444,9 +532,12 @@ export async function importSalesList(seasonId, { gender, rows, createMissing = 
     await setSeasonShowroom(seasonId, showroom.id, {
       menPackage: gender === 'MEN' ? true : !!prior?.men_package,
       womenPackage: gender === 'WOMEN' ? true : !!prior?.women_package,
+      menSets: gender === 'MEN' ? row.sets : (prior?.men_sets ?? 1),
+      womenSets: gender === 'WOMEN' ? row.sets : (prior?.women_sets ?? 1),
       extras: prior?.extras || null,
       remarks: prior?.remarks || null,
     });
+    if (row.sets > 1) result.sets[showroom.name] = row.sets;
     result.ticked += 1;
   }
 

@@ -98,6 +98,23 @@ CREATE TABLE IF NOT EXISTS showroom_ops.seasons (
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ─── season_sprints — a season orders in waves ───────────────────────────────
+-- The real workbook carries "SPRINT 1 ORDER DATE / DELIVERY DATE" and the same
+-- for sprint 2, so a season needs more than one pair of dates. A table rather
+-- than fixed columns, because nothing says it stops at two.
+CREATE TABLE IF NOT EXISTS showroom_ops.season_sprints (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  season_id      UUID NOT NULL REFERENCES showroom_ops.seasons(id) ON DELETE CASCADE,
+  name           TEXT NOT NULL,          -- 'Sprint 1'
+  order_date     DATE,                   -- files ready
+  delivery_date  DATE,
+  sort_order     INTEGER NOT NULL DEFAULT 0,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_season_sprints_season
+  ON showroom_ops.season_sprints(season_id);
+
 -- ─── season_showrooms — which showrooms participate this season ───────────────
 CREATE TABLE IF NOT EXISTS showroom_ops.season_showrooms (
   season_id      UUID NOT NULL REFERENCES showroom_ops.seasons(id)   ON DELETE CASCADE,
@@ -108,6 +125,13 @@ CREATE TABLE IF NOT EXISTS showroom_ops.season_showrooms (
   remarks        TEXT,
   PRIMARY KEY (season_id, showroom_id)
 );
+
+-- Oslo 1 / Oslo 2 / Oslo 3 are one physical showroom holding three collection
+-- sets. The registry keeps one row called "Oslo"; the set count lives here
+-- because it changes from season to season, and it is what makes a sign that
+-- goes to everyone arrive in Oslo three times.
+ALTER TABLE showroom_ops.season_showrooms ADD COLUMN IF NOT EXISTS men_sets   INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE showroom_ops.season_showrooms ADD COLUMN IF NOT EXISTS women_sets INTEGER NOT NULL DEFAULT 1;
 
 -- ─── season_lines — one row = one print/digital item ──────────────────────────
 CREATE TABLE IF NOT EXISTS showroom_ops.season_lines (
@@ -146,6 +170,7 @@ ALTER TABLE showroom_ops.showrooms          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE showroom_ops.showroom_materials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE showroom_ops.materials        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE showroom_ops.seasons          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE showroom_ops.season_sprints   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE showroom_ops.season_showrooms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE showroom_ops.season_lines     ENABLE ROW LEVEL SECURITY;
 

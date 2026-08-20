@@ -44,6 +44,23 @@ const btnLight = { padding: "9px 16px", background: C.white, color: C.text, bord
 
 const Pill = ({ children, color }) => <span style={{ display: "inline-block", fontSize: 10, fontWeight: 700, color, background: color + "1A", padding: "3px 8px", borderRadius: 4, letterSpacing: ".5px", textTransform: "uppercase", border: `1px solid ${color}33` }}>{children}</span>;
 
+// Mirrors derivedLineQuantity() in lib/showroom-ops/store.js: local-showroom
+// material scales with the collection sets held at each ticked location, so
+// Oslo with three sets needs three. Collection-meeting scopes are one venue and
+// keep an editorial amount.
+const derivedQty = (line, seasonShowrooms) => {
+  if (!line || line.scope !== "LOCAL_SHOWROOMS") return null;
+  let total = 0;
+  for (const ss of seasonShowrooms || []) {
+    const men = ss.menPackage ? (ss.menSets ?? 1) : 0;
+    const women = ss.womenPackage ? (ss.womenSets ?? 1) : 0;
+    if (line.gender === "MEN") total += men;
+    else if (line.gender === "WOMEN") total += women;
+    else total += Math.max(men, women);
+  }
+  return total;
+};
+
 function SubNav({ tab, setTab }) {
   const tabs = [
     ["dashboard", "Season Dashboard"], ["saleslist", "Sales List"], ["graphics", "Graphics Queue"],
@@ -128,7 +145,7 @@ function SeasonDashboard({ seasons, reloadSeasons, selectedId, setSelectedId, ma
         <Card><div style={{ padding: 20, textAlign: "center", color: C.textS, fontSize: 13 }}>Loading…</div></Card>
       ) : (
         <div>
-          <SeasonHeader season={detail.season} onChanged={loadDetail} />
+          <SeasonHeader season={detail.season} sprints={detail.sprints} onChanged={loadDetail} />
 
           {/* Status board per sprint */}
           <Card style={{ marginTop: 18 }}>
@@ -150,12 +167,12 @@ function SeasonDashboard({ seasons, reloadSeasons, selectedId, setSelectedId, ma
             <button onClick={() => setShowAddLine(true)} style={btnDark}>+ Add line</button>
           </div>
 
-          {showAddLine && <LineForm seasonId={selectedId} season={detail.season} materials={materials} onClose={() => setShowAddLine(false)} onSaved={async () => { setShowAddLine(false); await loadDetail(); }} />}
+          {showAddLine && <LineForm seasonId={selectedId} season={detail.season} materials={materials} sprints={detail.sprints} seasonShowrooms={detail.seasonShowrooms} onClose={() => setShowAddLine(false)} onSaved={async () => { setShowAddLine(false); await loadDetail(); }} />}
 
           {SCOPES.filter((sc) => linesByScope[sc]?.length).map((sc) => (
             <div key={sc} style={{ marginBottom: 18 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 8 }}>{SCOPE_LABEL[sc]} <span style={{ color: C.textS }}>({linesByScope[sc].length})</span></div>
-              <LinesTable lines={linesByScope[sc]} materials={materials} season={detail.season} onChanged={loadDetail} />
+              <LinesTable lines={linesByScope[sc]} materials={materials} season={detail.season} sprints={detail.sprints} seasonShowrooms={detail.seasonShowrooms} onChanged={loadDetail} />
             </div>
           ))}
           {!(detail.lines || []).length && <Card><div style={{ fontSize: 13, color: C.textS }}>No lines yet. Add the first print/digital item for this season.</div></Card>}
@@ -165,7 +182,57 @@ function SeasonDashboard({ seasons, reloadSeasons, selectedId, setSelectedId, ma
   );
 }
 
-function SeasonHeader({ season, onChanged }) {
+// A season orders in waves; each sprint carries its own "files ready" and
+// delivery date, mirroring the SPRINT 1 / SPRINT 2 blocks in the workbook.
+function SeasonSprints({ seasonId, sprints, onChanged }) {
+  const [busy, setBusy] = useState(false);
+
+  const add = async () => {
+    setBusy(true);
+    try {
+      await fetch(`/api/showroom-ops/seasons/${seasonId}/sprints`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: `Sprint ${(sprints?.length || 0) + 1}` }),
+      });
+      await onChanged();
+    } finally { setBusy(false); }
+  };
+  const patch = async (id, field, value) => {
+    await fetch(`/api/showroom-ops/sprints/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [field]: value || null }),
+    });
+    await onChanged();
+  };
+  const remove = async (sp) => {
+    if (!confirm(`Remove ${sp.name}?`)) return;
+    await fetch(`/api/showroom-ops/sprints/${sp.id}`, { method: "DELETE" });
+    await onChanged();
+  };
+
+  return (
+    <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.surfaceD}` }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.textS, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Sprints</div>
+      {(sprints || []).map((sp) => (
+        <div key={sp.id} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
+          <input defaultValue={sp.name} onBlur={(e) => patch(sp.id, "name", e.target.value)}
+            style={{ ...inputStyle, width: 120 }} />
+          <label style={{ fontSize: 11, color: C.textS }}>Order (files ready)</label>
+          <input type="date" defaultValue={sp.orderDate || ""} onChange={(e) => patch(sp.id, "orderDate", e.target.value)}
+            style={{ ...inputStyle, width: 150 }} />
+          <label style={{ fontSize: 11, color: C.textS }}>Delivery</label>
+          <input type="date" defaultValue={sp.deliveryDate || ""} onChange={(e) => patch(sp.id, "deliveryDate", e.target.value)}
+            style={{ ...inputStyle, width: 150 }} />
+          <button onClick={() => remove(sp)} style={{ background: "none", border: "none", color: C.danger, cursor: "pointer", fontSize: 16 }}>×</button>
+        </div>
+      ))}
+      {!(sprints || []).length && <div style={{ fontSize: 12, color: C.textS, marginBottom: 8 }}>No sprints yet — add one per ordering wave.</div>}
+      <button onClick={add} disabled={busy} style={{ ...btnLight, fontSize: 12, padding: "7px 12px" }}>+ Add sprint</button>
+    </div>
+  );
+}
+
+function SeasonHeader({ season, sprints, onChanged }) {
   const [edit, setEdit] = useState(false);
   const [form, setForm] = useState(season);
   useEffect(() => setForm(season), [season]);
@@ -204,6 +271,7 @@ function SeasonHeader({ season, onChanged }) {
           ))}
         </div>
       )}
+      <SeasonSprints seasonId={season.id} sprints={sprints} onChanged={onChanged} />
     </Card>
   );
 }
@@ -277,7 +345,7 @@ function DuplicateForm({ source, onClose, onSaved }) {
   );
 }
 
-function LineForm({ seasonId, season, materials, onClose, onSaved, line }) {
+function LineForm({ seasonId, season, materials, sprints, seasonShowrooms, onClose, onSaved, line }) {
   const editing = !!line;
   const [form, setForm] = useState(line || {
     scope: "LOCAL_SHOWROOMS", gender: "UNISEX", materialId: "", freeTextName: "", motifTitle: "",
@@ -320,8 +388,17 @@ function LineForm({ seasonId, season, materials, onClose, onSaved, line }) {
         <div><label style={labelStyle}>Colour {material?.defaultColour ? <span style={{ color: C.steel }}>(def. {material.defaultColour})</span> : ""}</label><input value={form.colourOverride || ""} onChange={(e) => setForm({ ...form, colourOverride: e.target.value })} placeholder={material?.defaultColour || "4+4"} style={inputStyle} /></div>
         <div><label style={labelStyle}>Quality {material?.defaultQuality ? <span style={{ color: C.steel }}>(def.)</span> : ""}</label><input value={form.qualityOverride || ""} onChange={(e) => setForm({ ...form, qualityOverride: e.target.value })} placeholder={material?.defaultQuality || "3 mm skiltekarton"} style={inputStyle} /></div>
         <div><label style={labelStyle}>Motives</label><input type="number" value={form.motives ?? ""} onChange={(e) => setForm({ ...form, motives: e.target.value })} style={inputStyle} /></div>
-        <div><label style={labelStyle}>Amount</label><input value={form.amount || ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="37 stk." style={inputStyle} /></div>
-        <div><label style={labelStyle}>Sprint</label><input value={form.sprint || ""} onChange={(e) => setForm({ ...form, sprint: e.target.value })} placeholder="Sprint 1" style={inputStyle} /></div>
+        {editing && <div><label style={labelStyle}>Amount</label><input value={form.amount || ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="1 stk." style={inputStyle} /></div>}
+        <div><label style={labelStyle}>Sprint</label>
+          {sprints?.length ? (
+            <select value={form.sprint || ""} onChange={(e) => setForm({ ...form, sprint: e.target.value })} style={inputStyle}>
+              <option value="">—</option>
+              {sprints.map((sp) => <option key={sp.id} value={sp.name}>{sp.name}</option>)}
+            </select>
+          ) : (
+            <input value={form.sprint || ""} onChange={(e) => setForm({ ...form, sprint: e.target.value })} placeholder="Add sprints on the season first" style={inputStyle} />
+          )}
+        </div>
         <div><label style={labelStyle}>Responsible</label><input value={form.responsible || ""} onChange={(e) => setForm({ ...form, responsible: e.target.value })} style={inputStyle} /></div>
         <div><label style={labelStyle}>Price</label><input type="number" value={form.price ?? ""} onChange={(e) => setForm({ ...form, price: e.target.value })} style={inputStyle} /></div>
         <div style={{ gridColumn: "1 / -1" }}><label style={labelStyle}>Copy brief (short note only)</label><input value={form.copyBrief || ""} onChange={(e) => setForm({ ...form, copyBrief: e.target.value })} style={inputStyle} /></div>
@@ -333,12 +410,19 @@ function LineForm({ seasonId, season, materials, onClose, onSaved, line }) {
         </div>
       </div>
       {error && <div style={{ marginTop: 12, fontSize: 12, color: C.nogo }}>{error}</div>}
+      {!editing && form.scope === "LOCAL_SHOWROOMS" && (
+        <div style={{ marginTop: 14, padding: "10px 14px", background: C.surface, borderRadius: 6, fontSize: 12, color: C.textS, lineHeight: 1.55 }}>
+          Quantity is not entered here. It follows the showrooms ticked for this season —
+          currently <strong style={{ color: C.text }}>{derivedQty({ scope: form.scope, gender: form.gender }, seasonShowrooms)}</strong> pieces,
+          counting every collection set a location holds.
+        </div>
+      )}
       <div style={{ marginTop: 18, display: "flex", gap: 10 }}><button onClick={save} disabled={busy} style={btnDark}>{busy ? "Saving…" : editing ? "Save line" : "Add line"}</button><button onClick={onClose} style={btnLight}>Cancel</button></div>
     </Modal>
   );
 }
 
-function LinesTable({ lines, materials, season, onChanged }) {
+function LinesTable({ lines, materials, season, sprints, seasonShowrooms, onChanged }) {
   const [editLine, setEditLine] = useState(null);
   const matById = useMemo(() => new Map(materials.map((m) => [m.id, m])), [materials]);
   const advance = async (line) => {
@@ -354,7 +438,7 @@ function LinesTable({ lines, materials, season, onChanged }) {
   };
   return (
     <div style={{ background: C.white, borderRadius: 8, border: `1px solid ${C.surfaceD}`, overflow: "hidden" }}>
-      {editLine && <LineForm seasonId={season.id} season={season} materials={materials} line={editLine} onClose={() => setEditLine(null)} onSaved={async () => { setEditLine(null); await onChanged(); }} />}
+      {editLine && <LineForm seasonId={season.id} season={season} materials={materials} sprints={sprints} seasonShowrooms={seasonShowrooms} line={editLine} onClose={() => setEditLine(null)} onSaved={async () => { setEditLine(null); await onChanged(); }} />}
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
         <thead><tr style={{ background: C.surface }}>{["Item", "Gender", "Motif", "Filename", "Amount", "Sprint", "Status", ""].map((h) => <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontSize: 10, fontWeight: 700, color: C.textS, textTransform: "uppercase", letterSpacing: ".5px", borderBottom: `1px solid ${C.surfaceD}` }}>{h}</th>)}</tr></thead>
         <tbody>
@@ -370,7 +454,11 @@ function LinesTable({ lines, materials, season, onChanged }) {
                 <td style={{ padding: "8px 12px" }}>{l.gender}</td>
                 <td style={{ padding: "8px 12px", color: C.textS }}>{l.motifTitle || "—"}</td>
                 <td style={{ padding: "8px 12px", fontFamily: "'DM Mono',monospace", fontSize: 10, color: C.textS, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={l.filename}>{l.filename || "—"}</td>
-                <td style={{ padding: "8px 12px" }}>{l.amount || "—"}</td>
+                <td style={{ padding: "8px 12px" }}>{(() => {
+                  const d = derivedQty(l, seasonShowrooms);
+                  if (d === null) return l.amount || "—";
+                  return <span title="From the showrooms ticked for this season">{d} <span style={{ color: C.textS, fontSize: 10 }}>derived</span></span>;
+                })()}</td>
                 <td style={{ padding: "8px 12px" }}>{l.sprint || "—"}</td>
                 <td style={{ padding: "8px 12px" }}><Pill color={STATUS_COLOR[l.status] || C.steel}>{l.status.replace("_", " ")}</Pill></td>
                 <td style={{ padding: "8px 12px", textAlign: "right", whiteSpace: "nowrap" }}>
@@ -555,6 +643,8 @@ function SalesListView({ seasons, selectedId, setSelectedId, showrooms, reloadRe
       showroomId: showroom.id,
       menPackage: gender === "MEN" ? !cur.menPackage : !!cur.menPackage,
       womenPackage: gender === "WOMEN" ? !cur.womenPackage : !!cur.womenPackage,
+      menSets: cur.menSets ?? 1,
+      womenSets: cur.womenSets ?? 1,
       extras: cur.extras || null,
       remarks: cur.remarks || null,
     };
@@ -572,6 +662,23 @@ function SalesListView({ seasons, selectedId, setSelectedId, showrooms, reloadRe
     } finally { setSaving(null); }
   };
 
+
+  const setSets = async (showroom, field, value) => {
+    const cur = ticks[showroom.id] || {};
+    const n = Math.max(1, parseInt(value, 10) || 1);
+    const next = {
+      showroomId: showroom.id,
+      menPackage: !!cur.menPackage, womenPackage: !!cur.womenPackage,
+      menSets: field === "menSets" ? n : (cur.menSets ?? 1),
+      womenSets: field === "womenSets" ? n : (cur.womenSets ?? 1),
+      extras: cur.extras || null, remarks: cur.remarks || null,
+    };
+    setTicks((p) => ({ ...p, [showroom.id]: { ...next } }));
+    await fetch(`/api/showroom-ops/seasons/${selectedId}/showrooms`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(next),
+    });
+  };
+
   const visible = showrooms.filter((s) => {
     if (!search) return true;
     const q = search.toLowerCase();
@@ -581,6 +688,8 @@ function SalesListView({ seasons, selectedId, setSelectedId, showrooms, reloadRe
 
   const menCount = Object.values(ticks).filter((t) => t.menPackage).length;
   const womenCount = Object.values(ticks).filter((t) => t.womenPackage).length;
+  const menPieces = Object.values(ticks).reduce((n, t) => n + (t.menPackage ? (t.menSets ?? 1) : 0), 0);
+  const womenPieces = Object.values(ticks).reduce((n, t) => n + (t.womenPackage ? (t.womenSets ?? 1) : 0), 0);
 
   return (
     <div>
@@ -592,7 +701,7 @@ function SalesListView({ seasons, selectedId, setSelectedId, showrooms, reloadRe
         </div>
         {selectedId && (
           <div style={{ fontSize: 12, color: C.textS }}>
-            <strong style={{ color: C.text }}>{menCount}</strong> MEN · <strong style={{ color: C.text }}>{womenCount}</strong> WOMEN packages
+            <strong style={{ color: C.text }}>{menCount}</strong> MEN ({menPieces} sets) · <strong style={{ color: C.text }}>{womenCount}</strong> WOMEN ({womenPieces} sets)
           </div>
         )}
       </div>
@@ -612,8 +721,8 @@ function SalesListView({ seasons, selectedId, setSelectedId, showrooms, reloadRe
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
               <tr style={{ background: C.surface }}>
-                {["Showroom", "City", "Country", "Cust# MEN", "Cust# WOMEN", "MEN", "WOMEN", "Always included", ""].map((h) => (
-                  <th key={h} style={{ padding: "8px 10px", textAlign: h === "MEN" || h === "WOMEN" ? "center" : "left", fontSize: 10, fontWeight: 700, color: C.textS, textTransform: "uppercase", letterSpacing: ".5px", borderBottom: `1px solid ${C.surfaceD}` }}>{h}</th>
+                {["Showroom", "City", "Country", "Cust# MEN", "Cust# WOMEN", "MEN", "Sets", "WOMEN", "Sets", "Always included", ""].map((h) => (
+                  <th key={h + Math.random()} style={{ padding: "8px 10px", textAlign: ["MEN", "WOMEN", "Sets"].includes(h) ? "center" : "left", fontSize: 10, fontWeight: 700, color: C.textS, textTransform: "uppercase", letterSpacing: ".5px", borderBottom: `1px solid ${C.surfaceD}` }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -637,8 +746,20 @@ function SalesListView({ seasons, selectedId, setSelectedId, showrooms, reloadRe
                     <td style={{ padding: "7px 10px", textAlign: "center" }}>
                       <input type="checkbox" checked={!!t.menPackage} disabled={busy} onChange={() => toggle(s, "MEN")} style={{ width: 16, height: 16, accentColor: C.oak, cursor: "pointer" }} />
                     </td>
+                    <td style={{ padding: "7px 6px", textAlign: "center" }}>
+                      {t.menPackage ? (
+                        <input value={t.menSets ?? 1} onChange={(e) => setSets(s, "menSets", e.target.value)} title="Collection sets at this location"
+                          style={{ width: 34, padding: "3px 4px", textAlign: "center", fontSize: 11, border: `1px solid ${(t.menSets ?? 1) > 1 ? C.oak : C.surfaceD}`, borderRadius: 4, outline: "none" }} />
+                      ) : <span style={{ color: C.steelL }}>—</span>}
+                    </td>
                     <td style={{ padding: "7px 10px", textAlign: "center" }}>
                       <input type="checkbox" checked={!!t.womenPackage} disabled={busy} onChange={() => toggle(s, "WOMEN")} style={{ width: 16, height: 16, accentColor: C.oak, cursor: "pointer" }} />
+                    </td>
+                    <td style={{ padding: "7px 6px", textAlign: "center" }}>
+                      {t.womenPackage ? (
+                        <input value={t.womenSets ?? 1} onChange={(e) => setSets(s, "womenSets", e.target.value)} title="Collection sets at this location"
+                          style={{ width: 34, padding: "3px 4px", textAlign: "center", fontSize: 11, border: `1px solid ${(t.womenSets ?? 1) > 1 ? C.oak : C.surfaceD}`, borderRadius: 4, outline: "none" }} />
+                      ) : <span style={{ color: C.steelL }}>—</span>}
                     </td>
                     <td style={{ padding: "7px 10px", fontSize: 11, color: allCustom.length ? C.oak : C.steelL }}>
                       {allCustom.length ? allCustom.join(" · ") : "—"}
@@ -649,7 +770,7 @@ function SalesListView({ seasons, selectedId, setSelectedId, showrooms, reloadRe
                   </tr>
                 );
               })}
-              {!visible.length && <tr><td colSpan={9} style={{ padding: 24, textAlign: "center", color: C.textS, fontSize: 13 }}>No showrooms match the search</td></tr>}
+              {!visible.length && <tr><td colSpan={11} style={{ padding: 24, textAlign: "center", color: C.textS, fontSize: 13 }}>No showrooms match the search</td></tr>}
             </tbody>
           </table>
         </Card>
