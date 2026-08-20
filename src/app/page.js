@@ -1050,19 +1050,6 @@ const FlowPage=({projects=[],setPage})=>{
     </div>
   </div>;
 };
-const InstalledExternalFolderLink=({asanaProjectId,setPage,setExternalFolderTarget})=>{
-  const [folder,setFolder]=useState(null);
-  useEffect(()=>{
-    if(!asanaProjectId)return;
-    fetch(`/api/external-folders/by-project/${asanaProjectId}`)
-      .then(r=>r.ok?r.json():{folder:null})
-      .then(d=>setFolder(d.folder||null))
-      .catch(()=>{});
-  },[asanaProjectId]);
-  if(!folder)return null;
-  return <button onClick={()=>{setExternalFolderTarget(folder.id);setPage("external-folders");}} style={{marginLeft:12,fontSize:11,color:C.oak,background:"none",border:"none",cursor:"pointer",fontWeight:500,padding:0}}>Open External Project Folder →</button>;
-};
-const InstalledPage=({projects,setPage,setExternalFolderTarget})=>{const c=projects.filter(p=>p.completed);return<div><Title sub="Completed">Installed Base</Title><div style={{display:"flex",gap:16,marginBottom:24}}><KPI label="Total" value={c.length}/></div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>{c.map(p=><div key={p.gid} style={{background:C.white,borderRadius:8,padding:24,border:`1px solid ${C.surfaceD}`,borderTop:`4px solid ${C.accent}`}}><div style={{fontSize:16,fontWeight:400,fontFamily:"'Cormorant Garamond',serif",marginBottom:8}}>{p.name}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:12}}>{[["Type",p.type],["Completed",fmtDate(p.completedAt)]].map(([l,v])=><div key={l}><div style={{color:C.textS,fontSize:10,fontWeight:600,textTransform:"uppercase"}}>{l}</div><div style={{fontWeight:500}}>{v}</div></div>)}</div><div style={{marginTop:12,display:"flex",flexWrap:"wrap",alignItems:"center"}}><a href={p.url} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:C.oak,textDecoration:"none",fontWeight:500}}>Details →</a><InstalledExternalFolderLink asanaProjectId={p.gid} setPage={setPage} setExternalFolderTarget={setExternalFolderTarget}/></div></div>)}</div></div>};
 const ReviewPill=()=><span style={{fontSize:9,fontWeight:700,color:C.review,background:"#FDF3E0",padding:"2px 6px",borderRadius:3,letterSpacing:".5px",marginLeft:8,verticalAlign:"middle",border:`1px solid ${C.review}33`}}>REVIEW</span>;
 
 const SectionHeader=({eyebrow,title,intro,id})=><div id={id} style={{paddingTop:24,marginBottom:24,scrollMarginTop:24}}>
@@ -1381,7 +1368,6 @@ export default function Home(){const [page,setPage]=useState("overview");const [
       {id:"intake",label:"Project Intake",icon:"✛"},
       {id:"projects",label:"Current",icon:"▦"},
       {id:"flow",label:"Project Flow",icon:"⟳"},
-      {id:"installed",label:"Installed Base",icon:"⊞"},
       {id:"footprint",label:"Footprint",icon:"▤"},
     ]},
     {label:"Tools",items:[
@@ -1429,7 +1415,6 @@ export default function Home(){const [page,setPage]=useState("overview");const [
         {page==="toolbox"&&<ToolboxPage/>}
         {page==="roi"&&<ROIPage projects={projects}/>}
         {page==="flow"&&<FlowPage projects={projects} setPage={setPage}/>}
-        {page==="installed"&&<InstalledPage projects={projects} setPage={setPage} setExternalFolderTarget={setExternalFolderTarget}/>}
         {page==="footprint"&&<FootprintPage projects={projects}/>}
         {page==="showroom-ops"&&<ShowroomOpsPage/>}
         {page==="standards"&&<StandardsPage/>}

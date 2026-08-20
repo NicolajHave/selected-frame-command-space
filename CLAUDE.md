@@ -132,6 +132,37 @@ To debug a parse, replay the real PDF rather than guessing:
 the `lines` array, then call the route's `POST` with
 `{ json: async () => ({ lines }) }`.
 
+## Footprint (square metres per FY)
+
+The Selected FY runs **1 August → 31 July**. `src/lib/fiscal-year.js` is the
+pure module for it, and labels a year by the calendar year it *started* in
+(`FY 26/27`). A project counts in the FY of its **completion date once
+finished, its due date otherwise**, so delivered work stays in the year it
+actually landed in — which is why the view keeps delivered and planned totals
+apart.
+
+Square metres live in Asana as the **`SQM` number custom field** (gid
+`1217571452526962`, overridable via `ASANA_SQM_FIELD_ID`), not in Supabase:
+every project in Current is an Asana task, whereas External Folders exist only
+for *some* projects, so a Supabase column would leave silent gaps in the
+report. `createIntakeTask()` attaches it on creation and, if Asana rejects the
+field, retries once without it — the task keys the External Folder and puts the
+project in Current, so it must never be lost over a custom-field problem.
+Projects with no value are surfaced as "missing" rather than counted as zero.
+
+## Writing into External Folders
+
+**Deleting a folder deletes the Blob objects first, then the row.** The file
+rows hold the only pointers to those blobs and the FK cascade drops them along
+with the folder, so the reverse order orphans the storage with no way to find
+it again. `DELETE /api/external-folders/[folderId]` also refuses unless
+`confirmName` matches the project name exactly.
+
+**Draft Studio files into `02-floorplans` as `<project> - Draft N`.**
+`nextDraftNumber()` takes `max(existing) + 1`, never `count + 1` — deleting a
+draft must not hand its number to a different document, since drafts get shared
+with partners. Only filenames matching the pattern we write are counted.
+
 ## Environment variables
 
 | Var | Used for |
