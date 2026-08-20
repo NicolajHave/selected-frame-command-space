@@ -93,6 +93,100 @@ function sheetByName(wb, wanted) {
   return name ? wb.Sheets[name] : null;
 }
 
+// ─── Sales list (per collection) ─────────────────────────────────────────────
+// The MEN and WOMEN workbooks do NOT share a layout: CUSTOMER_No. sits in
+// column 12 in one and 11 in the other, the header row is at a different
+// height, and the WOMEN file spells it "SHOWRROM". So everything is mapped by
+// header name, never by position.
+
+const SALES_FIELDS = {
+  priority:    ['priority'],
+  salesRep:    ['salesrepresentative', 'salesrep'],
+  city:        ['city'],
+  country:     ['country'],
+  notes:       ['notes'],
+  customerNo:  ['customerno', 'customer_no', 'customernumber'],
+  companyName: ['showroomcompanyname', 'showrromcompanyname', 'companyname', 'showroom'],
+  address:     ['address'],
+  zip:         ['zipcode', 'zip', 'postcode'],
+  contact:     ['contactperson', 'contact'],
+  phone:       ['phonenumber', 'phone'],
+  email:       ['email', 'e-mail'],
+};
+
+/** Collection sheets in a sales list workbook, newest-looking first. */
+export async function readSalesListSheets(file) {
+  const XLSX = await loadSheetJs();
+  const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+  return wb.SheetNames;
+}
+
+// "41564 Kaarst Holzbüttgen" -> zip 41564, city "Kaarst Holzbüttgen".
+// Left alone when it would be a guess: UK "E1 6PX", Swedish "412 63".
+function splitZipCity(raw) {
+  const s = String(raw || '').trim();
+  const m = s.match(/^(\d{4,6})\s+([A-Za-zÀ-ÿ].*)$/);
+  return m ? { zip: m[1], city: m[2].trim() } : { zip: s, city: '' };
+}
+
+/**
+ * Parse one collection sheet of a sales list.
+ * Returns the participating showrooms with their delivery details.
+ */
+export async function parseSalesListSheet(file, sheetName) {
+  const XLSX = await loadSheetJs();
+  const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+  const ws = wb.Sheets[sheetName];
+  if (!ws) throw new Error(`Sheet "${sheetName}" not found`);
+  const grid = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', blankrows: false });
+
+  // The sheet opens with sample-allocation blocks; the real table starts at the
+  // row naming the sales representative.
+  const headerIdx = grid.findIndex((r) => r.some((c) => norm(c) === 'salesrepresentative'));
+  if (headerIdx === -1) throw new Error('Could not find the SALES LIST header row in that sheet');
+
+  const header = grid[headerIdx].map((c) => norm(c));
+  const colOf = (candidates) => {
+    for (const cand of candidates) {
+      const i = header.indexOf(cand);
+      if (i !== -1) return i;
+    }
+    return -1;
+  };
+  const cols = {};
+  for (const [field, cands] of Object.entries(SALES_FIELDS)) cols[field] = colOf(cands);
+
+  const rows = [];
+  for (let i = headerIdx + 1; i < grid.length; i++) {
+    const r = grid[i];
+    const val = (field) => (cols[field] === -1 ? '' : String(r[cols[field]] ?? '').trim());
+    const city = val('city');
+    const customerNo = val('customerNo');
+    // A row is real when it names a location. Totals and spacers have neither.
+    if (!city && !customerNo) continue;
+    if (/^(total|meeting|balance)/i.test(city)) continue;
+    const { zip, city: zipCity } = splitZipCity(val('zip'));
+    rows.push({
+      priority: val('priority'),
+      salesRep: val('salesRep'),
+      // The sales list's CITY is the showroom label (Düsseldorf, Oslo2).
+      name: city,
+      city: zipCity,
+      country: val('country'),
+      customerNo,
+      companyName: val('companyName'),
+      address: val('address'),
+      zip,
+      contact: val('contact'),
+      phone: val('phone'),
+      email: val('email'),
+      notes: val('notes'),
+    });
+  }
+  const missingCols = Object.entries(cols).filter(([, i]) => i === -1).map(([f]) => f);
+  return { rows, headerRow: headerIdx, missingCols };
+}
+
 /**
  * Parse SELECTED_SHOWROOM_MASTER_REGISTRY.xlsx into mapped rows.
  * Returns { showrooms, materials, verifyChecklist, sheetNames }.

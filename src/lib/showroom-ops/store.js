@@ -359,6 +359,101 @@ export async function deleteLine(id) {
 }
 
 /**
+ * Import one gender's sales list into a season.
+ *
+ * The customer number is the join key: the sales list calls a showroom
+ * "Düsseldorf" where the shipping list calls it "Kaarst", so matching on name
+ * alone would create duplicates. Name is only a fallback, normalised so
+ * "Montreal 1" and "Montreal1" land on the same physical location — multiple
+ * sample sets per city ship once, by design.
+ *
+ * Existing showrooms are never overwritten: only blank fields are filled in,
+ * so a corrected address in the registry survives the next import.
+ */
+const normName = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '').replace(/\d+$/, '');
+
+export async function importSalesList(seasonId, { gender, rows, createMissing = false }) {
+  if (gender !== 'MEN' && gender !== 'WOMEN') throw new Error('gender must be MEN or WOMEN');
+  const season = await getSeason(seasonId);
+  if (!season) return null;
+
+  const existing = await listShowrooms();
+  const byCustomer = new Map();
+  for (const s of existing) {
+    for (const c of [s.customerNoMen, s.customerNoWomen]) {
+      const key = String(c || '').trim();
+      if (key) byCustomer.set(key, s);
+    }
+  }
+  const byName = new Map(existing.map((s) => [normName(s.name), s]));
+
+  const custField = gender === 'MEN' ? 'customerNoMen' : 'customerNoWomen';
+  const addrField = gender === 'MEN' ? 'addressMen' : 'addressWomen';
+  const zipField = gender === 'MEN' ? 'zipMen' : 'zipWomen';
+  const contactField = gender === 'MEN' ? 'contactMen' : 'contactWomen';
+
+  const result = { matched: [], created: [], unmatched: [], ticked: 0 };
+
+  for (const row of rows || []) {
+    const cust = String(row.customerNo || '').trim();
+    let showroom = (cust && byCustomer.get(cust)) || byName.get(normName(row.name)) || null;
+
+    if (!showroom) {
+      if (!createMissing) { result.unmatched.push({ name: row.name, customerNo: cust }); continue; }
+      showroom = await createShowroom({
+        name: row.name,
+        city: row.city || null,
+        country: row.country || null,
+        companyName: row.companyName || null,
+        [custField]: cust || null,
+        [addrField]: row.address || null,
+        [zipField]: row.zip || null,
+        [contactField]: row.contact || null,
+        ...(gender === 'WOMEN' ? { emailWomen: row.email || null, phoneWomen: row.phone || null } : {}),
+        status: cust ? 'ACTIVE' : 'VERIFY',
+        notes: row.notes || null,
+      });
+      if (cust) byCustomer.set(cust, showroom);
+      byName.set(normName(showroom.name), showroom);
+      result.created.push(showroom.name);
+    } else {
+      // Fill blanks only — an address corrected in the registry must not be
+      // clobbered by a stale sales list.
+      const patch = {};
+      const fill = (field, value) => {
+        if (value && !String(showroom[field] || '').trim()) patch[field] = value;
+      };
+      fill('city', row.city);
+      fill('country', row.country);
+      fill('companyName', row.companyName);
+      fill(custField, cust);
+      fill(addrField, row.address);
+      fill(zipField, row.zip);
+      fill(contactField, row.contact);
+      if (gender === 'WOMEN') { fill('emailWomen', row.email); fill('phoneWomen', row.phone); }
+      if (Object.keys(patch).length) await updateShowroom(showroom.id, patch);
+      result.matched.push(showroom.name);
+    }
+
+    // Tick the gender, preserving whatever the other gender already had.
+    const sb = getShowroomSupabase();
+    const prior = unwrap(
+      await sb.from('season_showrooms').select('*').eq('season_id', seasonId).eq('showroom_id', showroom.id).maybeSingle(),
+      'importSalesList/existing',
+    );
+    await setSeasonShowroom(seasonId, showroom.id, {
+      menPackage: gender === 'MEN' ? true : !!prior?.men_package,
+      womenPackage: gender === 'WOMEN' ? true : !!prior?.women_package,
+      extras: prior?.extras || null,
+      remarks: prior?.remarks || null,
+    });
+    result.ticked += 1;
+  }
+
+  return result;
+}
+
+/**
  * Everything a ticked showroom pulls in for a season, per gender.
  *
  * A tick on Helsinki/MEN drags Helsinki's standing MEN (and BOTH) materials
