@@ -103,12 +103,25 @@ function SeasonDashboard({ seasons, reloadSeasons, selectedId, setSelectedId, ma
   const [showDuplicate, setShowDuplicate] = useState(false);
   const [showAddLine, setShowAddLine] = useState(false);
 
+  const [detailError, setDetailError] = useState(null);
+  const [customs, setCustoms] = useState([]);
+
   const loadDetail = useCallback(async () => {
-    if (!selectedId) { setDetail(null); return; }
-    setLoading(true);
+    if (!selectedId) { setDetail(null); setCustoms([]); return; }
+    setLoading(true); setDetailError(null);
     try {
       const r = await fetch(`/api/showroom-ops/seasons/${selectedId}`);
-      if (r.ok) setDetail(await r.json());
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        // Never leave the page spinning on a failed read — say what broke.
+        throw new Error(j.error || j.message || `Could not load the season (${r.status})`);
+      }
+      setDetail(await r.json());
+      const c = await fetch(`/api/showroom-ops/seasons/${selectedId}/customisations`);
+      setCustoms(c.ok ? ((await c.json()).rows || []) : []);
+    } catch (e) {
+      setDetailError(e.message || "Could not load the season");
+      setDetail(null);
     } finally { setLoading(false); }
   }, [selectedId]);
   useEffect(() => { loadDetail(); }, [loadDetail]);
@@ -141,9 +154,20 @@ function SeasonDashboard({ seasons, reloadSeasons, selectedId, setSelectedId, ma
 
       {!selectedId ? (
         <Card><div style={{ fontSize: 13, color: C.textS }}>Select a season, or create one. A new season is best started by duplicating the previous one — lines copy across with status reset to DRAFT.</div></Card>
-      ) : loading || !detail ? (
+      ) : loading ? (
         <Card><div style={{ padding: 20, textAlign: "center", color: C.textS, fontSize: 13 }}>Loading…</div></Card>
-      ) : (
+      ) : detailError ? (
+        <Card style={{ borderColor: C.nogo + "55", background: "#FBF0EE" }}>
+          <Eyebrow>Could not load this season</Eyebrow>
+          <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>{detailError}</div>
+          <div style={{ fontSize: 12, color: C.textS, marginTop: 10, lineHeight: 1.6 }}>
+            If this mentions a missing column or table, re-run <code>supabase/showroom-ops-schema.sql</code> in the
+            Supabase SQL Editor, then run <code>NOTIFY pgrst, &apos;reload schema&apos;;</code> so the API picks the
+            change up.
+          </div>
+          <button onClick={loadDetail} style={{ ...btnLight, marginTop: 12 }}>Try again</button>
+        </Card>
+      ) : !detail ? null : (
         <div>
           <SeasonHeader season={detail.season} sprints={detail.sprints} onChanged={loadDetail} />
 
@@ -176,6 +200,37 @@ function SeasonDashboard({ seasons, reloadSeasons, selectedId, setSelectedId, ma
             </div>
           ))}
           {!(detail.lines || []).length && <Card><div style={{ fontSize: 13, color: C.textS }}>No lines yet. Add the first print/digital item for this season.</div></Card>}
+
+          {/* Standing customisations from the ticked showrooms. Not season
+              lines — they live on the showroom, so they appear here without
+              anyone adding them, and disappear if the showroom is unticked. */}
+          {customs.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.oak, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 8 }}>
+                Customised per showroom <span style={{ color: C.textS }}>({customs.length})</span>
+              </div>
+              <div style={{ background: C.white, borderRadius: 8, border: `1px solid ${C.surfaceD}`, borderLeft: `3px solid ${C.oak}`, overflow: "hidden" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead><tr style={{ background: C.surface }}>{["Showroom", "Gender", "Item", "Format", "Qty", "Remarks"].map((h) => (
+                    <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontSize: 10, fontWeight: 700, color: C.textS, textTransform: "uppercase", letterSpacing: ".5px", borderBottom: `1px solid ${C.surfaceD}` }}>{h}</th>
+                  ))}</tr></thead>
+                  <tbody>{customs.map((r, i) => (
+                    <tr key={i} style={{ borderBottom: `1px solid ${C.surfaceD}` }}>
+                      <td style={{ padding: "8px 12px", fontWeight: 500 }}>{r.showroom}</td>
+                      <td style={{ padding: "8px 12px" }}><Pill color={r.gender === "MEN" ? C.blue : C.oak}>{r.gender}</Pill></td>
+                      <td style={{ padding: "8px 12px" }}>{r.name}</td>
+                      <td style={{ padding: "8px 12px", color: C.textS }}>{r.format || "—"}</td>
+                      <td style={{ padding: "8px 12px" }}>{r.quantity}</td>
+                      <td style={{ padding: "8px 12px", color: C.textS }}>{r.remarks || "—"}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+              <div style={{ fontSize: 11, color: C.textS, marginTop: 6 }}>
+                From the showrooms ticked in Sales List. Maintained on the showroom in Registry Admin.
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
