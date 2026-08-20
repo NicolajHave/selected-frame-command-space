@@ -1,7 +1,7 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { generateFilename } from "../../lib/showroom-ops/filename";
-import { exportToXlsx, parseRegistryWorkbook } from "./xlsx";
+import { exportToXlsx, parseRegistryWorkbook, readSalesListSheets, parseSalesListSheet } from "./xlsx";
 
 const C = {
   steel: "#8A8D8F", steelL: "#B8BBBE", steelD: "#5C5F61",
@@ -387,6 +387,132 @@ function LinesTable({ lines, materials, season, onChanged }) {
   );
 }
 
+// Seed a season's ticks from the sales rep's own workbook. Matching happens on
+// customer number server-side; this panel only parses, previews and posts.
+function SalesListImport({ seasonId, onImported }) {
+  const [file, setFile] = useState(null);
+  const [sheets, setSheets] = useState([]);
+  const [sheet, setSheet] = useState("");
+  const [gender, setGender] = useState("MEN");
+  const [parsed, setParsed] = useState(null);
+  const [createMissing, setCreateMissing] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [result, setResult] = useState(null);
+
+  const onFile = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setFile(f); setParsed(null); setResult(null); setError(null); setSheet("");
+    try {
+      const names = await readSalesListSheets(f);
+      setSheets(names);
+      // The collection sheets are the ones worth offering first.
+      const guess = names.find((n) => /^(SUM|SPR|AUT|WIN)/i.test(n));
+      if (guess) setSheet(guess);
+    } catch (err) { setError(err.message); }
+    // Guess the gender from the filename so it is right by default.
+    if (/women|femme/i.test(f.name)) setGender("WOMEN");
+    else if (/men|homme/i.test(f.name)) setGender("MEN");
+  };
+
+  const preview = async () => {
+    if (!file || !sheet) return;
+    setBusy(true); setError(null); setResult(null);
+    try {
+      setParsed(await parseSalesListSheet(file, sheet));
+    } catch (err) { setError(err.message); setParsed(null); } finally { setBusy(false); }
+  };
+
+  const run = async () => {
+    if (!parsed?.rows?.length) return;
+    setBusy(true); setError(null);
+    try {
+      const r = await fetch(`/api/showroom-ops/seasons/${seasonId}/import-sales-list`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gender, rows: parsed.rows, createMissing }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || `Import failed (${r.status})`);
+      setResult(j);
+      await onImported();
+    } catch (err) { setError(err.message); } finally { setBusy(false); }
+  };
+
+  return (
+    <Card style={{ marginBottom: 16 }}>
+      <Eyebrow>Import sales list</Eyebrow>
+      <div style={{ fontSize: 12, color: C.textS, lineHeight: 1.6, marginBottom: 12 }}>
+        Upload the sales rep&apos;s MEN or WOMEN workbook and pick the collection sheet. Showrooms are matched on
+        customer number — the sales list says “Düsseldorf” where shipping says “Kaarst”, so names alone are not
+        reliable. Existing showrooms keep their data; only blank fields are filled in.
+      </div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <input type="file" accept=".xlsx,.xls" onChange={onFile} style={{ fontSize: 12 }} />
+        {sheets.length > 0 && (
+          <select value={sheet} onChange={(e) => { setSheet(e.target.value); setParsed(null); }} style={{ ...inputStyle, width: "auto", minWidth: 150 }}>
+            <option value="">— Collection sheet —</option>
+            {sheets.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        )}
+        {sheets.length > 0 && (
+          <select value={gender} onChange={(e) => setGender(e.target.value)} style={{ ...inputStyle, width: 110 }}>
+            <option value="MEN">MEN</option><option value="WOMEN">WOMEN</option>
+          </select>
+        )}
+        {sheet && <button onClick={preview} disabled={busy} style={btnLight}>{busy ? "Reading…" : "Preview"}</button>}
+      </div>
+
+      {error && <div style={{ marginTop: 12, padding: "10px 14px", background: "#FBE5E1", borderLeft: `3px solid ${C.nogo}`, borderRadius: 4, fontSize: 12, color: C.nogo }}>{error}</div>}
+
+      {parsed && (
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${C.surfaceD}` }}>
+          <div style={{ fontSize: 13, color: C.text, marginBottom: 10 }}>
+            Found <strong>{parsed.rows.length}</strong> showrooms in “{sheet}”
+            {parsed.rows.filter((r) => !r.customerNo).length > 0 && (
+              <span style={{ color: C.warn }}>
+                {" "}· {parsed.rows.filter((r) => !r.customerNo).length} without a customer number (matched by name)
+              </span>
+            )}
+          </div>
+          <div style={{ maxHeight: 160, overflow: "auto", border: `1px solid ${C.surfaceD}`, borderRadius: 6, marginBottom: 12 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+              <tbody>
+                {parsed.rows.slice(0, 60).map((r, i) => (
+                  <tr key={i} style={{ borderBottom: `1px solid ${C.surfaceD}` }}>
+                    <td style={{ padding: "4px 8px", fontWeight: 500 }}>{r.name}</td>
+                    <td style={{ padding: "4px 8px", fontFamily: "'DM Mono',monospace", color: r.customerNo ? C.text : C.warn }}>{r.customerNo || "no cust#"}</td>
+                    <td style={{ padding: "4px 8px", color: C.textS }}>{r.country}</td>
+                    <td style={{ padding: "4px 8px", color: C.textS }}>{r.zip} {r.city}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: C.text, marginBottom: 12, cursor: "pointer" }}>
+            <input type="checkbox" checked={createMissing} onChange={(e) => setCreateMissing(e.target.checked)} style={{ width: 15, height: 15, accentColor: C.oak }} />
+            Create showrooms that are not in the registry yet
+          </label>
+          <button onClick={run} disabled={busy} style={btnDark}>{busy ? "Importing…" : `Import & tick ${gender}`}</button>
+        </div>
+      )}
+
+      {result && (
+        <div style={{ marginTop: 12, padding: "12px 16px", background: "#EEF4EF", border: `1px solid ${C.success}33`, borderRadius: 6, fontSize: 12, color: C.text, lineHeight: 1.6 }}>
+          ✓ Ticked <strong>{result.ticked}</strong> showrooms for {gender}
+          {result.created.length > 0 && <> · created <strong>{result.created.length}</strong> new</>}
+          {result.matched.length > 0 && <> · matched <strong>{result.matched.length}</strong> existing</>}
+          {result.unmatched.length > 0 && (
+            <div style={{ marginTop: 6, color: C.warn }}>
+              Not in the registry and not created: {result.unmatched.map((u) => u.name).join(", ")}
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 // ─── Sales List — tick which showrooms get a package this season ─────────────
 // The working view: pick a season, tick MEN / WOMEN per showroom, and edit
 // showroom details in place. Standing customisations are shown read-only so it
@@ -475,6 +601,8 @@ function SalesListView({ seasons, selectedId, setSelectedId, showrooms, reloadRe
 
       {editing && <ShowroomForm showroom={editing} onClose={() => setEditing(null)} onSaved={async () => { setEditing(null); await reloadRegistry(); }} />}
 
+      {selectedId && <SalesListImport seasonId={selectedId} onImported={async () => { await reloadRegistry(); await load(); }} />}
+
       {!selectedId ? (
         <Card><div style={{ fontSize: 13, color: C.textS }}>Pick a season, then tick which showrooms receive a MEN or WOMEN package. The ticks drive the graphics sheet and the shipping list.</div></Card>
       ) : loading ? (
@@ -536,10 +664,19 @@ function GraphicsQueue({ seasons, selectedId, setSelectedId, materials }) {
   const [loading, setLoading] = useState(false);
   const matById = useMemo(() => new Map(materials.map((m) => [m.id, m])), [materials]);
 
+  const [customs, setCustoms] = useState([]);
+
   const load = useCallback(async () => {
-    if (!selectedId) { setDetail(null); return; }
+    if (!selectedId) { setDetail(null); setCustoms([]); return; }
     setLoading(true);
-    try { const r = await fetch(`/api/showroom-ops/seasons/${selectedId}`); if (r.ok) setDetail(await r.json()); } finally { setLoading(false); }
+    try {
+      const [dRes, cRes] = await Promise.all([
+        fetch(`/api/showroom-ops/seasons/${selectedId}`),
+        fetch(`/api/showroom-ops/seasons/${selectedId}/customisations`),
+      ]);
+      if (dRes.ok) setDetail(await dRes.json());
+      if (cRes.ok) setCustoms((await cRes.json()).rows || []);
+    } finally { setLoading(false); }
   }, [selectedId]);
   useEffect(() => { load(); }, [load]);
 
@@ -559,6 +696,46 @@ function GraphicsQueue({ seasons, selectedId, setSelectedId, materials }) {
   return (
     <div>
       <div style={{ marginBottom: 18 }}><SeasonSelector seasons={seasons} selectedId={selectedId} onSelect={setSelectedId} /></div>
+
+      {/* Customised material owed to individual showrooms. Not season lines —
+          these come from the showrooms that were ticked, so graphics see them
+          without anyone re-entering them each season. */}
+      {selectedId && customs.length > 0 && (
+        <Card style={{ marginBottom: 18, borderLeft: `3px solid ${C.oak}` }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+            <Eyebrow>Customised per showroom ({customs.length})</Eyebrow>
+            <button
+              onClick={() => exportToXlsx({
+                filename: `${(seasons.find((x) => x.id === selectedId) || {}).code || "SEASON"}_CUSTOMISED.xlsx`,
+                sheetName: "Customised",
+                columns: [
+                  { header: "Showroom", key: "showroom" }, { header: "Gender", key: "gender" },
+                  { header: "Item", key: "name" }, { header: "Format", key: "format" },
+                  { header: "Qty", key: "quantity" }, { header: "Remarks", key: "remarks" },
+                ],
+                rows: customs,
+              })}
+              style={{ ...btnLight, padding: "6px 12px", fontSize: 12 }}
+            >Export Excel</button>
+          </div>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead><tr style={{ background: C.surface }}>{["Showroom", "Gender", "Item", "Format", "Qty", "Remarks"].map((h) => (
+              <th key={h} style={{ padding: "6px 10px", textAlign: "left", fontSize: 10, fontWeight: 700, color: C.textS, textTransform: "uppercase", letterSpacing: ".5px", borderBottom: `1px solid ${C.surfaceD}` }}>{h}</th>
+            ))}</tr></thead>
+            <tbody>{customs.map((r, i) => (
+              <tr key={i} style={{ borderBottom: `1px solid ${C.surfaceD}` }}>
+                <td style={{ padding: "6px 10px", fontWeight: 500 }}>{r.showroom}</td>
+                <td style={{ padding: "6px 10px" }}><Pill color={r.gender === "MEN" ? C.blue : C.oak}>{r.gender}</Pill></td>
+                <td style={{ padding: "6px 10px" }}>{r.name}</td>
+                <td style={{ padding: "6px 10px", color: C.textS }}>{r.format || "—"}</td>
+                <td style={{ padding: "6px 10px" }}>{r.quantity}</td>
+                <td style={{ padding: "6px 10px", color: C.textS }}>{r.remarks || "—"}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </Card>
+      )}
+
       {!selectedId ? <Card><div style={{ fontSize: 13, color: C.textS }}>Select a season to see its graphics queue.</div></Card>
         : loading ? <Card><div style={{ padding: 20, textAlign: "center", color: C.textS, fontSize: 13 }}>Loading…</div></Card>
         : !queue.length ? <Card><div style={{ fontSize: 13, color: C.textS }}>Nothing in the queue — all lines are FINAL or beyond.</div></Card>
