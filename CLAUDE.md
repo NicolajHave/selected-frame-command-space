@@ -132,6 +132,44 @@ To debug a parse, replay the real PDF rather than guessing:
 the `lines` array, then call the route's `POST` with
 `{ json: async () => ({ lines }) }`.
 
+## Showroom Ops — how a season is planned
+
+A season is planned by ticking showrooms in **Sales List**; everything
+downstream derives from those ticks. Ordering happens in waves, so dates live
+in `season_sprints` rather than on the season.
+
+**Customer number is the join key, never the name.** The sales list calls a
+showroom *Düsseldorf* where the shipping list calls it *Kaarst*. Name is only a
+fallback, normalised so `Montreal 1` and `Montreal1` resolve to one location.
+
+**The MEN and WOMEN sales workbooks do not share a layout.** `CUSTOMER_No.`
+sits in column 12 in one and 11 in the other, the header row is at a different
+height, and the WOMEN file spells it `SHOWRROM`. Map by header name, never by
+position. Zip splits into zip + city only when unambiguous — German
+`41564 Kaarst Holzbüttgen` splits, UK `E1 6PX` and Swedish `412 63` must not.
+
+**`Oslo 1/2/3` is one location holding three collection sets.** The registry
+keeps one row called *Oslo*; the count lives on `season_showrooms.men_sets` /
+`women_sets` because it changes per season. It is what makes a sign that goes
+to everyone arrive in Oslo three times — production quantity for
+`LOCAL_SHOWROOMS` lines is derived from these, never typed. Collection-meeting
+scopes are a single venue and keep an editorial amount.
+
+**`showroom_materials` holds standing customisations** (Helsinki's 850×2000
+lightposter). They belong to the showroom, not the season, and are derived on
+read so an edit reaches every season at once. Gender `BOTH` means **one item
+for the location** — emitting it per gender doubles the quantity and had the
+buyer shipping twice.
+
+The Material Catalog carries the recurring boards so a line only needs its
+motif; `src/lib/showroom-ops/standard-materials.js` defines them and the
+Registry Admin button inserts only the ones missing.
+
+Schema revisions land often here, so reads degrade rather than fail:
+`isMissingSchema()` lets a season load without sprints and a tick save without
+set counts. After running the SQL, `NOTIFY pgrst, 'reload schema';` — a stale
+PostgREST cache reports the column as missing.
+
 ## Footprint (square metres per FY)
 
 The Selected FY runs **1 August → 31 July**. `src/lib/fiscal-year.js` is the

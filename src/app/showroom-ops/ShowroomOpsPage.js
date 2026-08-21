@@ -438,7 +438,15 @@ function LineForm({ seasonId, season, materials, sprints, seasonShowrooms, onClo
         <div><label style={labelStyle}>Gender</label><select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} style={inputStyle}>{GENDERS.map((g) => <option key={g}>{g}</option>)}</select></div>
         <div style={{ gridColumn: "1 / -1" }}><label style={labelStyle}>Material (catalog)</label><select value={form.materialId || ""} onChange={(e) => setForm({ ...form, materialId: e.target.value })} style={inputStyle}><option value="">— Free-text one-off —</option>{materials.map((m) => <option key={m.id} value={m.id}>{m.code ? `${m.code} · ` : ""}{m.name}</option>)}</select></div>
         {isFreeText && <div style={{ gridColumn: "1 / -1" }}><label style={labelStyle}>One-off product name</label><input value={form.freeTextName || ""} onChange={(e) => setForm({ ...form, freeTextName: e.target.value })} placeholder="e.g. Kodak floor foil" style={inputStyle} /></div>}
-        <div style={{ gridColumn: "1 / -1" }}><label style={labelStyle}>Motif title</label><input value={form.motifTitle || ""} onChange={(e) => setForm({ ...form, motifTitle: e.target.value })} placeholder="Elevated Jersey" style={inputStyle} /></div>
+        <div style={{ gridColumn: "1 / -1" }}>
+          <label style={labelStyle}>Motif / subtitle</label>
+          <input value={form.motifTitle || ""} onChange={(e) => setForm({ ...form, motifTitle: e.target.value })} placeholder="Elevated Jersey" style={inputStyle} />
+          {(material?.name || form.freeTextName) && (
+            <div style={{ fontSize: 11, color: C.textS, marginTop: 4 }}>
+              Reads as “{material?.name || form.freeTextName}{form.motifTitle ? ` - ${form.motifTitle}` : ""}”
+            </div>
+          )}
+        </div>
         <div><label style={labelStyle}>Format {material?.defaultFormat ? <span style={{ color: C.steel }}>(def. {material.defaultFormat})</span> : ""}</label><input value={form.formatOverride || ""} onChange={(e) => setForm({ ...form, formatOverride: e.target.value })} placeholder={material?.defaultFormat || "300 x 420 mm"} style={inputStyle} /></div>
         <div><label style={labelStyle}>Colour {material?.defaultColour ? <span style={{ color: C.steel }}>(def. {material.defaultColour})</span> : ""}</label><input value={form.colourOverride || ""} onChange={(e) => setForm({ ...form, colourOverride: e.target.value })} placeholder={material?.defaultColour || "4+4"} style={inputStyle} /></div>
         <div><label style={labelStyle}>Quality {material?.defaultQuality ? <span style={{ color: C.steel }}>(def.)</span> : ""}</label><input value={form.qualityOverride || ""} onChange={(e) => setForm({ ...form, qualityOverride: e.target.value })} placeholder={material?.defaultQuality || "3 mm skiltekarton"} style={inputStyle} /></div>
@@ -1271,6 +1279,47 @@ function ShowroomForm({ showroom, onClose, onSaved }) {
   );
 }
 
+// The boards that recur every season. Adding them is idempotent: only the ones
+// missing from the catalog are inserted, so pressing this twice is harmless and
+// a board whose defaults were adjusted is never overwritten.
+function StandardMaterialsButton({ onAdded }) {
+  const [missing, setMissing] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const check = useCallback(async () => {
+    try {
+      const r = await fetch("/api/showroom-ops/materials/standards");
+      if (r.ok) setMissing((await r.json()).missing || []);
+    } catch { /* button simply stays hidden */ }
+  }, []);
+  useEffect(() => { check(); }, [check]);
+
+  const add = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      const r = await fetch("/api/showroom-ops/materials/standards", { method: "POST" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Failed");
+      setMsg(j.added ? `Added ${j.names.join(", ")}` : "Already in the catalog");
+      await check();
+      await onAdded();
+    } catch (e) { setMsg(e.message); } finally { setBusy(false); }
+  };
+
+  if (missing === null) return <span />;
+  if (!missing.length) return <span style={{ fontSize: 11, color: C.textS }}>{msg || "Standard boards are in the catalog"}</span>;
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <button onClick={add} disabled={busy} style={btnLight}>
+        {busy ? "Adding…" : `+ Add standard boards (${missing.length})`}
+      </button>
+      <span style={{ fontSize: 11, color: C.textS }}>{msg || missing.join(", ")}</span>
+    </div>
+  );
+}
+
 function MaterialAdmin({ materials, reload }) {
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
@@ -1281,7 +1330,10 @@ function MaterialAdmin({ materials, reload }) {
   };
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}><button onClick={() => setCreating(true)} style={btnDark}>+ Add material</button></div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 10, flexWrap: "wrap" }}>
+        <StandardMaterialsButton onAdded={reload} />
+        <button onClick={() => setCreating(true)} style={btnDark}>+ Add material</button>
+      </div>
       {(creating || editing) && <MaterialForm material={editing} onClose={() => { setCreating(false); setEditing(null); }} onSaved={async () => { setCreating(false); setEditing(null); await reload(); }} />}
       <Card style={{ padding: 0, overflow: "hidden" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
