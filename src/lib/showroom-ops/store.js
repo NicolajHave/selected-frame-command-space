@@ -593,29 +593,33 @@ export async function getSeasonCustomisations(seasonId) {
     bySr.get(m.showroomId).push(m);
   }
 
-  const wanted = (m, gender) => m.gender === 'BOTH' || m.gender === gender;
   const rows = [];
   for (const ss of detail.seasonShowrooms) {
     const sr = byId.get(ss.showroomId);
     if (!sr) continue;
-    for (const gender of ['MEN', 'WOMEN']) {
-      const ticked = gender === 'MEN' ? ss.menPackage : ss.womenPackage;
-      if (!ticked) continue;
-      for (const m of bySr.get(sr.id) || []) {
-        if (!wanted(m, gender)) continue;
-        rows.push({
-          showroomId: sr.id,
-          showroom: sr.name,
-          city: sr.city,
-          country: sr.country,
-          gender,
-          name: m.name,
-          format: m.format,
-          quantity: m.quantity || 1,
-          remarks: m.remarks,
-          materialId: m.materialId,
-        });
-      }
+    const men = !!ss.menPackage;
+    const women = !!ss.womenPackage;
+    if (!men && !women) continue;
+
+    const push = (gender, m) => rows.push({
+      showroomId: sr.id,
+      showroom: sr.name,
+      city: sr.city,
+      country: sr.country,
+      gender,
+      name: m.name,
+      format: m.format,
+      quantity: m.quantity || 1,
+      remarks: m.remarks,
+      materialId: m.materialId,
+    });
+
+    for (const m of bySr.get(sr.id) || []) {
+      // A BOTH item is one item for the location, not one per gender: a unisex
+      // poster with a quantity of 2 means two pieces, not two per package.
+      if (m.gender === 'BOTH') push('BOTH', m);
+      else if (m.gender === 'MEN' && men) push('MEN', m);
+      else if (m.gender === 'WOMEN' && women) push('WOMEN', m);
     }
   }
   rows.sort((a, b) =>
@@ -638,9 +642,13 @@ export async function getShippingList(seasonId) {
   const byId = new Map(all.map((s) => [s.id, s]));
   // Standing customisations show up as extras on the row, so the buyer sees
   // Helsinki's lightposter without anyone re-typing it each season.
-  const customFor = (showroomId, gender) =>
+  // A BOTH item ships once for the location. It is listed on the men's row when
+  // there is one, otherwise the women's — listing it on both would have the
+  // buyer send it twice.
+  const customFor = (showroomId, gender, isPrimary) =>
     customs
-      .filter((m) => m.active && m.showroomId === showroomId && (m.gender === 'BOTH' || m.gender === gender))
+      .filter((m) => m.active && m.showroomId === showroomId
+        && (m.gender === gender || (m.gender === 'BOTH' && isPrimary)))
       .map((m) => `${m.quantity > 1 ? `${m.quantity}× ` : ''}${m.name}${m.format ? ` (${m.format})` : ''}`);
 
   const rows = [];
@@ -652,8 +660,9 @@ export async function getShippingList(seasonId) {
       deliveryType: sr.deliveryType, remarks: ss.remarks,
       specialHandling: sr.specialHandling, status: sr.status,
     };
+    const primaryGender = ss.menPackage ? 'MEN' : 'WOMEN';
     const withExtras = (gender) => {
-      const parts = [ss.extras, ...customFor(sr.id, gender)].filter(Boolean);
+      const parts = [ss.extras, ...customFor(sr.id, gender, gender === primaryGender)].filter(Boolean);
       return parts.join(' · ');
     };
     if (ss.menPackage) {
