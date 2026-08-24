@@ -21,6 +21,15 @@
 /** @type {NewsItem[]} */
 export const NEWS = [
   {
+    title: "Selected Frame opening — Salling, Kultorvet",
+    date: "2026-08-24",
+    category: "Opening",
+    description:
+      "We've opened a brand new Selected Frame Womenswear shop at Salling on Kultorvet in Copenhagen — a beautiful space in a prime city-centre location, and Salling's first store outside Jutland.",
+    mediaType: "video",
+    mediaSrc: "/news/cph-4k.mp4",
+  },
+  {
     title: "Selected Frame opening — Engelhorn",
     date: "2026-05-15",
     category: "Opening",
@@ -48,15 +57,5 @@ export const NEWS = [
       "Soft Shop Solution opened on the womens floor in Magasin, Lyngby. 25 sqm.",
     mediaType: "image",
     mediaSrc: "/images/kh_selected_sis_032_web.jpg",
-  },
-  {
-    title: "Draft Studio is live in the Command Space",
-    date: "2026-04-02",
-    category: "Tool update",
-    description:
-      "Condition supplier PDFs to the Selected Frame standard directly in the app — replaces the local Python workflow.",
-    mediaType: "image",
-    mediaSrc: "/images/kh_selected_sis_023_web.jpg",
-    link: "draft",
   },
 ];
