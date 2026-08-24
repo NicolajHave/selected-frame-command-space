@@ -235,6 +235,12 @@ must never fail the user's submission. Report the outcome instead.
 - **Always merge to `main`.** Finish a task by creating the PR *and* merging it
   via the GitHub MCP tools, so `main` matches what is reported as done. Never
   leave work sitting on the branch.
+- The work branch is long-lived and every PR is **squash**-merged, which
+  rewrites history — so the branch is behind `main` the moment a PR lands and
+  the next PR from it fails with "Pull Request has merge conflicts" even when
+  nothing really conflicts. Reset onto main and replay instead of merging:
+  `git fetch origin main && git checkout -B <branch> origin/main`, then
+  cherry-pick the new commits and force-with-lease push.
 - Verify with `npm run build` before committing. For pure logic (filename
   generation, PDF building, sanitisation) also run it directly with `node` —
   a green build does not prove the logic is right.
