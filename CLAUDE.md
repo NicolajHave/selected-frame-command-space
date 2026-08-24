@@ -46,10 +46,6 @@ Bigger features live in their own directory and are imported into it.
 | `src/app/standards-content.js` | Standards page content + element catalogue |
 | `src/data/news.js` | Front-page News section content — order newest-first, first item is the featured card |
 
-`src/app/draft-studio/` (Draft Studio) is no longer linked from the sidebar nav
-— its code and its `/api/pdf-studio` routes are untouched, just unreached, in
-case it is re-enabled later.
-
 ## News section
 
 `src/data/news.js` feeds the Overview page's News section (`NewsSection` in
