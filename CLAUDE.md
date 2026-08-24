@@ -44,6 +44,23 @@ Bigger features live in their own directory and are imported into it.
 | `src/app/embed/project-intake/` | Chrome-free intake form for iframe embedding |
 | `src/data/toolboxTemplates.js` | Email template copy |
 | `src/app/standards-content.js` | Standards page content + element catalogue |
+| `src/data/news.js` | Front-page News section content — order newest-first, first item is the featured card |
+
+`src/app/draft-studio/` (Draft Studio) is no longer linked from the sidebar nav
+— its code and its `/api/pdf-studio` routes are untouched, just unreached, in
+case it is re-enabled later.
+
+## News section
+
+`src/data/news.js` feeds the Overview page's News section (`NewsSection` in
+`src/app/page.js`). Order is newest-first; `NEWS[0]` renders as the big featured
+card. Videos use a single `<video src>` with no `<source>` fallback, so only one
+universally-supported format works in practice — export as `.mp4` (H.264) and
+place it under `public/news/`. Watch the file size: it ships in the git repo and
+in every Vercel deploy, so a 4K master should be compressed to a web-optimised
+bitrate before committing. A `link` on an item points at an internal page id, so
+removing a page from the nav means removing or repointing any news item that
+links to it.
 
 ## Supabase — schemas are applied by hand
 
