@@ -218,10 +218,13 @@ with partners. Only filenames matching the pattern we write are counted.
 
 ## Concept Requests
 
-Additions, changes, feedback and cost input on the concept, in
-`concept_requests`. Triage runs NEW → UNDER_REVIEW → ACCEPTED / DECLINED /
-PARKED → IMPLEMENTED; the decision note is what makes the register worth
-keeping.
+Additions, changes and feedback on the concept, in `concept_requests`. Triage
+runs NEW → UNDER_REVIEW → ACCEPTED / DECLINED / PARKED → IMPLEMENTED; the
+decision note is what makes the register worth keeping.
+
+A fourth type, `COST`, was retired from the form — cost optimisation is decided
+internally rather than collected. The label is kept in the display maps so any
+row already stored under it still reads properly.
 
 A request points at an element from the Standards catalogue by code, and
 `element_name` is **denormalised onto the row** so a later catalogue rename

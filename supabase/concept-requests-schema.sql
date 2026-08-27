@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS concept_requests (
   partner          TEXT,                  -- partner / store the input comes from
 
   -- What it is about
-  type             TEXT NOT NULL,         -- ADDITION | CHANGE | FEEDBACK | COST
+  type             TEXT NOT NULL,         -- ADDITION | CHANGE | FEEDBACK (COST retired, old rows kept)
   element_code     TEXT,                  -- e.g. '105-06-010' from the Standards catalogue
   element_name     TEXT,                  -- denormalised so a catalogue rename keeps history readable
   title            TEXT NOT NULL,
