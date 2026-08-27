@@ -41,6 +41,7 @@ Bigger features live in their own directory and are imported into it.
 | `src/app/showroom-ops/` | Seasons, print lines, filename generator, shipping list |
 | `src/app/external-project-folders/` | Per-project file workspace (password-gated) |
 | `src/app/toolbox/` | Partner email templates (6 languages) |
+| `src/app/concept-requests/` | Concept input register — form + triage, mails via Power Automate |
 | `src/app/embed/project-intake/` | Chrome-free intake form for iframe embedding |
 | `src/data/toolboxTemplates.js` | Email template copy |
 | `src/app/standards-content.js` | Standards page content + element catalogue |
@@ -66,6 +67,7 @@ must paste it into the Supabase SQL Editor. Always say so explicitly.
 - `supabase/schema.sql` — External Project Folders (public schema)
 - `supabase/opening-report-schema.sql` — Opening Reports (public schema)
 - `supabase/showroom-ops-schema.sql` — Showroom Ops (isolated `showroom_ops` schema)
+- `supabase/concept-requests-schema.sql` — Concept Requests (public schema)
 
 **Gotchas learned the hard way:**
 
@@ -214,6 +216,22 @@ it again. `DELETE /api/external-folders/[folderId]` also refuses unless
 draft must not hand its number to a different document, since drafts get shared
 with partners. Only filenames matching the pattern we write are counted.
 
+## Concept Requests
+
+Additions, changes, feedback and cost input on the concept, in
+`concept_requests`. Triage runs NEW → UNDER_REVIEW → ACCEPTED / DECLINED /
+PARKED → IMPLEMENTED; the decision note is what makes the register worth
+keeping.
+
+A request points at an element from the Standards catalogue by code, and
+`element_name` is **denormalised onto the row** so a later catalogue rename
+leaves old requests readable.
+
+**Photos upload to Blob before the row is created.** One POST then both stores
+the request and fires one webhook carrying the links. The alternative — create,
+upload, patch, notify — leaves a request whose mail lists no photos if it fails
+halfway. Deleting a request drops its blobs before the row, as everywhere else.
+
 ## Environment variables
 
 | Var | Used for |
@@ -224,6 +242,8 @@ with partners. Only filenames matching the pattern we write are counted.
 | `EXTERNAL_FOLDER_PASSWORD` | Shared gate for External Folders |
 | `POWER_AUTOMATE_PROJECT_INTAKE_WEBHOOK` | Intake → OneDrive + Outlook flow |
 | `PROJECT_INTAKE_EMAIL_TO` | Recipient the flow mails |
+| `POWER_AUTOMATE_CONCEPT_REQUEST_WEBHOOK` | Concept Requests → Outlook flow |
+| `CONCEPT_REQUEST_EMAIL_TO` | Optional; defaults to Nicolaj + Ulrik, semicolon-separated |
 | `RETENTION_DAYS`, `RETENTION_REMINDER_EMAIL`, `CRON_SECRET` | Folder retention job |
 | `EMBED_ALLOWED_ORIGINS` | Restricts who may iframe `/embed/*` (unset = any) |
 
@@ -254,6 +274,18 @@ must never fail the user's submission. Report the outcome instead.
   would produce a duplicate without the env vars or the git connection.
 - Copy is British English. The brand is written **Selected** — never SELECTED.
 - Write in Danish when the user does.
+
+## Mail — Power Automate is the only working path
+
+`src/lib/external-folders/email.js` and the intake email helper are **stubs**
+that return `provider_not_configured`. Nothing in the app sends mail directly;
+every mail that actually arrives goes out through a Power Automate flow calling
+Outlook. Adding mail to a feature means a new flow and a new webhook env var —
+not a call to those helpers.
+
+Each flow gets its **own** trigger URL. The intake flow also creates OneDrive
+folders, so reusing it for a mail-only feature sends the wrong payload shape.
+`docs/power-automate-concept-request-flow.md` is the mail-only build guide.
 
 ## Power Automate (intake → OneDrive + mail)
 
