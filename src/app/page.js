@@ -1,5 +1,6 @@
 "use client";
 import { SECTIONS as SF_SECTIONS, INTRO as SF_INTRO, DNA as SF_DNA, NON_NEGOTIABLES as SF_NON_NEGOTIABLES, SPACE_MANAGEMENT as SF_SPACE_MANAGEMENT, BRAND_APPLICATION as SF_BRAND_APPLICATION, FIXTURES as SF_FIXTURES, MERCHANDISING as SF_MERCHANDISING, PLAYBOOKS as SF_PLAYBOOKS, EXCEPTIONS as SF_EXCEPTIONS } from "./standards-content";
+import ConceptRequestsPage from "./concept-requests/ConceptRequestsPage";
 import DraftStudioPage from "./draft-studio/DraftStudioPage";
 import ToolboxPage from "./toolbox/ToolboxPage";
 import ProjectIntakePage from "./project-intake/ProjectIntakePage";
@@ -1375,6 +1376,7 @@ export default function Home(){const [page,setPage]=useState("overview");const [
       {id:"draft",label:"Draft Studio",icon:"✎"},
       {id:"quotation",label:"Quotation",icon:"📋"},
       {id:"opening-report",label:"Opening Report",icon:"✓"},
+      {id:"concept-requests",label:"Concept Requests",icon:"✦"},
       {id:"toolbox",label:"Toolbox",icon:"⊟"},
     ]},
     {label:"Showroom Ops",items:[
@@ -1412,6 +1414,7 @@ export default function Home(){const [page,setPage]=useState("overview");const [
         {page==="quotation"&&<QuotationPage/>}
         {page==="opening-report"&&<OpeningReportsPage/>}
         {page==="draft"&&<DraftStudioPage/>}
+        {page==="concept-requests"&&<ConceptRequestsPage/>}
         {page==="toolbox"&&<ToolboxPage/>}
         {page==="roi"&&<ROIPage projects={projects}/>}
         {page==="flow"&&<FlowPage projects={projects} setPage={setPage}/>}
