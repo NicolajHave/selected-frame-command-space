@@ -98,7 +98,16 @@ export async function notifyConceptRequest(req) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    if (!r.ok) return { sent: false, reason: `webhook returned ${r.status}` };
+    if (!r.ok) {
+      // 401/403 from Power Automate means the trigger URL's `sig=` signature
+      // is missing, truncated or stale — not that the Flow rejected the body.
+      // Say so, or the next person reads it as a payload problem.
+      const hint =
+        r.status === 401 || r.status === 403
+          ? ' — the trigger URL is missing or has a stale sig= signature. Re-copy the full HTTP POST URL from the Flow and redeploy.'
+          : '';
+      return { sent: false, reason: `webhook returned ${r.status}${hint}` };
+    }
     return { sent: true };
   } catch (e) {
     return { sent: false, reason: e.message };

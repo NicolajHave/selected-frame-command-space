@@ -23,8 +23,12 @@ const TYPES = [
   { id: "ADDITION", label: "Addition", hint: "A new element we do not have today" },
   { id: "CHANGE", label: "Change", hint: "An existing element that should work differently" },
   { id: "FEEDBACK", label: "Feedback / problem", hint: "Something that does not work in practice" },
-  { id: "COST", label: "Cost optimisation", hint: "A cheaper or simpler way to reach the same result" },
 ];
+
+// COST is retired as a choice — cost optimisation is ours to work out, not
+// something to invite input on. Kept in the label map so any request already
+// submitted under it still reads properly in the register.
+const TYPE_LABELS = { ...Object.fromEntries(TYPES.map((t) => [t.id, t.label])), COST: "Cost optimisation" };
 
 const URGENCIES = [
   { id: "NICE_TO_HAVE", label: "Nice to have" },
@@ -208,7 +212,7 @@ function RequestForm({ onSubmitted }) {
         <div style={{ fontSize: 11, fontWeight: 700, color: C.textS, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 16 }}>What it is about</div>
 
         <Field label="Type" required>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div style={{ display: "grid", gap: 8 }}>
             {TYPES.map((t) => (
               <div key={t.id} onClick={() => set("type", t.id)}
                 style={{ padding: "11px 13px", borderRadius: 6, cursor: "pointer", fontSize: 13,
@@ -311,7 +315,7 @@ function RequestCard({ req, onChanged }) {
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}>
             <Pill colour={statusColour(req.status)}>{labelOf(STATUSES, req.status)}</Pill>
-            <Pill colour={C.steelD}>{labelOf(TYPES, req.type)}</Pill>
+            <Pill colour={C.steelD}>{TYPE_LABELS[req.type] || req.type}</Pill>
             {req.urgency === "BLOCKING" && <Pill colour={C.danger}>Blocking</Pill>}
             {req.urgency === "UPCOMING_PROJECT" && <Pill colour={C.warn}>Upcoming project</Pill>}
           </div>

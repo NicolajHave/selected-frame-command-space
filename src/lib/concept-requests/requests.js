@@ -10,7 +10,10 @@ export { isConfigured };
 
 const TABLE = 'concept_requests';
 
-export const TYPES = ['ADDITION', 'CHANGE', 'FEEDBACK', 'COST'];
+// COST is retired as a submittable type — cost optimisation is decided
+// internally, not collected through this form. Existing COST rows still read
+// back fine; only new submissions are restricted.
+export const TYPES = ['ADDITION', 'CHANGE', 'FEEDBACK'];
 export const URGENCIES = ['NICE_TO_HAVE', 'UPCOMING_PROJECT', 'BLOCKING'];
 export const STATUSES = ['NEW', 'UNDER_REVIEW', 'ACCEPTED', 'DECLINED', 'PARKED', 'IMPLEMENTED'];
 
