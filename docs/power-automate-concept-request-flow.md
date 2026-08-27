@@ -57,8 +57,17 @@ are there for the day you want a nicer HTML layout.
    - **Body**: dynamic content `emailBody`
    - Under **Advanced options**, set **Importance** to Normal and leave
      **Is HTML** off — the body is plain text.
-4. **Save.** The trigger URL only appears after the first save.
-5. Copy the **HTTP POST URL** from the trigger card.
+4. On the trigger card, set **Who can trigger the flow?** to **Anyone**.
+   This is the step that decides whether the whole thing works: the default,
+   *Any user in my tenant*, authenticates with an Entra ID bearer token and
+   mints a URL with **no `sig=`** — Command Space has no way to obtain such a
+   token, so every call comes back **401**. *Anyone* issues a URL carrying its
+   own signature, which is what the app can call. "Anyone" means anyone
+   holding the URL, and the signature is 43 random characters.
+5. **Save.** The trigger URL only appears after the first save.
+6. Copy the **HTTP POST URL** from the trigger card. It must end in
+   `&sp=…&sv=1.0&sig=…`; if it stops at `?api-version=1`, step 4 was missed.
+   Changing that setting mints a new URL, so re-copy after any change.
 
 ## Wire it up in Vercel
 
@@ -66,7 +75,7 @@ Add to Vercel → Project → Settings → Environment Variables:
 
 | Var | Value |
 |---|---|
-| `POWER_AUTOMATE_CONCEPT_REQUEST_WEBHOOK` | the HTTP POST URL from step 5 |
+| `POWER_AUTOMATE_CONCEPT_REQUEST_WEBHOOK` | the HTTP POST URL from step 6 |
 | `CONCEPT_REQUEST_EMAIL_TO` | optional; defaults to Nicolaj + Ulrik, semicolon-separated |
 
 Vercel reads env vars **only at build time**, so redeploy after adding
