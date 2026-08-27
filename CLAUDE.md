@@ -290,6 +290,12 @@ Each flow gets its **own** trigger URL. The intake flow also creates OneDrive
 folders, so reusing it for a mail-only feature sends the wrong payload shape.
 `docs/power-automate-concept-request-flow.md` is the mail-only build guide.
 
+A new HTTP trigger defaults to **Who can trigger the flow? → Any user in my
+tenant**, which authenticates with an Entra ID bearer token and mints a URL
+with **no `sig=`**. The app cannot obtain such a token, so every call returns
+**401**. The setting must be **Anyone**, whose URL carries its own signature.
+A trigger URL ending at `?api-version=1` is the tell.
+
 ## Power Automate (intake → OneDrive + mail)
 
 `docs/power-automate-intake-flow.md` has the full build guide. The webhook body
