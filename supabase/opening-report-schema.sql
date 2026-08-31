@@ -30,6 +30,26 @@ CREATE TABLE IF NOT EXISTS opening_reports (
 CREATE INDEX IF NOT EXISTS idx_opening_reports_status
   ON opening_reports(status);
 
+-- Which project the report belongs to. Added after the first release, so
+-- idempotent ALTERs keep existing deployments in step.
+--
+-- The Asana gid is the join key — it is what keys the External Folder too, so
+-- an approved report can file itself into the same place as the filecard. The
+-- name, region and dates are denormalised alongside it: a report is a record
+-- of what was true on opening day, and it must stay readable even if the task
+-- is later renamed or removed from Asana.
+ALTER TABLE opening_reports ADD COLUMN IF NOT EXISTS asana_project_id  TEXT;
+ALTER TABLE opening_reports ADD COLUMN IF NOT EXISTS project_name      TEXT;
+ALTER TABLE opening_reports ADD COLUMN IF NOT EXISTS project_region    TEXT;
+ALTER TABLE opening_reports ADD COLUMN IF NOT EXISTS project_due_date  DATE;
+
+-- The report PDF generated on approval, stored in Blob and handed to the Flow.
+ALTER TABLE opening_reports ADD COLUMN IF NOT EXISTS report_pdf_url    TEXT;
+ALTER TABLE opening_reports ADD COLUMN IF NOT EXISTS report_pdf_path   TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_opening_reports_project
+  ON opening_reports(asana_project_id);
+
 CREATE TABLE IF NOT EXISTS opening_report_checkpoints (
   id            TEXT PRIMARY KEY,
   report_id     TEXT NOT NULL REFERENCES opening_reports(id) ON DELETE CASCADE,

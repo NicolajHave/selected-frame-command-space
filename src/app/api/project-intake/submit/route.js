@@ -18,6 +18,8 @@
 import { NextResponse } from 'next/server';
 import { put, copy } from '@vercel/blob';
 import { buildFilecardSummary } from '../../../../lib/project-intake/payload';
+// Shared with Opening Reports so both file under the SAME OneDrive path.
+import { safeName, isIso, buildTargetPath } from '../../../../lib/onedrive-path';
 import { buildFilecardPdf } from '../../../../lib/project-intake/filecard-pdf';
 import { asanaConfigured, createIntakeTask, updateTaskNotes, buildTaskName } from '../../../../lib/project-intake/asana';
 import {
@@ -46,25 +48,6 @@ function slugify(s) {
       .replace(/^-+|-+$/g, '')
       .slice(0, 60) || 'project'
   );
-}
-
-/**
- * Make a project or file name safe for OneDrive / SharePoint. Those reject
- * \ / : * ? " < > | outright — and a project called "Magasin / Lyngby" would
- * otherwise turn the folder path into an unintended nested folder.
- */
-function safeName(s, fallback = 'Untitled') {
-  const out = String(s || '')
-    .replace(/[\\/:*?"<>|]+/g, '-')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/\.+$/, '')
-    .slice(0, 120);
-  return out || fallback;
-}
-
-function isIso(v) {
-  return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 }
 
 function validate(payload) {
@@ -264,14 +247,11 @@ export async function POST(request) {
   // OneDrive filing: <year>/<REGION>/<project>. The year comes from the
   // desired opening date, so a 2027 opening files under 2027 without anyone
   // having to remember. Falls back to the current year if the date is absent.
-  const targetYear = String(
-    (isIso(payload.projectBasics.desiredOpeningDate)
-      ? new Date(payload.projectBasics.desiredOpeningDate)
-      : new Date()
-    ).getFullYear(),
-  );
-  const targetRegion = safeName(payload.projectBasics.marketRegion, 'UNSPECIFIED');
-  const targetPath = `${targetYear}/${targetRegion}/${safeProject}`;
+  const { targetYear, targetRegion, targetPath } = buildTargetPath({
+    dates: [payload.projectBasics.desiredOpeningDate],
+    region: payload.projectBasics.marketRegion,
+    projectName,
+  });
   if (pdfUrl) webhookFiles.push({ name: pdfFileName, url: pdfUrl });
   for (const meta of Object.values(payload.attachments || {})) {
     for (const f of meta?.files || []) {
