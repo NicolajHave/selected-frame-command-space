@@ -53,12 +53,24 @@ const ELEMENTS = SF_FIXTURES.categories.flatMap((cat) =>
   cat.items.map((it) => ({ code: it.code, name: it.name, category: cat.name })),
 );
 
+// Content types Blob is told to accept. The upload token carries the same
+// list — a type missing there is rejected when the user tries, not at build.
+const DOC_TYPES = {
+  pdf: "application/pdf",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+};
+
+const extOf = (name) => (String(name || "").split(".").pop() || "").toLowerCase();
+
 /**
- * Rows written before attachments could be PDFs carry no contentType, so fall
- * back to the extension rather than rendering a document as a broken image.
+ * Rows written before attachments could be documents carry no contentType, so
+ * fall back to the extension rather than rendering one as a broken image.
  */
 const isImage = (p) =>
-  p.contentType ? p.contentType.startsWith("image/") : !/\.pdf$/i.test(p.name || p.url || "");
+  p.contentType ? p.contentType.startsWith("image/") : !DOC_TYPES[extOf(p.name || p.url)];
 
 const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
@@ -148,9 +160,9 @@ function RequestForm({ onSubmitted }) {
       for (const file of files) {
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "_");
         // Blob rejects a content type it was not told to allow, so never guess
-        // "image/jpeg" for a file the browser did not type — a PDF dragged in
-        // from Explorer sometimes arrives with an empty type.
-        const contentType = file.type || (/\.pdf$/i.test(file.name) ? "application/pdf" : "image/jpeg");
+        // "image/jpeg" for a file the browser did not type — a document dragged
+        // in from Explorer sometimes arrives with an empty type.
+        const contentType = file.type || DOC_TYPES[extOf(file.name)] || "image/jpeg";
         const result = await upload(`concept-requests/${Date.now()}-${safeName}`, file, {
           access: "public",
           handleUploadUrl: "/api/concept-requests/upload-url",
@@ -271,8 +283,8 @@ function RequestForm({ onSubmitted }) {
           </Field>
         )}
 
-        <Field label="Photos or documents" hint="A picture of the problem is worth three paragraphs. JPG, PNG, WebP, HEIC or PDF, up to 25 MB each.">
-          <input type="file" accept="image/*,application/pdf,.pdf" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} style={{ fontSize: 13, color: C.text }} />
+        <Field label="Photos or documents" hint="A picture of the problem is worth three paragraphs. Images, PDF, Word or Excel, up to 25 MB each.">
+          <input type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} style={{ fontSize: 13, color: C.text }} />
           {files.length > 0 && (
             <div style={{ fontSize: 12, color: C.textS, marginTop: 8 }}>
               {files.length} file{files.length === 1 ? "" : "s"} selected: {files.map((f) => f.name).join(", ")}

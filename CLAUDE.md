@@ -216,6 +216,18 @@ it again. `DELETE /api/external-folders/[folderId]` also refuses unless
 draft must not hand its number to a different document, since drafts get shared
 with partners. Only filenames matching the pattern we write are counted.
 
+## Blob uploads
+
+Every upload path (External Folders, Opening Reports, Concept Requests) signs a
+token in an `/upload-url` route, and Blob refuses any content type the token
+does not list in `allowedContentTypes` — a rejection that surfaces only when a
+user tries, never at build time. Adding a file type means editing that list,
+not just the `accept` attribute on the input.
+
+Never guess a content type client-side: a document dragged in from Explorer can
+arrive with an empty `file.type`, and defaulting it to an image type gets it
+rejected under a second, more confusing error. Fall back on the extension.
+
 ## Concept Requests
 
 Additions, changes and feedback on the concept, in `concept_requests`. Triage
