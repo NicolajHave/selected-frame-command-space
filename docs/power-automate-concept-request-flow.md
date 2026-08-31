@@ -56,17 +56,27 @@ are there for the day you want a nicer HTML layout.
    - **To**: dynamic content `emailTo`
    - **Subject**: dynamic content `emailSubject`
    - **Body**: the expression `triggerBody()?['emailBodyHtml']`
-   - Under **Advanced options**, set **Is HTML** to **Yes**.
 
-   `emailBodyHtml` is a laid-out HTML mail. `emailBody` is the same content
-   as plain text and is still sent, for a Flow that has not been switched
-   over — but with **Is HTML** on it must not be used, or the mail arrives
-   as one collapsed block of text.
+   **Send an email (V2)** has no *Is HTML* toggle — that belonged to the
+   older *Send an email* action. In V2 the Body field is already an HTML
+   field, so an HTML string placed there is sent as HTML. If the rich-text
+   editor gets in the way, click the **`</>`** (code view) button on the
+   body toolbar and put the expression in there.
 
-   `emailBodyHtml` was added after the first build, so it will not appear in
-   the dynamic-content picker until you re-paste the sample payload. The
-   expression above works either way: **Body** field → **Expression** tab →
+   `emailBodyHtml` is the laid-out mail. `emailBody` carries the same content
+   as plain text and is still sent, so a Flow pointed at it keeps working —
+   useful as a fallback if the HTML one ever comes through empty.
+
+   `emailBodyHtml` was added after the first build, so it does **not** appear
+   in the dynamic-content picker until the sample payload is re-pasted. The
+   expression above sidesteps that: **Body** field → **Expression** tab →
    paste it.
+
+   **An empty mail body means the expression resolved to nothing** — almost
+   always because the running app version predates the field. Check the
+   Flow's run history: open the latest run, expand the trigger, and look for
+   `emailBodyHtml` in the raw body. If it is absent, the deploy is the
+   problem, not the Flow.
 4. On the trigger card, set **Who can trigger the flow?** to **Anyone**.
    This is the step that decides whether the whole thing works: the default,
    *Any user in my tenant*, authenticates with an Entra ID bearer token and
