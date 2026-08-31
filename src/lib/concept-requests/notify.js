@@ -50,8 +50,8 @@ export function buildEmailBody(req) {
   lines.push(`From: ${from}${req.submitterEmail ? ` (${req.submitterEmail})` : ''}`);
 
   if (req.photos?.length) {
-    lines.push('', `Photos (${req.photos.length}):`);
-    req.photos.forEach((p) => lines.push(p.url));
+    lines.push('', `Attachments (${req.photos.length}):`);
+    req.photos.forEach((p) => lines.push(p.name ? `${p.name} — ${p.url}` : p.url));
   }
 
   lines.push('', 'Triage this in Command Space → Concept Requests.');

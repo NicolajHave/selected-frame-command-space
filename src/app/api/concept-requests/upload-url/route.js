@@ -27,7 +27,12 @@ export async function POST(request) {
           throw new Error(`Invalid upload path. Must start with ${PREFIX}`);
         }
         return {
-          allowedContentTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'],
+          // PDFs as well as photos: a request often comes with a drawing or a
+          // spec sheet, and Blob rejects anything not listed here outright.
+          allowedContentTypes: [
+            'image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif',
+            'application/pdf',
+          ],
           maximumSizeInBytes: 25 * 1024 * 1024,
           addRandomSuffix: true,
         };
