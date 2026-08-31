@@ -20,6 +20,7 @@ Outlook.
   "emailTo": "nicolaj.ostergaard@bestseller.com;ulrik.riisom@bestseller.com",
   "emailSubject": "Selected Frame concept — Change: Hanger bar sits too high in 700 units",
   "emailBody": "Change — existing element\n\nHanger bar sits too high...",
+  "emailBodyHtml": "<table role=\"presentation\" …>…</table>",
   "requestId": "9f0c…",
   "type": "CHANGE",
   "typeLabel": "Change — existing element",
@@ -54,9 +55,18 @@ are there for the day you want a nicer HTML layout.
 3. Add an action: **Outlook → Send an email (V2)**.
    - **To**: dynamic content `emailTo`
    - **Subject**: dynamic content `emailSubject`
-   - **Body**: dynamic content `emailBody`
-   - Under **Advanced options**, set **Importance** to Normal and leave
-     **Is HTML** off — the body is plain text.
+   - **Body**: the expression `triggerBody()?['emailBodyHtml']`
+   - Under **Advanced options**, set **Is HTML** to **Yes**.
+
+   `emailBodyHtml` is a laid-out HTML mail. `emailBody` is the same content
+   as plain text and is still sent, for a Flow that has not been switched
+   over — but with **Is HTML** on it must not be used, or the mail arrives
+   as one collapsed block of text.
+
+   `emailBodyHtml` was added after the first build, so it will not appear in
+   the dynamic-content picker until you re-paste the sample payload. The
+   expression above works either way: **Body** field → **Expression** tab →
+   paste it.
 4. On the trigger card, set **Who can trigger the flow?** to **Anyone**.
    This is the step that decides whether the whole thing works: the default,
    *Any user in my tenant*, authenticates with an Entra ID bearer token and
