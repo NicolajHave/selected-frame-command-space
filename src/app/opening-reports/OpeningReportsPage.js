@@ -59,7 +59,70 @@ function SectionHeader({ n, title, sub }) {
 }
 
 // ─── List view ────────────────────────────────────────────────────────────────
-function ReportsListView({ reports, onCreate, onOpen, loading }) {
+/**
+ * Deleting is gated by the shared code — checked server-side too, so this is a
+ * guard against a mis-click rather than a lock. The name must be recognisable
+ * in the dialog, since a report cannot be recovered afterwards.
+ */
+function DeleteReport({ report, onDeleted }) {
+  const [open, setOpen] = useState(false);
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const remove = async () => {
+    setBusy(true); setError(null);
+    try {
+      const r = await fetch(`/api/opening-reports/${report.reportUrlSlug}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: code.trim() }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.message || j.error || `Delete failed (${r.status})`);
+      await onDeleted();
+    } catch (e) {
+      setError(e.message);
+      setBusy(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+        title="Delete this report"
+        style={{ background: "none", border: "none", color: C.steel, cursor: "pointer", fontSize: 15, padding: "2px 6px", lineHeight: 1 }}
+      >
+        ×
+      </button>
+    );
+  }
+
+  return (
+    <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <input
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+        type="password"
+        autoComplete="off"
+        placeholder="Code"
+        autoFocus
+        onKeyDown={(e) => { if (e.key === "Enter") remove(); if (e.key === "Escape") setOpen(false); }}
+        style={{ width: 62, padding: "5px 7px", fontSize: 12, border: `1px solid ${error ? C.nogo : C.surfaceD}`, borderRadius: 4, fontFamily: "inherit" }}
+      />
+      <button onClick={remove} disabled={busy} title={error || `Delete ${report.partnerName}`}
+        style={{ background: "none", border: "none", color: C.nogo, cursor: busy ? "wait" : "pointer", fontSize: 12, fontWeight: 600, padding: "2px 4px" }}>
+        {busy ? "…" : "Delete"}
+      </button>
+      <button onClick={() => { setOpen(false); setError(null); }} style={{ background: "none", border: "none", color: C.textS, cursor: "pointer", fontSize: 12, padding: "2px 4px" }}>
+        Cancel
+      </button>
+    </div>
+  );
+}
+
+function ReportsListView({ reports, onCreate, onOpen, loading, onChanged }) {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18, gap: 16, flexWrap: "wrap" }}>
@@ -81,11 +144,18 @@ function ReportsListView({ reports, onCreate, onOpen, loading }) {
         </Card>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 110px 110px 110px 100px", gap: 16, padding: "8px 18px", fontSize: 9, fontWeight: 700, color: C.textS, textTransform: "uppercase", letterSpacing: "1px" }}>
-            <div>Partner</div><div>Location</div><div>Opening</div><div>Submitted</div><div>Submitted by</div><div>Status</div>
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 110px 110px 110px 100px 150px", gap: 16, padding: "8px 18px", fontSize: 9, fontWeight: 700, color: C.textS, textTransform: "uppercase", letterSpacing: "1px" }}>
+            <div>Partner</div><div>Location</div><div>Opening</div><div>Submitted</div><div>Submitted by</div><div>Status</div><div />
           </div>
           {reports.map((r) => (
-            <button key={r.id} onClick={() => onOpen(r)} style={{ textAlign: "left", display: "grid", gridTemplateColumns: "2fr 1fr 110px 110px 110px 100px", gap: 16, alignItems: "center", padding: "14px 18px", background: C.white, border: `1px solid ${C.surfaceD}`, borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>
+            <div
+              key={r.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => onOpen(r)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(r); } }}
+              style={{ textAlign: "left", display: "grid", gridTemplateColumns: "2fr 1fr 110px 110px 110px 100px 150px", gap: 16, alignItems: "center", padding: "14px 18px", background: C.white, border: `1px solid ${C.surfaceD}`, borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}
+            >
               <div>
                 <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{r.partnerName}</div>
                 <div style={{ fontSize: 11, color: C.textS, marginTop: 2, fontFamily: "'DM Mono',monospace" }}>{r.reportUrlSlug}</div>
@@ -95,7 +165,10 @@ function ReportsListView({ reports, onCreate, onOpen, loading }) {
               <div style={{ fontSize: 12, color: C.textS }}>{fmtDate(r.submittedAt)}</div>
               <div style={{ fontSize: 12, color: C.text }}>{r.completedByName}</div>
               <div><StatusPill status={r.status} /></div>
-            </button>
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <DeleteReport report={r} onDeleted={onChanged} />
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -108,10 +181,47 @@ function CreateReportView({ onCreated, onCancel }) {
   const [form, setForm] = useState({
     partnerName: "", location: "", sqm: "", openingDate: todayISO(), completedByName: "",
   });
+  const [projects, setProjects] = useState([]);
+  const [projectsError, setProjectsError] = useState(null);
+  const [projectGid, setProjectGid] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
-  const canSubmit = form.partnerName.trim() && form.location.trim() && form.completedByName.trim();
+  // Both open and completed projects: a report is often written after the
+  // project has been closed off in Asana.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/projects");
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || "Could not load projects");
+        if (!cancelled) setProjects(j.projects || []);
+      } catch (e) {
+        if (!cancelled) setProjectsError(e.message);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const selected = projects.find((p) => p.gid === projectGid) || null;
+
+  // Picking the project fills in what it already knows, so the rep is not
+  // retyping the partner and city that Asana already holds.
+  const pickProject = (gid) => {
+    setProjectGid(gid);
+    const p = projects.find((x) => x.gid === gid);
+    if (!p) return;
+    const [partner, city] = String(p.name || "").split(",").map((s) => s.trim());
+    setForm((f) => ({
+      ...f,
+      partnerName: f.partnerName || partner || p.name || "",
+      location: f.location || city || "",
+      sqm: f.sqm || (p.sqm != null ? String(p.sqm) : ""),
+    }));
+  };
+
+  const canSubmit = form.partnerName.trim() && form.location.trim() && form.completedByName.trim() && projectGid;
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -126,6 +236,10 @@ function CreateReportView({ onCreated, onCancel }) {
           sqm: form.sqm ? Number(form.sqm) : null,
           openingDate: form.openingDate || null,
           completedByName: form.completedByName.trim(),
+          asanaProjectId: projectGid || null,
+          projectName: selected?.name || null,
+          projectRegion: selected?.region || null,
+          projectDueDate: selected?.dueOn || null,
         }),
       });
       if (!r.ok) {
@@ -146,8 +260,40 @@ function CreateReportView({ onCreated, onCancel }) {
       <button onClick={onCancel} style={{ background: "none", border: "none", color: C.oak, fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 18, fontWeight: 500 }}>← All Opening Reports</button>
       <Title sub="Create the report shell. The compliance checklist, photos and confirmation are filled in next.">New Opening Report</Title>
 
+      <Card style={{ marginBottom: 18 }}>
+        <SectionHeader n="1" title="Project" sub="Which project this opening belongs to — it decides where the report is filed" />
+        <div style={{ marginTop: 16 }}>
+          <FormLabel required>Project</FormLabel>
+          {projectsError ? (
+            <div style={{ fontSize: 12, color: C.nogo }}>
+              Could not load projects ({projectsError}). Without a project the report cannot be filed to a folder.
+            </div>
+          ) : (
+            <select value={projectGid} onChange={(e) => pickProject(e.target.value)} style={inputStyle}>
+              <option value="">{projects.length ? "Select a project…" : "Loading projects…"}</option>
+              {["Open", "Completed"].map((group) => {
+                const items = projects.filter((p) => (group === "Completed" ? p.completed : !p.completed));
+                if (!items.length) return null;
+                return (
+                  <optgroup key={group} label={group}>
+                    {items.map((p) => (
+                      <option key={p.gid} value={p.gid}>
+                        {p.name}{p.region ? ` · ${p.region}` : ""}
+                      </option>
+                    ))}
+                  </optgroup>
+                );
+              })}
+            </select>
+          )}
+          <div style={{ fontSize: 11, color: C.textS, marginTop: 6, lineHeight: 1.6 }}>
+            On approval the report and its photos are filed to this project&rsquo;s External Folder and to the same OneDrive folder as the filecard.
+          </div>
+        </div>
+      </Card>
+
       <Card>
-        <SectionHeader n="1" title="Identification" sub="Where, when, and who is filling this in" />
+        <SectionHeader n="2" title="Identification" sub="Where, when, and who is filling this in" />
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
           <div>
             <FormLabel required>Partner name</FormLabel>
@@ -552,21 +698,29 @@ function ApprovalControls({ slug, onApproved }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [note, setNote] = useState("");
+  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [filing, setFiling] = useState(null);
 
   const approve = async () => {
     if (!name.trim()) { setError("Your name is required"); return; }
+    if (!code.trim()) { setError("The approval code is required"); return; }
     setBusy(true); setError(null);
     try {
       const r = await fetch(`/api/opening-reports/${slug}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ approvedByName: name.trim(), approvalNote: note.trim() || null }),
+        body: JSON.stringify({ approvedByName: name.trim(), approvalNote: note.trim() || null, code: code.trim() }),
       });
-      if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
-        throw new Error(j.error || `Approve failed (${r.status})`);
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.message || j.error || `Approve failed (${r.status})`);
+      // The approval itself is committed; filing the PDF, the folder and
+      // OneDrive are best-effort, so say plainly what did not happen rather
+      // than implying everything landed.
+      if (j.filing && [j.filing.pdf, j.filing.externalFolder, j.filing.powerAutomate]
+        .some((s) => s && (s.ok === false || s.sent === false))) {
+        setFiling(j.filing);
       }
       await onApproved();
     } catch (e) {
@@ -575,6 +729,22 @@ function ApprovalControls({ slug, onApproved }) {
       setBusy(false);
     }
   };
+
+  if (filing) {
+    const problems = [
+      filing.pdf?.ok === false && `the PDF could not be generated (${filing.pdf.reason})`,
+      filing.externalFolder?.ok === false && `it was not filed to the project folder (${filing.externalFolder.reason})`,
+      filing.powerAutomate?.sent === false && `no mail or OneDrive copy went out (${filing.powerAutomate.reason})`,
+    ].filter(Boolean);
+    return (
+      <div style={{ marginTop: 18, padding: 16, background: C.surface, borderRadius: 8, borderLeft: `3px solid ${C.warn}` }}>
+        <div style={{ fontSize: 13, color: C.text, fontWeight: 500, marginBottom: 6 }}>Approved — but not everything was filed</div>
+        <div style={{ fontSize: 12, color: C.textS, lineHeight: 1.6 }}>
+          The approval is saved. However, {problems.join("; ")}. Nothing is lost — the report and its photos are still here.
+        </div>
+      </div>
+    );
+  }
 
   if (!open) {
     return (
@@ -597,6 +767,13 @@ function ApprovalControls({ slug, onApproved }) {
           <FormLabel>Note (optional)</FormLabel>
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Brief note for the record" style={inputStyle} />
         </div>
+        <div>
+          <FormLabel required>Approval code</FormLabel>
+          <input value={code} onChange={(e) => setCode(e.target.value)} type="password" autoComplete="off" placeholder="••••" style={inputStyle} />
+        </div>
+      </div>
+      <div style={{ marginTop: 12, fontSize: 11, color: C.textS, lineHeight: 1.6 }}>
+        On approval the report is generated as a PDF, filed to the project folder, and copied to the same OneDrive folder as the filecard.
       </div>
       {error && <div style={{ marginTop: 10, fontSize: 12, color: C.nogo }}>{error}</div>}
       <div style={{ marginTop: 14, display: "flex", gap: 10 }}>
@@ -638,5 +815,5 @@ export default function OpeningReportsPage() {
   if (view.name === "editor") {
     return <ReportEditorView slug={view.slug} onBack={() => setView({ name: "list" })} />;
   }
-  return <ReportsListView reports={reports} loading={loading} onCreate={() => setView({ name: "create" })} onOpen={(r) => setView({ name: "editor", slug: r.reportUrlSlug })} />;
+  return <ReportsListView reports={reports} loading={loading} onChanged={loadList} onCreate={() => setView({ name: "create" })} onOpen={(r) => setView({ name: "editor", slug: r.reportUrlSlug })} />;
 }

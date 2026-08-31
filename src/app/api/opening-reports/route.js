@@ -4,6 +4,7 @@ import {
   createOpeningReport,
   listOpeningReports,
 } from '../../../lib/opening-reports/reports';
+import { notifyOpeningReport } from '../../../lib/opening-reports/notify';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,6 +30,10 @@ export async function POST(request) {
     shopfloorResponsible,
     responsibleContact,
     responsibilityWhen,
+    asanaProjectId,
+    projectName,
+    projectRegion,
+    projectDueDate,
   } = body || {};
   if (!partnerName) return NextResponse.json({ error: 'partnerName is required' }, { status: 400 });
   if (!location) return NextResponse.json({ error: 'location is required' }, { status: 400 });
@@ -43,8 +48,17 @@ export async function POST(request) {
       shopfloorResponsible,
       responsibleContact,
       responsibilityWhen,
+      asanaProjectId,
+      projectName,
+      projectRegion,
+      projectDueDate,
     });
-    return NextResponse.json({ report });
+
+    // Best-effort: the report exists, so a failing webhook must not fail the
+    // creation. The outcome is reported back instead.
+    const mail = await notifyOpeningReport(report, { event: 'created' });
+
+    return NextResponse.json({ report, mail });
   } catch (e) {
     return NextResponse.json({ error: e.message || 'Failed to create report' }, { status: 500 });
   }

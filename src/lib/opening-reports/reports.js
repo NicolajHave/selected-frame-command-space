@@ -35,6 +35,12 @@ function rowToReport(r) {
     approvalNote: r.approval_note,
     reportUrlSlug: r.report_url_slug,
     blobPrefix: r.blob_prefix,
+    asanaProjectId: r.asana_project_id || null,
+    projectName: r.project_name || null,
+    projectRegion: r.project_region || null,
+    projectDueDate: r.project_due_date || null,
+    reportPdfUrl: r.report_pdf_url || null,
+    reportPdfPath: r.report_pdf_path || null,
   };
 }
 
@@ -88,6 +94,10 @@ export async function createOpeningReport({
   shopfloorResponsible,
   responsibleContact,
   responsibilityWhen,
+  asanaProjectId,
+  projectName,
+  projectRegion,
+  projectDueDate,
 }) {
   if (!partnerName) throw new Error('partnerName is required');
   if (!location) throw new Error('location is required');
@@ -112,6 +122,10 @@ export async function createOpeningReport({
       status: 'submitted',
       report_url_slug: slug,
       blob_prefix: blobPrefix,
+      asana_project_id: asanaProjectId || null,
+      project_name: projectName || null,
+      project_region: projectRegion || null,
+      project_due_date: projectDueDate || null,
     }),
     'createOpeningReport',
   );
@@ -231,6 +245,25 @@ export async function approveOpeningReport(slug, { approvedByName, approvalNote 
     'approveOpeningReport',
   );
   return getOpeningReportWithChildren(slug);
+}
+
+/** Records the generated report PDF once it is in Blob. */
+export async function setOpeningReportPdf(reportId, { url, path }) {
+  const sb = getSupabase();
+  unwrap(
+    await sb.from(REPORTS).update({ report_pdf_url: url, report_pdf_path: path }).eq('id', reportId),
+    'setOpeningReportPdf',
+  );
+}
+
+/**
+ * Deletes the report row. Checkpoints and photos go with it through the FK
+ * cascade — the caller must remove the Blob objects FIRST, because the photo
+ * rows hold the only pointers to them.
+ */
+export async function deleteOpeningReport(reportId) {
+  const sb = getSupabase();
+  unwrap(await sb.from(REPORTS).delete().eq('id', reportId), 'deleteOpeningReport');
 }
 
 export async function recordOpeningReportPhoto({
