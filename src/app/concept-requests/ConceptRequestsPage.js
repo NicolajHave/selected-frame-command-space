@@ -53,6 +53,13 @@ const ELEMENTS = SF_FIXTURES.categories.flatMap((cat) =>
   cat.items.map((it) => ({ code: it.code, name: it.name, category: cat.name })),
 );
 
+/**
+ * Rows written before attachments could be PDFs carry no contentType, so fall
+ * back to the extension rather than rendering a document as a broken image.
+ */
+const isImage = (p) =>
+  p.contentType ? p.contentType.startsWith("image/") : !/\.pdf$/i.test(p.name || p.url || "");
+
 const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
 
@@ -140,12 +147,16 @@ function RequestForm({ onSubmitted }) {
       const photos = [];
       for (const file of files) {
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "_");
+        // Blob rejects a content type it was not told to allow, so never guess
+        // "image/jpeg" for a file the browser did not type — a PDF dragged in
+        // from Explorer sometimes arrives with an empty type.
+        const contentType = file.type || (/\.pdf$/i.test(file.name) ? "application/pdf" : "image/jpeg");
         const result = await upload(`concept-requests/${Date.now()}-${safeName}`, file, {
           access: "public",
           handleUploadUrl: "/api/concept-requests/upload-url",
-          contentType: file.type || "image/jpeg",
+          contentType,
         });
-        photos.push({ url: result.url, pathname: result.pathname, name: file.name, size: file.size });
+        photos.push({ url: result.url, pathname: result.pathname, name: file.name, size: file.size, contentType });
       }
 
       const element = ELEMENTS.find((e) => e.code === form.elementCode);
@@ -260,8 +271,8 @@ function RequestForm({ onSubmitted }) {
           </Field>
         )}
 
-        <Field label="Photos" hint="A picture of the problem is worth three paragraphs. JPG, PNG, WebP or HEIC, up to 25 MB each.">
-          <input type="file" accept="image/*" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} style={{ fontSize: 13, color: C.text }} />
+        <Field label="Photos or documents" hint="A picture of the problem is worth three paragraphs. JPG, PNG, WebP, HEIC or PDF, up to 25 MB each.">
+          <input type="file" accept="image/*,application/pdf,.pdf" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} style={{ fontSize: 13, color: C.text }} />
           {files.length > 0 && (
             <div style={{ fontSize: 12, color: C.textS, marginTop: 8 }}>
               {files.length} file{files.length === 1 ? "" : "s"} selected: {files.map((f) => f.name).join(", ")}
@@ -339,13 +350,19 @@ function RequestCard({ req, onChanged }) {
 
           {req.photos?.length > 0 && (
             <div style={{ marginBottom: 16 }}>
-              <Label>Photos</Label>
+              <Label>Attachments</Label>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                {req.photos.map((p) => (
+                {req.photos.map((p) => (isImage(p) ? (
                   <a key={p.url} href={p.url} target="_blank" rel="noreferrer">
                     <img src={p.url} alt={p.name || ""} style={{ width: 120, height: 120, objectFit: "cover", borderRadius: 6, border: `1px solid ${C.surfaceD}` }} />
                   </a>
-                ))}
+                ) : (
+                  <a key={p.url} href={p.url} target="_blank" rel="noreferrer"
+                    style={{ width: 120, height: 120, borderRadius: 6, border: `1px solid ${C.surfaceD}`, background: C.surface, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, textDecoration: "none", padding: 8, boxSizing: "border-box" }}>
+                    <span style={{ fontSize: 26, color: C.steel }}>▤</span>
+                    <span style={{ fontSize: 10, color: C.text, textAlign: "center", wordBreak: "break-word", lineHeight: 1.3 }}>{p.name || "Document"}</span>
+                  </a>
+                )))}
               </div>
             </div>
           )}
