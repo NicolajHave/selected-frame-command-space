@@ -27,11 +27,17 @@ export async function POST(request) {
           throw new Error(`Invalid upload path. Must start with ${PREFIX}`);
         }
         return {
-          // PDFs as well as photos: a request often comes with a drawing or a
-          // spec sheet, and Blob rejects anything not listed here outright.
+          // Documents as well as photos: a request often comes with a drawing,
+          // a spec sheet or a costing, and Blob rejects anything not listed
+          // here outright. Legacy .doc/.xls are included because plenty are
+          // still in circulation.
           allowedContentTypes: [
             'image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif',
             'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           ],
           maximumSizeInBytes: 25 * 1024 * 1024,
           addRandomSuffix: true,
