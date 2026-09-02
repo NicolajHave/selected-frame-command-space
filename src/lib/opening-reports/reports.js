@@ -85,6 +85,20 @@ function unwrap({ data, error }, ctx) {
   return data;
 }
 
+/**
+ * A column this deployment has not been given yet — the schema file is applied
+ * by hand, so a release can reach the app before the SQL reaches Supabase.
+ *
+ * Narrower than the showroom-ops helper of the same name: a missing *table*
+ * (42P01, "does not exist") is deliberately not matched here, so a wholly
+ * un-applied schema still fails loudly with the "run the schema" message
+ * rather than quietly writing half a report.
+ */
+function isMissingSchema(e) {
+  const m = String(e?.message || '');
+  return /Could not find the .* column|schema cache|PGRST204/i.test(m);
+}
+
 export async function createOpeningReport({
   partnerName,
   location,
@@ -108,27 +122,37 @@ export async function createOpeningReport({
   const blobPrefix = `opening-reports/${id}/`;
   const sb = getSupabase();
 
-  unwrap(
-    await sb.from(REPORTS).insert({
-      id,
-      partner_name: partnerName,
-      location,
-      sqm: sqm != null ? Number(sqm) : null,
-      opening_date: openingDate || null,
-      completed_by_name: completedByName,
-      shopfloor_responsible: shopfloorResponsible || null,
-      responsible_contact: responsibleContact || null,
-      responsibility_when: responsibilityWhen || null,
-      status: 'submitted',
-      report_url_slug: slug,
-      blob_prefix: blobPrefix,
-      asana_project_id: asanaProjectId || null,
-      project_name: projectName || null,
-      project_region: projectRegion || null,
-      project_due_date: projectDueDate || null,
-    }),
-    'createOpeningReport',
-  );
+  const core = {
+    id,
+    partner_name: partnerName,
+    location,
+    sqm: sqm != null ? Number(sqm) : null,
+    opening_date: openingDate || null,
+    completed_by_name: completedByName,
+    shopfloor_responsible: shopfloorResponsible || null,
+    responsible_contact: responsibleContact || null,
+    responsibility_when: responsibilityWhen || null,
+    status: 'submitted',
+    report_url_slug: slug,
+    blob_prefix: blobPrefix,
+  };
+  const projectColumns = {
+    asana_project_id: asanaProjectId || null,
+    project_name: projectName || null,
+    project_region: projectRegion || null,
+    project_due_date: projectDueDate || null,
+  };
+
+  // The project columns arrived in a later revision of the schema file, which
+  // is applied by hand. If this deployment has not had it run yet, still take
+  // the report: a rep standing in a shop on opening day must never be blocked
+  // by a pending migration. The link is what is lost, not the report.
+  try {
+    unwrap(await sb.from(REPORTS).insert({ ...core, ...projectColumns }), 'createOpeningReport');
+  } catch (e) {
+    if (!isMissingSchema(e)) throw e;
+    unwrap(await sb.from(REPORTS).insert(core), 'createOpeningReport/withoutProject');
+  }
 
   // Seed the 16 checkpoints. Result is left NULL until the rep fills them in.
   const checkpointRows = CHECKPOINTS.map((c) => ({
@@ -250,10 +274,19 @@ export async function approveOpeningReport(slug, { approvedByName, approvalNote 
 /** Records the generated report PDF once it is in Blob. */
 export async function setOpeningReportPdf(reportId, { url, path }) {
   const sb = getSupabase();
-  unwrap(
-    await sb.from(REPORTS).update({ report_pdf_url: url, report_pdf_path: path }).eq('id', reportId),
-    'setOpeningReportPdf',
-  );
+  try {
+    unwrap(
+      await sb.from(REPORTS).update({ report_pdf_url: url, report_pdf_path: path }).eq('id', reportId),
+      'setOpeningReportPdf',
+    );
+  } catch (e) {
+    // Same story as the project columns: the PDF is already generated and in
+    // Blob, and it is handed to the folder and the Flow from the approval
+    // route directly. Only the pointer on the row is lost.
+    if (!isMissingSchema(e)) throw e;
+    return { stored: false, reason: 'report_pdf_url column not in this deployment yet' };
+  }
+  return { stored: true };
 }
 
 /**

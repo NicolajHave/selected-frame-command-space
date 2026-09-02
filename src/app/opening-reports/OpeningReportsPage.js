@@ -246,7 +246,8 @@ function CreateReportView({ onCreated, onCancel }) {
         const j = await r.json().catch(() => ({}));
         throw new Error(j.error || `Create failed (${r.status})`);
       }
-      const { report } = await r.json();
+      const { report, warning } = await r.json();
+      if (warning) window.alert(warning);
       onCreated(report);
     } catch (e) {
       setError(e.message || "Could not create report");

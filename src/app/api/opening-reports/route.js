@@ -58,7 +58,21 @@ export async function POST(request) {
     // creation. The outcome is reported back instead.
     const mail = await notifyOpeningReport(report, { event: 'created' });
 
-    return NextResponse.json({ report, mail });
+    // The report is taken even when this deployment has not had the project
+    // columns applied yet — but say so, or the rep believes the report is
+    // linked and the filing on approval will quietly have nowhere to go.
+    const projectLinkLost = Boolean(asanaProjectId) && !report.asanaProjectId;
+
+    return NextResponse.json({
+      report,
+      mail,
+      ...(projectLinkLost
+        ? {
+            warning:
+              'The report was created, but it could not be linked to the project: run supabase/opening-report-schema.sql in the SQL Editor, then NOTIFY pgrst, \'reload schema\';',
+          }
+        : {}),
+    });
   } catch (e) {
     return NextResponse.json({ error: e.message || 'Failed to create report' }, { status: 500 });
   }
