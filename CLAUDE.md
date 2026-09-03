@@ -101,8 +101,9 @@ OneDrive folder names, so spelling and casing are load-bearing.
 
 ## PDFs (pdf-lib)
 
-Two server-side generators share one trap: `src/lib/project-intake/filecard-pdf.js`
-and `src/lib/quotation-pdf.js`. The `StandardFonts` encode **WinAnsi / CP1252
+Three server-side generators share one trap: `src/lib/project-intake/filecard-pdf.js`,
+`src/lib/quotation-pdf.js` and `src/lib/opening-reports/report-pdf.js`. The
+`StandardFonts` encode **WinAnsi / CP1252
 only**, and drawing anything outside that set *throws* — a typographic minus
 (U+2212) pasted into a project name was enough to kill a whole render. Free-text
 fields pick such characters up from Word and Excel routinely, and because the
@@ -110,6 +111,11 @@ integrations are best-effort the failure is silent: the rep just never gets a
 filecard. Route every `drawText` and `widthOfTextAtSize` through
 `safeText()` in `src/lib/pdf-text.js`; never call them directly on
 user-supplied text.
+
+pdf-lib embeds **JPEG and PNG only**. A photo off an iPhone is HEIC and a Mac
+screenshot is WebP, so a generator that embeds user photos must list what it
+could not embed rather than dropping it silently — the file itself is still
+filed alongside.
 
 The quotation PDF is rendered server-side (not from the print view) because a
 print window produces no file to upload. `POST /api/external-folders/[folderId]/quotation`
@@ -247,6 +253,48 @@ the request and fires one webhook carrying the links. The alternative — create
 upload, patch, notify — leaves a request whose mail lists no photos if it fails
 halfway. Deleting a request drops its blobs before the row, as everywhere else.
 
+## OneDrive paths are shared, not duplicated
+
+`src/lib/onedrive-path.js` builds `<year>/<REGION>/<project>` and is used by
+both Project Intake and Opening Reports. They must produce the *same* folder
+for the same project — the point of filing an opening report is that it lands
+beside the filecard, and a stray difference in how a slash or a trailing dot is
+handled would silently create a second folder nobody goes looking in.
+
+The year is the one thing they cannot always agree on: intake uses the desired
+opening date, a report the project's due date. Those differ only when a project
+slips across a new year, so the Flow must create the folder if it is missing.
+
+## Opening Reports
+
+A report is started by **choosing its project** — open or completed. The Asana
+gid is the join key: it keys the External Folder too, which is what lets an
+approved report file itself where the filecard already is. Name and region are
+denormalised onto the row, because a report records what was true on opening
+day and must stay readable if the task is later renamed.
+
+Deleting a report and approving one both sit behind a shared code
+(`OPENING_REPORT_ADMIN_CODE`, default `1234`), checked **server-side** so the
+button cannot be clicked past in devtools.
+
+Approval is where the record is made: a PDF is generated, filed to the
+project's External Folder and handed to Power Automate for OneDrive. The
+approval commits first and everything after it is best-effort — the UI names
+what did not land rather than implying it all worked.
+
+**The folder's categories are a fixed list** (`CATEGORIES` in
+`external-project-folders/ui.js`). Filing under an invented one renders as an
+unknown group, so the report goes to `07-handover` and its photos to
+`06-photos`.
+
+Writes that touch a recently added column **degrade instead of failing**: the
+schema file is applied by hand, so a release reaches the app before the SQL
+reaches Supabase, and a rep standing in a shop on opening day must not be
+blocked by a pending migration. The report is taken without the project link
+and the response says which SQL to run. The check is deliberately narrower than
+the showroom-ops helper of the same name — a missing *table* still fails loudly
+rather than writing half a report.
+
 ## Environment variables
 
 | Var | Used for |
@@ -259,6 +307,9 @@ halfway. Deleting a request drops its blobs before the row, as everywhere else.
 | `PROJECT_INTAKE_EMAIL_TO` | Recipient the flow mails |
 | `POWER_AUTOMATE_CONCEPT_REQUEST_WEBHOOK` | Concept Requests → Outlook flow |
 | `CONCEPT_REQUEST_EMAIL_TO` | Optional; defaults to Nicolaj + Ulrik, semicolon-separated |
+| `POWER_AUTOMATE_OPENING_REPORT_WEBHOOK` | Opening Reports → Outlook + OneDrive flow |
+| `OPENING_REPORT_EMAIL_TO` | Optional; defaults to Nicolaj, semicolon-separated |
+| `OPENING_REPORT_ADMIN_CODE` | Optional; the delete / approve code, defaults to `1234` |
 | `RETENTION_DAYS`, `RETENTION_REMINDER_EMAIL`, `CRON_SECRET` | Folder retention job |
 | `EMBED_ALLOWED_ORIGINS` | Restricts who may iframe `/embed/*` (unset = any) |
 
@@ -301,6 +352,11 @@ not a call to those helpers.
 Each flow gets its **own** trigger URL. The intake flow also creates OneDrive
 folders, so reusing it for a mail-only feature sends the wrong payload shape.
 `docs/power-automate-concept-request-flow.md` is the mail-only build guide.
+
+`docs/power-automate-opening-report-flow.md` is the third, and the pattern to
+copy when one feature needs mail at more than one moment: it sends an `event`
+field (`created` / `approved`) and the Flow branches on it, rather than making
+the user build and maintain two flows.
 
 A new HTTP trigger defaults to **Who can trigger the flow? → Any user in my
 tenant**, which authenticates with an Entra ID bearer token and mints a URL
