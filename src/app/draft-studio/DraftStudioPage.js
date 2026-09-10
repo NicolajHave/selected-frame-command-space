@@ -340,7 +340,9 @@ export default function DraftStudioPage() {
     replaceLogos: true,
     updateContact: true,
     appendZoning: false,
-    addInfoPage: false,
+    // On by default: every draft should carry the concept page unless someone
+    // deliberately takes it off.
+    addInfoPage: true,
   });
   // For the concept information page: free text and an optional picture.
   const [infoNotes, setInfoNotes] = useState("");

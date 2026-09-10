@@ -41,6 +41,7 @@ Bigger features live in their own directory and are imported into it.
 | `src/app/showroom-ops/` | Seasons, print lines, filename generator, shipping list |
 | `src/app/external-project-folders/` | Per-project file workspace (password-gated) |
 | `src/app/toolbox/` | Partner email templates (6 languages) |
+| `src/app/draft-studio/` | Conditions supplier draft PDFs to the Selected Frame standard — logos, contact line, zoning, concept info page. Pipeline in `src/lib/pdf-studio.js` |
 | `src/app/concept-requests/` | Concept input register — form + triage, mails via Power Automate |
 | `src/app/embed/project-intake/` | Chrome-free intake form for iframe embedding |
 | `src/data/toolboxTemplates.js` | Email template copy |
@@ -222,6 +223,23 @@ it again. `DELETE /api/external-folders/[folderId]` also refuses unless
 draft must not hand its number to a different document, since drafts get shared
 with partners. Only filenames matching the pattern we write are counted.
 
+## Draft Studio
+
+Supplier drafts arrive in whatever page size the supplier uses, so anything
+drawn onto them is laid out **relative to the cover's dimensions**, never in
+fixed points.
+
+A page inserted into the document goes in **before** the per-page loop in
+`processPdf`, so it gets the Frame logo like every other page — and must keep
+its content clear of the bottom-right corner that logo covers (about 150 pt).
+
+The concept information page (`src/lib/pdf-studio-info-page.js`, on by
+default) is the *pre-text* twin of the Final Installation Alignment in Toolbox:
+the same points, phrased as what the site will need rather than as
+confirmations, because a draft goes out before anything is agreed. When the
+concept changes — the NCS wall colour, the electrical arrangement — change
+both.
+
 ## Blob uploads
 
 Every upload path (External Folders, Opening Reports, Concept Requests) signs a
@@ -338,6 +356,13 @@ must never fail the user's submission. Report the outcome instead.
   safe trigger. Do not reach for the Vercel deploy tool available here: it
   uploads a file tree as a *new* project rather than rebuilding this one, which
   would produce a duplicate without the env vars or the git connection.
+- To **look at** a generated PDF page: there is no renderer in the container
+  and cdnjs is blocked by the egress proxy. Run
+  `npm install --no-save playwright-core pdfjs-dist@3.11.174` — **in one
+  command**, a second `--no-save` install prunes the first — then inject
+  `node_modules/pdfjs-dist/build/pdf.min.js` with `page.addScriptTag({ path })`,
+  hand the worker in as a Blob URL, render to a canvas in
+  `/opt/pw-browsers/chromium` and screenshot it.
 - Copy is British English. The brand is written **Selected** — never SELECTED.
 - Write in Danish when the user does.
 
