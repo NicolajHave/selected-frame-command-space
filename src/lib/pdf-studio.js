@@ -14,6 +14,7 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { insertInfoPage } from './pdf-studio-info-page';
 
 const WHITE = rgb(1, 1, 1);
 const BLACK = rgb(0, 0, 0);
@@ -170,6 +171,9 @@ function applyContactText(page, font, text) {
  * @param {boolean} options.updateContact  Replace the cover contact line.
  * @param {boolean} options.appendZoning   Append the zoning template.
  * @param {string}  [options.contactText]  Override the contact line.
+ * @param {boolean} [options.addInfoPage]  Insert the concept information page after the cover.
+ * @param {string}  [options.infoNotes]    Free text for that page.
+ * @param {Uint8Array} [options.infoImageBytes]  JPEG or PNG for that page.
  * @returns {Promise<{ bytes: Uint8Array, report: object }>}
  */
 export async function processPdf(inputBytes, options) {
@@ -178,6 +182,9 @@ export async function processPdf(inputBytes, options) {
     updateContact = true,
     appendZoning = false,
     contactText = CONTACT.text,
+    addInfoPage = false,
+    infoNotes = '',
+    infoImageBytes = null,
   } = options || {};
 
   const report = {
@@ -188,8 +195,35 @@ export async function processPdf(inputBytes, options) {
   };
 
   const pdfDoc = await PDFDocument.load(inputBytes);
+  report.pageCount = pdfDoc.getPageCount();
+
+  // Inserted BEFORE the per-page loop below, so it gets the Frame logo like
+  // every other page — and told to keep its right column clear of the corner
+  // that logo will occupy.
+  if (addInfoPage) {
+    const fonts = {
+      regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
+      bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
+    };
+    let image = null;
+    if (infoImageBytes) {
+      try {
+        image = await embedPngOrJpg(pdfDoc, infoImageBytes);
+      } catch (e) {
+        report.warnings.push(`Info page image could not be embedded (${e.message}) — JPEG or PNG only`);
+      }
+    }
+    const { warnings } = insertInfoPage(pdfDoc, {
+      fonts,
+      notes: infoNotes,
+      image,
+      bottomReserve: replaceLogos ? 150 : 0,
+    });
+    report.operations.push('add-info-page');
+    report.warnings.push(...warnings);
+  }
+
   const pages = pdfDoc.getPages();
-  report.pageCount = pages.length;
 
   let frameLogoImg = null;
   let coverLogoImg = null;

@@ -51,6 +51,11 @@ const OPTIONS = [
     label: "Append zoning template",
     desc: "Adds the standard zoning pages to the back of the document",
   },
+  {
+    key: "addInfoPage",
+    label: "Add concept information page",
+    desc: "Inserts a page after the cover: what the concept asks of the site, plus an optional picture and your own notes",
+  },
 ];
 
 const formatBytes = (n) => {
@@ -335,7 +340,11 @@ export default function DraftStudioPage() {
     replaceLogos: true,
     updateContact: true,
     appendZoning: false,
+    addInfoPage: false,
   });
+  // For the concept information page: free text and an optional picture.
+  const [infoNotes, setInfoNotes] = useState("");
+  const [infoImage, setInfoImage] = useState(null);
   const [busy, setBusy] = useState(false);
   const [busyStage, setBusyStage] = useState(null); // "uploading" | "processing"
   const [error, setError] = useState(null);
@@ -370,7 +379,7 @@ export default function DraftStudioPage() {
       setError("Choose a PDF first");
       return;
     }
-    const anyOp = opts.replaceLogos || opts.updateContact || opts.appendZoning;
+    const anyOp = opts.replaceLogos || opts.updateContact || opts.appendZoning || opts.addInfoPage;
     if (!anyOp) {
       setError("Select at least one operation");
       return;
@@ -386,6 +395,20 @@ export default function DraftStudioPage() {
         contentType: "application/pdf",
       });
 
+      // The picture for the info page goes the same way. Its type is taken
+      // from the extension when the browser gives none — never guessed as
+      // something Blob would refuse.
+      let infoImageUrl = null;
+      if (opts.addInfoPage && infoImage) {
+        const isPng = infoImage.type === "image/png" || /\.png$/i.test(infoImage.name);
+        const img = await upload(`pdf-studio/${Date.now()}-info-${infoImage.name}`, infoImage, {
+          access: "public",
+          handleUploadUrl: "/api/pdf-studio/upload",
+          contentType: isPng ? "image/png" : "image/jpeg",
+        });
+        infoImageUrl = img.url;
+      }
+
       // 2. Ask the server to process the blob and stream the result back.
       setBusyStage("processing");
       const res = await fetch("/api/pdf-studio", {
@@ -397,6 +420,9 @@ export default function DraftStudioPage() {
           replaceLogos: opts.replaceLogos,
           updateContact: opts.updateContact,
           appendZoning: opts.appendZoning,
+          addInfoPage: opts.addInfoPage,
+          infoNotes: opts.addInfoPage ? infoNotes : "",
+          infoImageUrl,
           folderId: folderId || null,
         }),
       });
@@ -435,7 +461,7 @@ export default function DraftStudioPage() {
   };
 
   const canSubmit =
-    !!file && !busy && (opts.replaceLogos || opts.updateContact || opts.appendZoning);
+    !!file && !busy && (opts.replaceLogos || opts.updateContact || opts.appendZoning || opts.addInfoPage);
 
   return (
     <div style={{ maxWidth: 760 }}>
@@ -486,6 +512,44 @@ export default function DraftStudioPage() {
                 />
               ))}
             </div>
+
+            {opts.addInfoPage && (
+              <div style={{ marginTop: 14, padding: "14px 16px", background: C.surface, borderRadius: 8, borderLeft: `3px solid ${C.oak}` }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.textS, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 8 }}>
+                  Concept information page
+                </div>
+                <div style={{ fontSize: 12, color: C.textS, lineHeight: 1.55, marginBottom: 12 }}>
+                  Goes in as page 2. The standard text — how an installation runs and what the site needs to be ready for — is fixed. Add a picture and your own notes below; both are optional.
+                </div>
+
+                <div style={{ fontSize: 11, fontWeight: 600, color: C.textS, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 6 }}>
+                  Picture · JPG or PNG
+                </div>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+                  disabled={busy}
+                  onChange={(e) => setInfoImage(e.target.files?.[0] || null)}
+                  style={{ fontSize: 13, color: C.text, marginBottom: 4 }}
+                />
+                <div style={{ fontSize: 11, color: C.textS, marginBottom: 14, lineHeight: 1.5 }}>
+                  {infoImage
+                    ? `${infoImage.name} · ${formatBytes(infoImage.size)}`
+                    : "Placed in a fixed-height box on the right, so it never runs over the text."}
+                </div>
+
+                <div style={{ fontSize: 11, fontWeight: 600, color: C.textS, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 6 }}>
+                  Notes for this draft · optional
+                </div>
+                <textarea
+                  value={infoNotes}
+                  disabled={busy}
+                  onChange={(e) => setInfoNotes(e.target.value.slice(0, 4000))}
+                  placeholder="Anything specific to this partner or site that the drawings do not say on their own."
+                  style={{ width: "100%", minHeight: 96, padding: "9px 12px", borderRadius: 6, border: `1px solid ${infoNotes ? C.oak : C.surfaceD}`, fontSize: 13, background: C.white, color: C.text, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }}
+                />
+              </div>
+            )}
           </div>
 
           {error && (

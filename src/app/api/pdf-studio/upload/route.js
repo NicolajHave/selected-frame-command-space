@@ -16,12 +16,15 @@ export async function POST(request) {
       request,
       body,
       onBeforeGenerateToken: async (pathname) => {
-        // Only allow PDF uploads under a known prefix.
+        // Only allow uploads under a known prefix. The PDF being processed
+        // and the optional picture for the concept information page both
+        // come through here — Blob refuses any type not listed, so the image
+        // types have to be on this list, not just on the file input.
         if (!pathname.startsWith('pdf-studio/')) {
           throw new Error('Invalid upload path');
         }
         return {
-          allowedContentTypes: ['application/pdf'],
+          allowedContentTypes: ['application/pdf', 'image/jpeg', 'image/png'],
           maximumSizeInBytes: 50 * 1024 * 1024, // 50 MB hard cap
           addRandomSuffix: true,
         };

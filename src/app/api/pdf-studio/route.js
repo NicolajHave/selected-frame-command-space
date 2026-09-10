@@ -46,11 +46,14 @@ export async function POST(request) {
     replaceLogos = false,
     updateContact = false,
     appendZoning = false,
+    addInfoPage = false,
+    infoNotes = '',
+    infoImageUrl = null,
     folderId = null,
   } = payload || {};
 
   if (!blobUrl || typeof blobUrl !== 'string') return bad('Missing blobUrl');
-  if (!replaceLogos && !updateContact && !appendZoning) {
+  if (!replaceLogos && !updateContact && !appendZoning && !addInfoPage) {
     return bad('Select at least one operation');
   }
 
@@ -78,22 +81,46 @@ export async function POST(request) {
     return bad(`Fetch failed: ${e.message || e}`, 502);
   }
 
+  // The optional picture for the info page comes the same way as the PDF:
+  // uploaded to Blob by the browser, fetched here. Losing it must not lose
+  // the draft — it degrades to a page without a picture, and says so.
+  let infoImageBytes = null;
+  if (addInfoPage && infoImageUrl && typeof infoImageUrl === 'string') {
+    try {
+      const res = await fetch(infoImageUrl);
+      if (!res.ok) throw new Error(`fetch ${res.status}`);
+      const ab = await res.arrayBuffer();
+      if (ab.byteLength > 15 * 1024 * 1024) throw new Error('image over 15 MB');
+      infoImageBytes = new Uint8Array(ab);
+    } catch (e) {
+      infoImageBytes = null;
+      payload._imageWarning = `Info page image was skipped (${e.message})`;
+    }
+  }
+
   let bytes, report;
   try {
     ({ bytes, report } = await processPdf(inputBytes, {
       replaceLogos,
       updateContact,
       appendZoning,
+      addInfoPage,
+      infoNotes: typeof infoNotes === 'string' ? infoNotes.slice(0, 4000) : '',
+      infoImageBytes,
     }));
+    if (payload._imageWarning) report.warnings.push(payload._imageWarning);
   } catch (e) {
     return bad(`PDF processing failed: ${e.message || e}`, 500);
   }
 
-  // Clean up the upload — it has served its purpose.
-  try {
-    await del(blobUrl);
-  } catch {
-    // Non-fatal: blob will expire on its own retention policy.
+  // Clean up the uploads — they have served their purpose.
+  for (const url of [blobUrl, infoImageUrl]) {
+    if (!url) continue;
+    try {
+      await del(url);
+    } catch {
+      // Non-fatal: blob will expire on its own retention policy.
+    }
   }
 
   const sourceName = (filename || 'document.pdf').replace(/\.pdf$/i, '');
