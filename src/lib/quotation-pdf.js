@@ -6,10 +6,15 @@
 //
 // Returns a Uint8Array of PDF bytes.
 
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb, PDFName, PDFHexString } from 'pdf-lib';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { safeText } from './pdf-text';
+
+// Info-dictionary key under which the quotation carries its own data. pdf.js
+// in the browser surfaces it as `info.Custom.SelectedFrameQuotation`, which is
+// how the Quotation Builder re-opens a document exactly as it was.
+export const EMBEDDED_KEY = 'SelectedFrameQuotation';
 
 const A4 = { w: 595.28, h: 841.89 };
 const M = 48;
@@ -59,6 +64,16 @@ export async function buildQuotationPdf(data) {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+
+  // The quotation carries its own data, so it can be opened again in the
+  // Quotation Builder exactly as it was — to add an item, adjust a price or
+  // re-issue it — rather than being guessed back from the printed text.
+  doc.setTitle(`Quotation – ${header.project || 'Selected Frame'}`);
+  doc.setProducer('Selected Frame Command Space');
+  doc.getInfoDict().set(
+    PDFName.of(EMBEDDED_KEY),
+    PDFHexString.fromText(JSON.stringify({ version: 1, ...(data || {}) })),
+  );
 
   let logo = null;
   try {
