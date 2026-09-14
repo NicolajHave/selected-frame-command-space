@@ -404,6 +404,61 @@ const QuotationPage=()=>{
     }catch(e){setErr(e.message)}finally{setParsing(false)}
   };
 
+  // ── Re-open a quotation this builder generated earlier ──────────────────
+  // To add an item, adjust a price or re-issue it. A document from after the
+  // data was embedded restores exactly from its metadata; an older one is read
+  // back from its printed text, best-effort and with the sums checked.
+  const [reopening,setReopening]=useState(false);
+  const [reopened,setReopened]=useState(null); // {project, exact}
+  const reopenRef=useRef(null);
+
+  const restoreFromPayload=(p,{exact})=>{
+    const code=p.currency?.code&&CURRENCIES[p.currency.code]?p.currency.code:"EUR";
+    setCurrency(code);
+    setFxRate(String(p.currency?.eurRate||CURRENCIES[code].eurRate));
+    setHdr({project:p.header?.project||"",salesArea:p.header?.salesArea!=null?String(p.header.salesArea):"",gender:p.header?.gender||"",quotationDate:p.header?.quotationDateISO||todayISO()});
+    const byLabel=Object.fromEntries((p.rows||[]).map(r=>[r.label,r.value]));
+    const cat=(k)=>byLabel[k]!=null?String(byLabel[k]):"";
+    setCats({inventory:cat("Inventory"),selectedDeliveries:cat("Selected Deliveries"),specificProjectCost:cat("Specific Project Cost")});
+    // Add-ons go back to their list entries by id, then by name. Anything the
+    // list no longer has becomes a custom item, so no amount is lost.
+    const ao={};const orphaned=[];
+    for(const a of p.addOns||[]){
+      const m=ADD_ONS.find(x=>x.id===a.id)||ADD_ONS.find(x=>x.name===a.name);
+      const qty=Math.max(1,parseInt(a.qty)||1);
+      if(m)ao[m.id]={qty};else orphaned.push({name:a.name,price:String(a.unitPrice??Math.round(((a.total||0)/qty)*100)/100),qty:String(qty)});
+    }
+    setAddOns(ao);
+    setCustoms([...orphaned,...(p.customs||[]).map(c=>{const qty=Math.max(1,parseInt(c.qty)||1);return{name:c.name,price:String(c.unitPrice??Math.round(((c.total||0)/qty)*100)/100),qty:String(qty)}})]);
+    if(p.split?.on&&p.split.parties?.length){setSplitOn(true);setSplit(p.split.parties.map(x=>({label:x.label||"",pct:String(x.pct??"")})));}else setSplitOn(false);
+    if(p.itemised?.categories?.length){
+      setParsed({project:p.header?.project||"",categories:p.itemised.categories.map(c=>({name:c.name,total:c.total,items:(c.items||[]).map(it=>({qty:it.qty,name:it.rawName||it.name,totalPrice:it.totalPrice}))}))});
+      setIncludeItems(true);
+    }else{setParsed(null);setIncludeItems(false);}
+    setWarnings(p.warnings||[]);setWarningsCollapsed(false);setErr(null);setFileResult(null);
+    setReopened({project:p.header?.project||"Quotation",exact});
+  };
+
+  const openExisting=async(file)=>{
+    if(!file||!file.name.toLowerCase().endsWith('.pdf'))return;
+    setReopening(true);setErr(null);
+    try{
+      const pdfjsLib=await loadPdfJs();
+      const buf=await file.arrayBuffer();
+      const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+      const {info}=await pdf.getMetadata().catch(()=>({info:{}}));
+      const embedded=info?.Custom?.SelectedFrameQuotation;
+      if(embedded){restoreFromPayload(JSON.parse(embedded),{exact:true});return;}
+      // Older document: read the printed text back, same line grouping as the supplier parser.
+      const lines=[];
+      for(let i=1;i<=pdf.numPages;i++){const pg=await pdf.getPage(i);const c=await pg.getTextContent();let lastY=null,line='';for(const it of c.items){if(lastY!==null&&Math.abs(it.transform[5]-lastY)>2){lines.push(line);line=''}line+=(line?' ':'')+it.str;lastY=it.transform[5]}if(line)lines.push(line)}
+      const r=await fetch("/api/quotation/reopen",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({lines})});
+      const data=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error(data.error||"Could not read this quotation");
+      restoreFromPayload(data,{exact:false});
+    }catch(e){setErr(e.message||"Could not open this quotation")}finally{setReopening(false)}
+  };
+
   const handleFileInput=(e)=>{const f=e.target.files?.[0];if(f)processPDF(f)};
   const handleDrop=(e)=>{e.preventDefault();e.stopPropagation();const f=e.dataTransfer?.files?.[0];if(f)processPDF(f)};
   const handleDragOver=(e)=>{e.preventDefault();e.stopPropagation()};
@@ -448,21 +503,27 @@ const QuotationPage=()=>{
       gender:hdr.gender||"",
       quotationDate:hdr.quotationDate?fmtDate(hdr.quotationDate):fmtDate(todayISO()),
       validUntil:fmtDate(validUntil),
+      // ISO copy so a re-opened quotation gets its date back into the picker.
+      quotationDateISO:hdr.quotationDate||todayISO(),
     },
-    currency:{code:currency,symbol:cur.symbol,locale:cur.locale},
+    currency:{code:currency,symbol:cur.symbol,locale:cur.locale,eurRate:cur.eurRate},
     rows:[
       {label:"Inventory",value:inv},
       {label:"Selected Deliveries",value:del},
       {label:"Specific Project Cost",value:proj},
     ],
-    addOns:Object.entries(addOns).map(([id,{qty}])=>{const a=ADD_ONS.find(x=>x.id===id);return a?{name:a.name,qty,total:a.price*qty*cur.eurRate}:null}).filter(Boolean),
-    customs:customs.filter(i=>i.name&&parseLooseEur(i.price)!==0).map(i=>({name:i.name,qty:parseInt(i.qty)||1,total:parseLooseEur(i.price)*(parseInt(i.qty)||1)})),
+    // ids and unit prices ride along so the builder can put each line back
+    // where it came from when the document is opened again.
+    addOns:Object.entries(addOns).map(([id,{qty}])=>{const a=ADD_ONS.find(x=>x.id===id);return a?{id,name:a.name,qty,unitPrice:a.price*cur.eurRate,total:a.price*qty*cur.eurRate}:null}).filter(Boolean),
+    customs:customs.filter(i=>i.name&&parseLooseEur(i.price)!==0).map(i=>({name:i.name,qty:parseInt(i.qty)||1,unitPrice:parseLooseEur(i.price),total:parseLooseEur(i.price)*(parseInt(i.qty)||1)})),
     supTotal,aoTotal,custTotal,grand,
     sqmPrice:sqm>0?Math.round(grand/sqm):0,
     split:splitOn?{on:true,parties:split.map((p,i)=>({label:p.label||`Party ${i+1}`,pct:splitPct(p),amount:splitAmounts[i]})),sum:splitSum,valid:splitValid}:null,
+    // rawName keeps the supplier's wording: the hanger rules match on it, and
+    // the display name would make a jeans rack stop counting.
     itemised:(includeItems&&parsed?.categories?.length)?{
       include:true,
-      categories:parsed.categories.map(c=>({name:c.name,total:c.total,items:(c.items||[]).map(it=>({qty:it.qty,name:displayItemName(it.name),totalPrice:it.totalPrice}))})),
+      categories:parsed.categories.map(c=>({name:c.name,total:c.total,items:(c.items||[]).map(it=>({qty:it.qty,name:displayItemName(it.name),rawName:it.name,totalPrice:it.totalPrice}))})),
     }:null,
   });
 
@@ -483,44 +544,25 @@ const QuotationPage=()=>{
     }finally{setFiling(false)}
   };
 
-  const exportPDF=()=>{
-    if(linkedFolderId)fileToFolder();
-    const esc=(s)=>String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-    const aoItems=Object.entries(addOns).map(([id,{qty}])=>{const a=ADD_ONS.find(x=>x.id===id);return a?{name:a.name,qty,total:a.price*qty*cur.eurRate}:null}).filter(Boolean);
-    const custItems=customs.filter(i=>i.name&&parseLooseEur(i.price)!==0).map(i=>({name:i.name,qty:parseInt(i.qty)||1,total:parseLooseEur(i.price)*(parseInt(i.qty)||1)}));
-    const qDate=hdr.quotationDate?fmtDate(hdr.quotationDate):fmtDate(todayISO());
-    const vDate=fmtDate(validUntil);
-    const w=window.open('','_blank');
-    w.document.write(`<!DOCTYPE html><html><head><title>Quotation – ${hdr.project||'Selected Frame'}</title><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'DM Sans',sans-serif;color:#2C2C2C;padding:40px 60px;max-width:900px;margin:0 auto;-webkit-print-color-adjust:exact;print-color-adjust:exact}.hd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:40px;padding-bottom:24px;border-bottom:2px solid #1A1A1A}.logo-wrap{display:flex;flex-direction:column;align-items:flex-start}.logo-img{height:36px;width:auto;max-width:240px;object-fit:contain;margin-bottom:8px;display:block}.logo-tag{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#8A8D8F}.meta{text-align:right;font-size:12px;color:#6B6B6B}.meta strong{color:#2C2C2C;display:block;font-size:14px;margin-bottom:4px}.meta .row{margin-top:6px}.meta .lbl{display:inline-block;min-width:80px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#8A8D8F}h2{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:400;margin:32px 0 16px;padding-bottom:8px;border-bottom:1px solid #ECEAE5}table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:24px}th{text-align:left;padding:8px 12px;background:#F5F4F1;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#6B6B6B;border-bottom:1px solid #ECEAE5;-webkit-print-color-adjust:exact;print-color-adjust:exact}td{padding:6px 12px;border-bottom:1px solid #F5F4F1}.r{text-align:right}.tot{background:#1A1A1A!important;color:#fff!important;padding:24px 28px;border-radius:8px;margin-top:32px;display:flex;justify-content:space-between;align-items:center;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.tot .l{font-size:14px;color:#B8BBBE!important}.tot .a{font-size:28px;font-family:'Cormorant Garamond',serif;font-weight:300;color:#fff!important}.sq{font-size:11px;color:#8A8D8F;text-align:right;margin-top:6px}.csplit{margin-top:18px;page-break-inside:avoid}.csplit .h{font-family:'Cormorant Garamond',serif;font-size:14px;font-weight:400;margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid #ECEAE5}.csplit table{font-size:10px;margin-bottom:0}.csplit th{padding:3px 8px}.csplit td{padding:2px 8px}.csplit .note{font-size:9px;color:#C75B4A;margin-top:4px}.itemsec{page-break-before:always;margin-top:24px}.itemsec .ann-h{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:400;margin-bottom:4px}.itemsec .ann-sub{font-size:11px;color:#6B6B6B;margin-bottom:14px}.itemsec .cat{margin-bottom:14px;page-break-inside:avoid}.itemsec .cath{display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:#2C2C2C;padding:6px 8px;background:#F5F4F1;border-radius:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact}.itemsec table{font-size:10px;margin:4px 0 0}.itemsec td{padding:2px 8px;border-bottom:1px solid #F5F4F1}.itemsec td.q{width:40px;color:#8A8D8F;font-family:'DM Mono',monospace}.itemsec td.r{text-align:right;width:110px}.validity{margin-top:20px;padding:14px 18px;background:#F5F4F1;border-radius:6px;border-left:3px solid #C4944A;font-size:12px;color:#2C2C2C;-webkit-print-color-adjust:exact;print-color-adjust:exact}.validity strong{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#6B6B6B;margin-bottom:4px}.ft{margin-top:48px;padding-top:20px;border-top:1px solid #ECEAE5;font-size:10px;color:#8A8D8F;display:flex;justify-content:space-between}@media print{body{padding:20px 40px}button{display:none!important}.tot{background:#1A1A1A!important;color:#fff!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}</style></head><body>
-<div class="hd">
-  <div class="logo-wrap"><img src="${LOGO_BLACK}" alt="Selected Frame" class="logo-img"/><span class="logo-tag">[ A frame for the business we share ]</span></div>
-  <div class="meta">
-    <strong>Quotation</strong>
-    ${hdr.project||''}
-    <div class="row"><span class="lbl">Date</span> ${qDate}</div>
-    <div class="row"><span class="lbl">Valid until</span> ${vDate}</div>
-    ${hdr.salesArea?`<div class="row"><span class="lbl">Sales area</span> ${hdr.salesArea} m²</div>`:''}
-    ${hdr.gender?`<div class="row"><span class="lbl">Gender</span> ${hdr.gender}</div>`:''}
-    <div class="row"><span class="lbl">Currency</span> ${currency}</div>
-  </div>
-</div>
-<button onclick="window.print()" style="background:#1A1A1A;color:#fff;border:none;padding:10px 24px;border-radius:6px;font-size:13px;cursor:pointer;margin-bottom:24px">Print / Save as PDF</button>
-<h2>Project Cost incl. construction, shopfitting and logistics</h2>
-<table><thead><tr><th>Category</th><th class="r">Amount</th></tr></thead><tbody>
-<tr><td>Inventory</td><td class="r">${fmtEur(inv)}</td></tr>
-<tr><td>Selected Deliveries</td><td class="r">${fmtEur(del)}</td></tr>
-<tr><td>Specific Project Cost</td><td class="r">${fmtEur(proj)}</td></tr>
-<tr style="font-weight:600;border-top:2px solid #ECEAE5"><td>Total</td><td class="r">${fmtEur(supTotal)}</td></tr>
-</tbody></table>
-${aoItems.length?`<h2>Add-ons</h2><table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Total</th></tr></thead><tbody>${aoItems.map(a=>`<tr><td>${a.name}</td><td class="r">${a.qty}</td><td class="r">${fmtEur(a.total)}</td></tr>`).join('')}<tr style="font-weight:600;border-top:2px solid #ECEAE5"><td colspan="2">Add-ons Total</td><td class="r">${fmtEur(aoTotal)}</td></tr></tbody></table>${currency!=='EUR'?`<div style="font-size:10px;color:#8A8D8F;margin-top:-12px">Add-on prices converted from EUR at 1 EUR = ${rate} ${currency}.</div>`:''}`:''}
-${custItems.length?`<h2>Additional Items</h2><table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Total</th></tr></thead><tbody>${custItems.map(a=>`<tr><td>${a.name}</td><td class="r">${a.qty}</td><td class="r">${fmtEurSigned(a.total)}</td></tr>`).join('')}<tr style="font-weight:600;border-top:2px solid #ECEAE5"><td colspan="2">Total</td><td class="r">${fmtEurSigned(custTotal)}</td></tr></tbody></table>`:''}
-<div class="tot"><div class="l">Total excl. VAT</div><div class="a">${fmtEur(grand)}</div></div>
-${sqm>0?`<div class="sq">${fmtEur(Math.round(grand/sqm))} / m²</div>`:''}
-${splitOn?`<div class="csplit"><div class="h">Cost Split</div><table><thead><tr><th>Party</th><th class="r">Share</th><th class="r">Amount</th></tr></thead><tbody>${split.map((p,i)=>`<tr><td>${p.label||`Party ${i+1}`}</td><td class="r">${splitPct(p).toLocaleString("en-US",{maximumFractionDigits:1})}%</td><td class="r">${fmtEur(splitAmounts[i])}</td></tr>`).join('')}<tr style="font-weight:600;border-top:2px solid #ECEAE5"><td>Total</td><td class="r">${splitSum.toLocaleString("en-US",{maximumFractionDigits:1})}%</td><td class="r">${fmtEur(grand)}</td></tr></tbody></table>${splitValid?'':`<div class="note">Note: shares total ${splitSum}%, not 100%.</div>`}</div>`:''}
-<div class="validity"><strong>Validity</strong>This quotation is valid until ${vDate} (14 days from quotation date).</div>
-${includeItems&&parsed&&parsed.categories&&parsed.categories.length?`<div class="itemsec"><div class="ann-h">Itemised Breakdown</div><div class="ann-sub">Line items from the uploaded supplier quotation, included for transparency.</div>${parsed.categories.map(cat=>`<div class="cat"><div class="cath"><span>${esc(cat.name)}</span><span>${fmtEur(cat.total)}</span></div><table><tbody>${(cat.items||[]).map(it=>`<tr><td class="q">${it.qty>0?`${esc(it.qty)}×`:''}</td><td>${esc(displayItemName(it.name))}</td><td class="r">${fmtEur(it.totalPrice)}</td></tr>`).join('')}</tbody></table></div>`).join('')}</div>`:''}
-<div class="ft"><span>Selected Frame · Brand Spaces</span><span>Confidential</span></div>
-</body></html>`);w.document.close()};
+  // Downloads the server-rendered PDF — the same renderer and document as the
+  // filed copy, so every quotation carries its own data and can be opened
+  // again later. The print window is gone: a browser-printed document has no
+  // data in it and cannot be re-opened.
+  const [exporting,setExporting]=useState(false);
+  const exportPDF=async()=>{
+    setExporting(true);setErr(null);
+    try{
+      if(linkedFolderId)await fileToFolder();
+      const r=await fetch("/api/quotation/pdf",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(buildQuotationPayload())});
+      if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(j.error||`Export failed (${r.status})`);}
+      const blob=await r.blob();
+      const cd=r.headers.get("Content-Disposition")||"";
+      const name=(cd.match(/filename="([^"]+)"/)||[])[1]||`Quotation - ${hdr.project||"Selected Frame"}.pdf`;
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),10000);
+    }catch(e){setErr(e.message||"Could not export the PDF")}finally{setExporting(false)}
+  };
 
   const sendEmail=()=>{
     if(!emailTo||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTo)){
@@ -565,6 +607,13 @@ Bestseller A/S`;
         <div onDrop={handleDrop} onDragOver={handleDragOver} onDragEnter={handleDragOver} onClick={()=>fileRef.current?.click()} style={{border:`2px dashed ${parsing?C.oak:C.surfaceD}`,borderRadius:8,padding:32,textAlign:"center",cursor:"pointer",background:parsing?C.oak+"06":"transparent",transition:"border-color .2s"}}>
           <input ref={fileRef} type="file" accept=".pdf" style={{display:"none"}} onChange={handleFileInput}/>
           {parsing?<div><div style={{fontSize:24,marginBottom:8}}>⏳</div><div style={{fontSize:13,color:C.oak,fontWeight:500}}>Parsing PDF…</div></div>:parsed?<div><div style={{fontSize:24,marginBottom:8}}>✅</div><div style={{fontSize:13,color:C.success,fontWeight:500}}>{parsed.project}</div><div style={{fontSize:11,color:C.textS,marginTop:4}}>Click or drag to replace</div></div>:<div><div style={{fontSize:24,marginBottom:8}}>📄</div><div style={{fontSize:13,color:C.textS}}>Drop PDF here or click to upload</div></div>}
+        </div>
+        <div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${C.surfaceD}`}}>
+          <div style={{fontSize:12,fontWeight:600,color:C.text,marginBottom:4}}>…or open an existing Selected Frame quotation</div>
+          <div style={{fontSize:11,color:C.textS,lineHeight:1.5,marginBottom:10}}>Re-open a quotation this builder generated — to add an item, change a price or re-issue it. Recent ones restore exactly; older ones are read from the printed text and the sums checked.</div>
+          <input ref={reopenRef} type="file" accept=".pdf" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(f)openExisting(f);e.target.value=""}}/>
+          <button onClick={()=>reopenRef.current?.click()} disabled={reopening||parsing} style={{padding:"9px 16px",borderRadius:6,border:`1px solid ${C.oak}`,background:C.white,color:C.oak,fontSize:12,fontWeight:600,cursor:reopening?"wait":"pointer",fontFamily:"inherit"}}>{reopening?"Reading…":"Open quotation PDF"}</button>
+          {reopened&&<div style={{fontSize:11,marginTop:8,color:reopened.exact?C.success:C.warn,lineHeight:1.5}}>{reopened.exact?`Restored exactly: ${reopened.project}. Add your items below and export again.`:`Restored from the printed text: ${reopened.project}. Check the amounts before exporting.`}</div>}
         </div>
         {err&&<div style={{marginTop:12,padding:"10px 14px",background:"#FDEAE6",borderRadius:6,fontSize:12,color:C.danger}}>{err}</div>}
       </div>
@@ -729,7 +778,7 @@ Bestseller A/S`;
           )}
         </div>}
         {grand>0&&<div style={{display:"flex",gap:8,marginTop:12}}>
-          <button onClick={exportPDF} style={{flex:1,padding:"14px",borderRadius:8,border:"none",background:C.oak,color:C.white,fontSize:14,fontWeight:600,cursor:"pointer"}}>Export Quotation as PDF →</button>
+          <button onClick={exportPDF} disabled={exporting} style={{flex:1,padding:"14px",borderRadius:8,border:"none",background:exporting?C.steelL:C.oak,color:C.white,fontSize:14,fontWeight:600,cursor:exporting?"wait":"pointer"}}>{exporting?"Rendering PDF…":"Export Quotation as PDF →"}</button>
           <button onClick={()=>setEmailOpen(o=>!o)} style={{padding:"14px 20px",borderRadius:8,border:`1px solid ${C.oak}`,background:emailOpen?C.oak+"15":C.white,color:C.oak,fontSize:14,fontWeight:600,cursor:"pointer"}}>Send via Email ✉</button>
         </div>}
         {grand>0&&emailOpen&&<div style={{marginTop:12,background:C.white,border:`1px solid ${C.surfaceD}`,borderRadius:8,padding:20}}>
