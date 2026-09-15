@@ -185,6 +185,7 @@ export async function processPdf(inputBytes, options) {
     addInfoPage = false,
     infoNotes = '',
     infoImageBytes = null,
+    appendDocs = [],          // [{ name, bytes }] to go in behind the last page
   } = options || {};
 
   const report = {
@@ -278,6 +279,27 @@ export async function processPdf(inputBytes, options) {
     } else {
       report.warnings.push(`Zoning template not found at /${ASSET_PATHS.zoningTemplate}`);
     }
+  }
+
+  // Documents behind the last page — after the zoning template, so the
+  // standard pages stay together and the attachments follow, in the order
+  // given. Copied as they are: an electrical plan or a product sheet is
+  // someone else's document, and stamping a logo over it could cover what it
+  // says. One that cannot be read is skipped with a warning, never fatal.
+  if (appendDocs.length) {
+    report.appendedDocs = [];
+    for (const { name, bytes: docBytes } of appendDocs) {
+      try {
+        const src = await PDFDocument.load(docBytes, { ignoreEncryption: true });
+        const copied = await pdfDoc.copyPages(src, src.getPageIndices());
+        copied.forEach((p) => pdfDoc.addPage(p));
+        report.appendedDocs.push({ name, pages: copied.length });
+        report.appendedPages += copied.length;
+      } catch (e) {
+        report.warnings.push(`"${name}" could not be appended (${e.message})`);
+      }
+    }
+    if (report.appendedDocs.length) report.operations.push('append-documents');
   }
 
   const bytes = await pdfDoc.save();

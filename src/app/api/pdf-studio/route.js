@@ -49,11 +49,19 @@ export async function POST(request) {
     addInfoPage = false,
     infoNotes = '',
     infoImageUrl = null,
+    appendUrls = [],
     folderId = null,
   } = payload || {};
 
+  // Documents to go in behind the last page: [{ name, url }] uploaded to Blob
+  // by the browser, ten at most.
+  const wantedAppends = (Array.isArray(appendUrls) ? appendUrls : [])
+    .map((a) => (typeof a === 'string' ? { name: 'document.pdf', url: a } : { name: String(a?.name || 'document.pdf'), url: a?.url }))
+    .filter((a) => typeof a.url === 'string' && a.url)
+    .slice(0, 10);
+
   if (!blobUrl || typeof blobUrl !== 'string') return bad('Missing blobUrl');
-  if (!replaceLogos && !updateContact && !appendZoning && !addInfoPage) {
+  if (!replaceLogos && !updateContact && !appendZoning && !addInfoPage && !wantedAppends.length) {
     return bad('Select at least one operation');
   }
 
@@ -98,6 +106,22 @@ export async function POST(request) {
     }
   }
 
+  // Fetch the documents to append. One that cannot be fetched is skipped with
+  // a warning rather than failing the whole draft — the rest still land.
+  const appendDocs = [];
+  const appendWarnings = [];
+  for (const { name, url } of wantedAppends) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`fetch ${res.status}`);
+      const ab = await res.arrayBuffer();
+      if (ab.byteLength > MAX_BYTES) throw new Error('over 50 MB');
+      appendDocs.push({ name, bytes: new Uint8Array(ab) });
+    } catch (e) {
+      appendWarnings.push(`"${name}" was not appended (${e.message})`);
+    }
+  }
+
   let bytes, report;
   try {
     ({ bytes, report } = await processPdf(inputBytes, {
@@ -107,14 +131,16 @@ export async function POST(request) {
       addInfoPage,
       infoNotes: typeof infoNotes === 'string' ? infoNotes.slice(0, 4000) : '',
       infoImageBytes,
+      appendDocs,
     }));
     if (payload._imageWarning) report.warnings.push(payload._imageWarning);
+    report.warnings.push(...appendWarnings);
   } catch (e) {
     return bad(`PDF processing failed: ${e.message || e}`, 500);
   }
 
   // Clean up the uploads — they have served their purpose.
-  for (const url of [blobUrl, infoImageUrl]) {
+  for (const url of [blobUrl, infoImageUrl, ...wantedAppends.map((a) => a.url)]) {
     if (!url) continue;
     try {
       await del(url);

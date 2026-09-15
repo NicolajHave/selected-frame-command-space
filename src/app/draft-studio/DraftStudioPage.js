@@ -347,6 +347,8 @@ export default function DraftStudioPage() {
   // For the concept information page: free text and an optional picture.
   const [infoNotes, setInfoNotes] = useState("");
   const [infoImage, setInfoImage] = useState(null);
+  // PDFs to go in behind the last page, in the order listed.
+  const [appendFiles, setAppendFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [busyStage, setBusyStage] = useState(null); // "uploading" | "processing"
   const [error, setError] = useState(null);
@@ -381,7 +383,7 @@ export default function DraftStudioPage() {
       setError("Choose a PDF first");
       return;
     }
-    const anyOp = opts.replaceLogos || opts.updateContact || opts.appendZoning || opts.addInfoPage;
+    const anyOp = opts.replaceLogos || opts.updateContact || opts.appendZoning || opts.addInfoPage || appendFiles.length > 0;
     if (!anyOp) {
       setError("Select at least one operation");
       return;
@@ -411,6 +413,17 @@ export default function DraftStudioPage() {
         infoImageUrl = img.url;
       }
 
+      // Documents to append go up the same way, in the order listed.
+      const appendUrls = [];
+      for (const f of appendFiles) {
+        const up = await upload(`pdf-studio/${Date.now()}-append-${f.name}`, f, {
+          access: "public",
+          handleUploadUrl: "/api/pdf-studio/upload",
+          contentType: "application/pdf",
+        });
+        appendUrls.push({ name: f.name, url: up.url });
+      }
+
       // 2. Ask the server to process the blob and stream the result back.
       setBusyStage("processing");
       const res = await fetch("/api/pdf-studio", {
@@ -425,6 +438,7 @@ export default function DraftStudioPage() {
           addInfoPage: opts.addInfoPage,
           infoNotes: opts.addInfoPage ? infoNotes : "",
           infoImageUrl,
+          appendUrls,
           folderId: folderId || null,
         }),
       });
@@ -463,7 +477,7 @@ export default function DraftStudioPage() {
   };
 
   const canSubmit =
-    !!file && !busy && (opts.replaceLogos || opts.updateContact || opts.appendZoning || opts.addInfoPage);
+    !!file && !busy && (opts.replaceLogos || opts.updateContact || opts.appendZoning || opts.addInfoPage || appendFiles.length > 0);
 
   return (
     <div style={{ maxWidth: 760 }}>
@@ -552,6 +566,45 @@ export default function DraftStudioPage() {
                 />
               </div>
             )}
+            <div style={{ marginTop: 14, padding: "14px 16px", background: C.surface, borderRadius: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.textS, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 8 }}>
+                Append PDFs after the last page
+              </div>
+              <div style={{ fontSize: 12, color: C.textS, lineHeight: 1.55, marginBottom: 10 }}>
+                Electrical plans, product sheets — anything that belongs behind the draft. Added in the order listed, after the zoning template if that is on, and left as they are: no logo is stamped on them.
+              </div>
+              <input
+                type="file"
+                accept=".pdf,application/pdf"
+                multiple
+                disabled={busy}
+                onChange={(e) => {
+                  const picked = Array.from(e.target.files || []).filter((f) => /\.pdf$/i.test(f.name));
+                  setAppendFiles((p) => [...p, ...picked]);
+                  e.target.value = "";
+                }}
+                style={{ fontSize: 13, color: C.text }}
+              />
+              {appendFiles.length > 0 && (
+                <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                  {appendFiles.map((f, i) => (
+                    <div key={`${f.name}-${i}`} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: C.text }}>
+                      <span style={{ color: C.textS, fontFamily: "'DM Mono',monospace", width: 18 }}>{i + 1}.</span>
+                      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
+                      <span style={{ color: C.textS }}>{formatBytes(f.size)}</span>
+                      <button
+                        onClick={() => setAppendFiles((p) => p.filter((_, j) => j !== i))}
+                        disabled={busy}
+                        title="Remove"
+                        style={{ background: "none", border: "none", color: C.textS, cursor: "pointer", fontSize: 15, lineHeight: 1, padding: "0 4px" }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {error && (
