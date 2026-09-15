@@ -43,6 +43,8 @@ Bigger features live in their own directory and are imported into it.
 | `src/app/toolbox/` | Partner email templates (6 languages) |
 | `src/app/draft-studio/` | Conditions supplier draft PDFs to the Selected Frame standard — logos, contact line, zoning, concept info page. Pipeline in `src/lib/pdf-studio.js` |
 | `src/app/concept-requests/` | Concept input register — form + triage, mails via Power Automate |
+| `src/app/assistant/` | Front-page assistant — grounded answers from Standards, Toolbox and News; prompt built in `src/lib/assistant/knowledge.js` |
+| `src/lib/quotation-reopen.js` | Reads an older quotation back from its printed text (newer ones restore from embedded data) |
 | `src/app/embed/project-intake/` | Chrome-free intake form for iframe embedding |
 | `src/data/toolboxTemplates.js` | Email template copy |
 | `src/app/standards-content.js` | Standards page content + element catalogue |
@@ -154,6 +156,20 @@ To debug a parse, replay the real PDF rather than guessing:
 the `lines` array, then call the route's `POST` with
 `{ json: async () => ({ lines }) }`.
 
+**Re-opening a quotation.** A generated quotation carries its own data in the
+PDF's Info dictionary (`SelectedFrameQuotation`, read by pdf.js as
+`info.Custom`), so it re-opens exactly. The download is the server-rendered
+PDF — the print window was removed because a browser-printed document has no
+data in it and cannot be re-opened.
+
+Older documents are parsed from their text by `src/lib/quotation-reopen.js`,
+and the amounts are summed against the document's own total — a mismatch is an
+error, same rule as the supplier parser. **pdf.js hands each line over in
+drawing order, not left-to-right**: the pdf-lib meta block reads
+`12 Aug 2026 DATE`. Anything parsing our own PDFs must match
+order-insensitively. `rawName` rides along in the itemised annex because the
+hanger rules match on the supplier's wording.
+
 ## Showroom Ops — how a season is planned
 
 A season is planned by ticking showrooms in **Sales List**; everything
@@ -239,6 +255,23 @@ the same points, phrased as what the site will need rather than as
 confirmations, because a draft goes out before anything is agreed. When the
 concept changes — the NCS wall colour, the electrical arrangement — change
 both.
+
+## Front-page assistant
+
+`src/lib/assistant/knowledge.js` builds the system prompt from the same files
+the pages render from, so Standards, Toolbox and News follow automatically on
+deploy. The one hand-written piece is `src/data/assistant-guide.js` — what each
+page is for and how a project runs; a new page gets a line there. The prompt
+must be **deterministic** (no timestamps, no ids): it is cached by exact prefix
+for an hour, and the route logs `cache_read` so a silent invalidator shows up
+as zero.
+
+Answers link to pages as `[[page-id|Label]]`, rendered by the card as
+navigation buttons — that is what makes it a way to find things rather than a
+chat window. Passwords and approval codes are **not in the prompt**; the surest
+way for the assistant not to reveal one is for it not to know it. Model is
+`claude-sonnet-5` at low effort, the user's choice. Live project data is out of
+scope for now.
 
 ## Blob uploads
 
@@ -330,6 +363,7 @@ rather than writing half a report.
 | `OPENING_REPORT_ADMIN_CODE` | Optional; the delete / approve code, defaults to `1234` |
 | `RETENTION_DAYS`, `RETENTION_REMINDER_EMAIL`, `CRON_SECRET` | Folder retention job |
 | `EMBED_ALLOWED_ORIGINS` | Restricts who may iframe `/embed/*` (unset = any) |
+| `ANTHROPIC_API_KEY` | The front-page assistant; a separate key per app keeps usage attributable |
 
 Integrations are **best-effort**: a failing webhook, Asana call or folder copy
 must never fail the user's submission. Report the outcome instead.
@@ -344,7 +378,9 @@ must never fail the user's submission. Report the outcome instead.
   the next PR from it fails with "Pull Request has merge conflicts" even when
   nothing really conflicts. Reset onto main and replay instead of merging:
   `git fetch origin main && git checkout -B <branch> origin/main`, then
-  cherry-pick the new commits and force-with-lease push.
+  cherry-pick the new commits and force-with-lease push. Fetch the *branch*
+  too, not only `main` — with only `main` fetched the lease is stale and the
+  push is rejected with "stale info".
 - Verify with `npm run build` before committing. For pure logic (filename
   generation, PDF building, sanitisation) also run it directly with `node` —
   a green build does not prove the logic is right.
