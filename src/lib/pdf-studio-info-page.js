@@ -54,25 +54,58 @@ export const INFO_PAGE_COPY = {
   notesHeading: 'Notes for this draft',
 };
 
-/** Word-wrap into lines no wider than `max` at `size`. Text is already safe. */
-function wrap(text, font, size, max) {
+/**
+ * Word-wrap one already-sanitised paragraph — no newlines in it by this point.
+ */
+function wrapOne(text, font, size, max) {
+  const words = String(text).split(/\s+/).filter(Boolean);
+  if (!words.length) return [''];
   const lines = [];
-  for (const para of String(text).split(/\r?\n/)) {
-    const words = para.split(/\s+/).filter(Boolean);
-    if (!words.length) { lines.push(''); continue; }
-    let line = '';
-    for (const w of words) {
-      const next = line ? `${line} ${w}` : w;
-      if (font.widthOfTextAtSize(next, size) > max && line) {
-        lines.push(line);
-        line = w;
-      } else {
-        line = next;
-      }
+  let line = '';
+  for (const w of words) {
+    const next = line ? `${line} ${w}` : w;
+    if (font.widthOfTextAtSize(next, size) > max && line) {
+      lines.push(line);
+      line = w;
+    } else {
+      line = next;
     }
-    if (line) lines.push(line);
   }
+  if (line) lines.push(line);
   return lines;
+}
+
+/**
+ * Word-wrap into lines no wider than `max` at `size`, keeping line breaks.
+ *
+ * Splits on newlines FIRST and sanitises each line after. safeText drops every
+ * character below 0x20 — a newline included — so sanitising the whole block up
+ * front silently glued the lines together into one run of text.
+ */
+function wrap(text, font, size, max) {
+  return String(text)
+    .split(/\r?\n/)
+    .flatMap((para) => wrapOne(safeText(para), font, size, max));
+}
+
+/**
+ * Notes as the writer typed them: one line per line, blank lines kept, and a
+ * line starting with "-", "*" or "•" rendered as a bullet with its wrapped
+ * continuation lines indented under the text rather than under the bullet.
+ */
+function layoutNotes(text, font, size, max, indent) {
+  const out = [];
+  for (const raw of String(text).split(/\r?\n/)) {
+    const line = safeText(raw).trim();
+    if (!line) { out.push({ text: '', bullet: false, indent: 0 }); continue; }
+    const m = line.match(/^[-*•]\s*(.*)$/);
+    const body = m ? m[1] : line;
+    if (m && !body) { out.push({ text: '', bullet: false, indent: 0 }); continue; }
+    wrapOne(body, font, size, m ? max - indent : max).forEach((t, i) => {
+      out.push({ text: t, bullet: Boolean(m) && i === 0, indent: m ? indent : 0 });
+    });
+  }
+  return out;
 }
 
 /**
@@ -188,15 +221,21 @@ export function insertInfoPage(pdfDoc, { fonts, notes = '', image = null, bottom
     // Cap at what fits above the reserved corner; say so rather than let the
     // last lines vanish under the logo.
     const maxLines = Math.max(0, Math.floor((ry - rightBottom) / lead));
-    let lines = wrap(safeText(trimmed), regular, base, rightW);
+    let lines = layoutNotes(trimmed, regular, base, rightW, base * 1.1);
     if (lines.length > maxLines) {
       lines = lines.slice(0, maxLines);
-      if (lines.length) lines[lines.length - 1] = `${lines[lines.length - 1].replace(/\s+\S*$/, '')} …`;
+      const last = lines[lines.length - 1];
+      if (last?.text) last.text = `${last.text.replace(/\s+\S*$/, '')} …`;
       warnings.push(`Notes were cut to ${maxLines} lines to fit the page`);
     }
     for (const line of lines) {
-      page.drawText(line, { x: rightX, y: ry, size: base, font: regular, color: INK });
-      ry -= lead;
+      if (line.bullet) {
+        page.drawText('•', { x: rightX, y: ry, size: base, font: regular, color: OAK });
+      }
+      if (line.text) {
+        page.drawText(line.text, { x: rightX + line.indent, y: ry, size: base, font: regular, color: INK });
+      }
+      ry -= lead;   // a blank line still takes a line, so paragraphs stay apart
     }
   }
 

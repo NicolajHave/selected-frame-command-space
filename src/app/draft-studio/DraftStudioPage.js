@@ -557,11 +557,14 @@ export default function DraftStudioPage() {
                 <div style={{ fontSize: 11, fontWeight: 600, color: C.textS, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 6 }}>
                   Notes for this draft · optional
                 </div>
+                <div style={{ fontSize: 11, color: C.textS, lineHeight: 1.5, marginBottom: 6 }}>
+                  Line breaks come through to the PDF. Start a line with <strong>-</strong> for a bullet.
+                </div>
                 <textarea
                   value={infoNotes}
                   disabled={busy}
                   onChange={(e) => setInfoNotes(e.target.value.slice(0, 4000))}
-                  placeholder="Anything specific to this partner or site that the drawings do not say on their own."
+                  placeholder={"Anything specific to this partner or site that the drawings do not say on their own.\n\n- Hero wall moves to the left-hand side\n- Ceiling height 2.7 m"}
                   style={{ width: "100%", minHeight: 96, padding: "9px 12px", borderRadius: 6, border: `1px solid ${infoNotes ? C.oak : C.surfaceD}`, fontSize: 13, background: C.white, color: C.text, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }}
                 />
               </div>
