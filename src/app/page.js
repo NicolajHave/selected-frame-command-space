@@ -1,7 +1,7 @@
 "use client";
 import { SECTIONS as SF_SECTIONS, INTRO as SF_INTRO, DNA as SF_DNA, NON_NEGOTIABLES as SF_NON_NEGOTIABLES, SPACE_MANAGEMENT as SF_SPACE_MANAGEMENT, BRAND_APPLICATION as SF_BRAND_APPLICATION, FIXTURES as SF_FIXTURES, MERCHANDISING as SF_MERCHANDISING, PLAYBOOKS as SF_PLAYBOOKS, EXCEPTIONS as SF_EXCEPTIONS } from "./standards-content";
 import ConceptRequestsPage from "./concept-requests/ConceptRequestsPage";
-import AssistantCard from "./assistant/AssistantCard";
+import AssistantWidget from "./assistant/AssistantWidget";
 import DraftStudioPage from "./draft-studio/DraftStudioPage";
 import ToolboxPage from "./toolbox/ToolboxPage";
 import ProjectIntakePage from "./project-intake/ProjectIntakePage";
@@ -117,7 +117,6 @@ const OverviewPage=({projects,setPage,setDetail})=>{const active=projects.filter
     <div style={{fontSize:12,fontWeight:600,color:C.oak,letterSpacing:".5px",whiteSpace:"nowrap"}}>Open →</div>
   </div>
   <NewsSection setPage={setPage}/>
-  <AssistantCard setPage={setPage}/>
   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginBottom:32}}>
     <div><Title sub="Nearest deadlines">Upcoming</Title><div style={{background:C.white,borderRadius:8,border:`1px solid ${C.surfaceD}`}}>{upcoming.slice(0,6).map((p,i)=><div key={p.gid} style={{padding:"14px 20px",borderBottom:i<5?`1px solid ${C.surfaceD}`:"none",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}} onClick={()=>{setDetail(p);setPage("projects")}}><div><div style={{fontSize:13,fontWeight:500,color:C.text}}>{p.name}</div><div style={{fontSize:11,color:C.textS,marginTop:2}}>{p.type}</div></div><div style={{fontSize:13,fontWeight:500,color:C.oak}}>{fmtDate(p.dueOn)}</div></div>)}{!upcoming.length&&<div style={{padding:20,fontSize:13,color:C.textS,textAlign:"center"}}>No upcoming deadlines</div>}</div></div>
     <div><Title sub="Selected Frame in action">The Concept</Title><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>{IMG.slice(0,4).map((s,i)=><div key={i} style={{borderRadius:8,overflow:"hidden",aspectRatio:"4 / 3"}}><img src={s} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div>)}</div></div>
@@ -1441,6 +1440,7 @@ export default function Home(){const [page,setPage]=useState("overview");const [
   ];
   const nav=navSections.flatMap(s=>s.items);
   return<div style={{display:"flex",minHeight:"100vh",background:C.surface}}>
+    <AssistantWidget setPage={setPage}/>
     <div style={{width:220,background:C.black,color:C.white,flexShrink:0,display:"flex",flexDirection:"column",padding:"28px 0",position:"sticky",top:0,height:"100vh"}}>
       <div style={{padding:"0 24px",marginBottom:32}}><img src={LOGO_WHITE} alt="" style={{height:28,marginBottom:8}}/><div style={{fontSize:9,color:C.steel,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:4}}>Command Space</div></div>
       <div style={{flex:1,display:"flex",flexDirection:"column",overflowY:"auto"}}>

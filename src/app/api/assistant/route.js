@@ -102,9 +102,12 @@ export async function POST(request) {
         }
       } catch (e) {
         // The stream is already open, so the error travels as text.
+        // A billing problem arrives as a 400, which would otherwise read as a
+        // bug in the request. Say what it actually is and where it is fixed.
         const msg =
           e instanceof Anthropic.RateLimitError ? 'The assistant is busy — try again in a moment.'
           : e instanceof Anthropic.AuthenticationError ? 'The assistant’s API key was rejected.'
+          : /credit balance/i.test(e?.message || '') ? 'The assistant’s API account has no credits. Add credits under Plans & Billing in the Anthropic Console, and it will answer.'
           : e instanceof Anthropic.APIError ? `The assistant hit an error (${e.status}).`
           : 'The assistant hit an error.';
         controller.enqueue(encoder.encode(`\n\n${msg}`));
