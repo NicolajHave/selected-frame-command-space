@@ -2,6 +2,7 @@
 import { SECTIONS as SF_SECTIONS, INTRO as SF_INTRO, DNA as SF_DNA, NON_NEGOTIABLES as SF_NON_NEGOTIABLES, SPACE_MANAGEMENT as SF_SPACE_MANAGEMENT, BRAND_APPLICATION as SF_BRAND_APPLICATION, FIXTURES as SF_FIXTURES, MERCHANDISING as SF_MERCHANDISING, PLAYBOOKS as SF_PLAYBOOKS, EXCEPTIONS as SF_EXCEPTIONS } from "./standards-content";
 import ConceptRequestsPage from "./concept-requests/ConceptRequestsPage";
 import AssistantWidget from "./assistant/AssistantWidget";
+import { parseAmountInput, pctForAmount } from "../lib/money-input";
 import DraftStudioPage from "./draft-studio/DraftStudioPage";
 import ToolboxPage from "./toolbox/ToolboxPage";
 import ProjectIntakePage from "./project-intake/ProjectIntakePage";
@@ -306,6 +307,16 @@ const HANGER_BUFFER_PCT=25;
 // grand total by percentage. Lives in the right column of the Quotation Builder.
 const CostSplitCard=({grand,split,setSplit,splitOn,setSplitOn,amounts,sum,valid,money})=>{
   const setAt=(i,patch)=>setSplit(p=>p.map((x,j)=>j===i?{...x,...patch}:x));
+  // A share can be given either way round: type the percentage, or type the
+  // amount. Percentage stays the stored value — it is what the PDF prints and
+  // what survives re-opening a quotation — so a typed amount is converted to
+  // the shortest percentage that gives that exact amount back.
+  const [amtDraft,setAmtDraft]=useState(null); // {i, v} while a box is being typed in
+  const typeAmount=(i,v)=>{
+    setAmtDraft({i,v});
+    const n=parseAmountInput(v);
+    if(n!==null)setAt(i,{pct:pctForAmount(n,grand)});
+  };
   const removeAt=(i)=>setSplit(p=>p.length<=2?p:p.filter((_,j)=>j!==i));
   const addParty=()=>setSplit(p=>p.length>=3?p:[...p,{label:p.length===2?"Third party":`Party ${p.length+1}`,pct:"0"}]);
   const setPcts=(arr)=>setSplit(p=>p.map((x,i)=>({...x,pct:String(arr[i]??x.pct)})));
@@ -323,13 +334,21 @@ const CostSplitCard=({grand,split,setSplit,splitOn,setSplitOn,amounts,sum,valid,
             <button key={l} onClick={()=>setPcts(arr)} style={{fontSize:11,fontWeight:500,padding:"5px 10px",borderRadius:14,border:`1px solid ${C.surfaceD}`,background:C.white,color:C.text,cursor:"pointer"}}>{l}</button>)}
           <button onClick={evenSplit} style={{fontSize:11,fontWeight:500,padding:"5px 10px",borderRadius:14,border:`1px solid ${C.surfaceD}`,background:C.white,color:C.text,cursor:"pointer"}}>Even</button>
         </div>
+        <div style={{fontSize:11,color:C.textS,marginBottom:10,lineHeight:1.5}}>Type a percentage or an amount — the other follows.</div>
         {split.map((p,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
           <input value={p.label} onChange={e=>setAt(i,{label:e.target.value})} placeholder="Party" style={{flex:1,minWidth:0,padding:"7px 10px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,outline:"none"}}/>
           <div style={{display:"flex",alignItems:"center",gap:2}}>
             <input value={p.pct} onChange={e=>setAt(i,{pct:e.target.value})} type="text" inputMode="decimal" style={{width:48,padding:"7px 6px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,textAlign:"right",outline:"none"}}/>
             <span style={{fontSize:13,color:C.textS}}>%</span>
           </div>
-          <div style={{minWidth:78,textAlign:"right",fontSize:13,fontWeight:600,color:C.text}}>{money(amounts[i])}</div>
+          <input
+            value={amtDraft?.i===i?amtDraft.v:money(amounts[i])}
+            onChange={e=>typeAmount(i,e.target.value)}
+            onFocus={e=>{setAmtDraft({i,v:String(amounts[i]??0)});e.target.select()}}
+            onBlur={()=>setAmtDraft(null)}
+            type="text" inputMode="decimal" title="Type an amount and the percentage follows"
+            style={{width:92,padding:"7px 8px",borderRadius:6,border:`1px solid ${C.surfaceD}`,fontSize:13,fontWeight:600,textAlign:"right",outline:"none",color:C.text}}
+          />
           {split.length>2&&<button onClick={()=>removeAt(i)} style={{background:"none",border:"none",color:C.danger,cursor:"pointer",fontSize:16,lineHeight:1}}>×</button>}
         </div>)}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10,paddingTop:10,borderTop:`1px solid ${C.surfaceD}`}}>
